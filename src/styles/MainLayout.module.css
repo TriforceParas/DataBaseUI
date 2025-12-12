@@ -1,0 +1,336 @@
+.container {
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+    width: 100vw;
+    color: var(--text-primary);
+}
+
+.navBar {
+    height: 44px;
+    border-bottom: 1px solid var(--border-color);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0 1rem;
+    background-color: var(--bg-secondary);
+}
+
+.navGroup {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.iconBtn {
+    width: 28px;
+    height: 28px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: var(--radius-sm);
+    color: var(--text-secondary);
+    transition: all 0.2s;
+    background: transparent;
+    border: none;
+    cursor: pointer;
+}
+
+.iconBtn:hover {
+    background-color: var(--bg-tertiary);
+    color: var(--text-primary);
+}
+
+.verticalDivider {
+    width: 1px;
+    height: 20px;
+    background-color: var(--border-color);
+    margin: 0 0.5rem;
+}
+
+.outlineBtn {
+    height: 28px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: var(--radius-sm);
+    color: var(--text-secondary);
+    transition: all 0.2s;
+    background: transparent;
+    border: 1px solid var(--border-color);
+    cursor: pointer;
+    padding: 0 0.75rem;
+    font-size: 0.85rem;
+    font-weight: 500;
+}
+
+.outlineBtn:hover {
+    background-color: var(--bg-tertiary);
+    color: var(--text-primary);
+    border-color: var(--text-primary);
+}
+
+/* Sidebar Styles */
+.sidebarConnection {
+    padding: 1rem;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    cursor: pointer;
+    color: var(--text-primary);
+}
+
+.sidebarConnection:hover {
+    background-color: var(--bg-tertiary);
+}
+
+.sidebarControls {
+    padding: 0 1rem 1rem 1rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.filterToggle {
+    background-color: var(--bg-tertiary);
+    border-radius: 4px;
+    padding: 2px;
+    display: flex;
+}
+
+.filterBtn,
+.filterBtnActive {
+    border: none;
+    background: transparent;
+    color: var(--text-secondary);
+    padding: 2px 8px;
+    font-size: 0.75rem;
+    cursor: pointer;
+    border-radius: 2px;
+}
+
+.filterBtnActive {
+    background-color: var(--bg-primary);
+    /* or lighter accent */
+    color: var(--text-primary);
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+}
+
+.newTagBtn {
+    background: transparent;
+    border: none;
+    color: var(--text-secondary);
+    font-size: 0.8rem;
+    cursor: pointer;
+    opacity: 0.8;
+}
+
+.newTagBtn:hover {
+    opacity: 1;
+    color: var(--text-primary);
+}
+
+/* Tab Bar */
+.tabBar {
+    height: 40px;
+    background-color: var(--bg-primary);
+    /* Matches content bg in image mostly */
+    display: flex;
+    align-items: center;
+    border-bottom: 1px solid var(--border-color);
+    padding-left: 0;
+}
+
+.dbDropdown {
+    padding: 0 1rem;
+    border-right: 1px solid var(--border-color);
+    height: 100%;
+    display: flex;
+    align-items: center;
+    font-size: 0.9rem;
+    font-weight: 600;
+    cursor: pointer;
+    background: transparent;
+    color: var(--text-primary);
+}
+
+.tabsContainer {
+    flex: 1;
+    display: flex;
+    overflow-x: auto;
+    gap: 4px;
+}
+
+.tab {
+    padding: 0 1rem;
+    height: 32px;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    border-radius: 4px 4px 0 0;
+    font-size: 0.85rem;
+    cursor: pointer;
+    background-color: transparent;
+    color: var(--text-secondary);
+    white-space: nowrap;
+    border: 1px solid transparent;
+}
+
+.tab:hover {
+    background-color: var(--bg-tertiary);
+    color: var(--text-primary);
+}
+
+.tab.active {
+    background-color: var(--bg-tertiary);
+    /* Active tab usually lighter or distinct */
+    color: var(--text-primary);
+    border: 1px solid var(--border-color);
+    border-bottom: none;
+    position: relative;
+    top: 1px;
+    /* Cover border */
+}
+
+.tabClose {
+    font-size: 1.2rem;
+    line-height: 0.5;
+    margin-left: 5px;
+    opacity: 0.5;
+}
+
+.tabClose:hover {
+    opacity: 1;
+}
+
+/* Toolbar Actions */
+.tableToolbar {
+    display: flex;
+    align-items: center;
+    padding: 0.5rem 1rem;
+    border-bottom: 1px solid var(--border-color);
+    gap: 0.5rem;
+    background-color: var(--bg-secondary);
+}
+
+.primaryBtn {
+    background-color: #3b82f6;
+    /* Blue */
+    color: white;
+    border: none;
+    padding: 0.4rem 1rem;
+    border-radius: 4px;
+    font-size: 0.9rem;
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    cursor: pointer;
+}
+
+.primaryBtn:hover {
+    background-color: #2563eb;
+}
+
+.toolbarBtn {
+    background: transparent;
+    border: none;
+    color: var(--text-primary);
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    padding: 0.4rem 0.6rem;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 0.9rem;
+}
+
+.toolbarBtn:hover {
+    background-color: var(--bg-tertiary);
+}
+
+/* Layout Containers */
+.body {
+    flex: 1;
+    display: flex;
+    overflow: hidden;
+}
+
+.sidebar {
+    width: 250px;
+    border-right: 1px solid var(--border-color);
+    background-color: var(--bg-secondary);
+    display: flex;
+    flex-direction: column;
+    transition: width 0.3s ease, opacity 0.3s ease;
+}
+
+.sidebar.closed {
+    width: 0;
+    border: none;
+    opacity: 0;
+    overflow: hidden;
+}
+
+.content {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    background-color: var(--bg-primary);
+    overflow: hidden;
+    position: relative;
+}
+
+.tableList {
+    flex: 1;
+    overflow-y: auto;
+    padding: 0 0.5rem;
+}
+
+.tableItem {
+    display: flex;
+    align-items: center;
+    padding: 0.5rem 0.75rem;
+    cursor: pointer;
+    border-radius: var(--radius-sm);
+    color: var(--text-secondary);
+    font-size: 0.9rem;
+}
+
+.tableItem:hover {
+    background-color: var(--bg-tertiary);
+    color: var(--text-primary);
+}
+
+.mainView {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+/* Form */
+.formContainer {
+    max-width: 600px;
+    margin: 2rem auto;
+    background: var(--bg-secondary);
+    padding: 2rem;
+    border-radius: var(--radius-md);
+    border: 1px solid var(--border-color);
+}
+
+.dangerBtn {
+    background-color: #ef4444;
+    color: white;
+    border: none;
+    padding: 0.4rem 1rem;
+    border-radius: 4px;
+    font-size: 0.9rem;
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    cursor: pointer;
+}
+
+.dangerBtn:hover {
+    background-color: #dc2626;
+}

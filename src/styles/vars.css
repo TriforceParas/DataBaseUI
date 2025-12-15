@@ -1,9 +1,10 @@
 :root {
-  /* Colors - Premium Dark Theme */
+  /* Colors - Default (Blue/Premium Dark) */
   --bg-primary: #0f111a;
   --bg-secondary: #1a1d2d;
   --bg-tertiary: #25293a;
-  --accent-primary: #6366f1; /* Indigo */
+  --accent-primary: #6366f1;
+  /* Indigo */
   --accent-secondary: #818cf8;
   --accent-hover: #4f46e5;
   --text-primary: #f8fafc;
@@ -30,8 +31,35 @@
   --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
   --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1);
   --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1);
-  
+
   /* Fonts */
   --font-sans: 'Inter', system-ui, -apple-system, sans-serif;
   --font-mono: 'JetBrains Mono', 'Fira Code', monospace;
+}
+
+[data-theme='gray'] {
+  --bg-primary: #202020;
+  --bg-secondary: #2d2d2d;
+  --bg-tertiary: #3a3a3a;
+  --border-color: #404040;
+  --input-bg: #2d2d2d;
+}
+
+[data-theme='amoled'] {
+  --bg-primary: #000000;
+  --bg-secondary: #121212;
+  --bg-tertiary: #1e1e1e;
+  --border-color: #333333;
+  --input-bg: #121212;
+}
+
+[data-theme='light'] {
+  --bg-primary: #ffffff;
+  --bg-secondary: #f8fafc;
+  --bg-tertiary: #e2e8f0;
+  --text-primary: #0f172a;
+  --text-secondary: #475569;
+  --text-muted: #94a3b8;
+  --border-color: #e2e8f0;
+  --input-bg: #ffffff;
 }

@@ -4,7 +4,7 @@ import { Connection, Tag, TableTag } from '../types';
 import { ChevronDown, Table, Check, Plus, Trash2 } from 'lucide-react';
 import { invoke } from '@tauri-apps/api/core';
 import { TagManager } from './TagManager';
-import { DndContext, useDraggable, useDroppable, DragEndEvent } from '@dnd-kit/core';
+import { DndContext, useDraggable, useDroppable, DragEndEvent, useSensor, useSensors, PointerSensor, KeyboardSensor } from '@dnd-kit/core';
 
 interface SidebarProps {
     sidebarOpen: boolean;
@@ -14,13 +14,14 @@ interface SidebarProps {
     onSwitchConnection: (conn: Connection) => void;
     onTableClick: (tableName: string) => void;
     onAddConnection: () => void;
+    refreshTrigger: number;
 }
 
 // Draggable Table Item
-const DraggableTableItem = ({ table, onClick }: { table: string; onClick: () => void }) => {
+const DraggableTableItem = ({ table, onClick, fromTagId }: { table: string; onClick: () => void; fromTagId?: number | null }) => {
     const { attributes, listeners, setNodeRef, transform } = useDraggable({
         id: `table-${table}`,
-        data: { tableName: table }
+        data: { tableName: table, fromTagId }
     });
 
     // Simple transform style if needed during drag, customized via DndContext usually
@@ -60,7 +61,7 @@ const TagGroup = ({ tag, tables, onTableClick, color }: { tag: Tag | null, table
                 <span style={{ marginLeft: 'auto', opacity: 0.5 }}>{tables.length}</span>
             </div>
             {tables.map(table => (
-                <DraggableTableItem key={table} table={table} onClick={() => onTableClick(table)} />
+                <DraggableTableItem key={table} table={table} onClick={() => onTableClick(table)} fromTagId={tag ? tag.id : null} />
             ))}
         </div>
     );
@@ -69,7 +70,7 @@ const TagGroup = ({ tag, tables, onTableClick, color }: { tag: Tag | null, table
 
 export const Sidebar: React.FC<SidebarProps> = ({
     sidebarOpen, connection, tables, savedConnections,
-    onSwitchConnection, onTableClick, onAddConnection
+    onSwitchConnection, onTableClick, onAddConnection, refreshTrigger
 }) => {
     const [viewMode, setViewMode] = useState<'az' | 'tags'>('az');
     const [showConnDropdown, setShowConnDropdown] = useState(false);
@@ -77,12 +78,18 @@ export const Sidebar: React.FC<SidebarProps> = ({
     const [tableTags, setTableTags] = useState<TableTag[]>([]);
     const [showTagManager, setShowTagManager] = useState(false);
 
+    // DnD Sensors for Sidebar
+    const sensors = useSensors(
+        useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
+        useSensor(KeyboardSensor, {} as any) // sortableKeyboardCoordinates might need simple setup or ignore if not sortable list
+    );
+
+
     useEffect(() => {
-        if (viewMode === 'tags') {
-            fetchTags();
-            fetchTableTags();
-        }
-    }, [viewMode, connection]);
+        // Always fetch tags so colors are available even in AZ mode
+        fetchTags();
+        fetchTableTags();
+    }, [connection, refreshTrigger]);
 
     const fetchTags = async () => {
         try {
@@ -103,43 +110,28 @@ export const Sidebar: React.FC<SidebarProps> = ({
         if (!over) return;
 
         const tableName = active.data.current?.tableName;
-        const tagId = over.data.current?.tagId; // number or null
+        const fromTagId = active.data.current?.fromTagId;
+        const toTagId = over.data.current?.tagId;
 
-        if (tagId !== undefined && tableName) {
-            // If tagId is null, it means "Untagged". We should remove existing tags for this table?
-            // User said "all the tables in the tag are we will be able to drag and add to a tag"
-            // Assuming moving to Untagged means removing tag.
+        if (tableName && toTagId !== undefined) {
+            if (fromTagId === toTagId) return;
+
             try {
-                if (tagId === null) {
-                    // Remove current tag? We need to know which tag it came from?
-                    // Or we just delete all tags for this table and connection?
-                    // Currently model allows multiple tags but UI implies single group.
-                    // For logic simplicity, assuming 1 tag per table for this view or we assign new tag.
-                    // But if we drop on untagged, we probably want to remove tags. 
-                    // Let's implement 'remove tag' if supported, or just ignore if multi-tag.
-                    // User requirements imply grouping. "The tags are like group".
+                // Remove from old tag if exists
+                if (fromTagId !== null && fromTagId !== undefined) {
+                    await invoke('remove_tag_from_table', {
+                        connectionId: connection.id,
+                        tableName: tableName,
+                        tagId: fromTagId
+                    });
+                }
 
-                    // Let's find current tag for this table and delete it?
-                    // Ideally we should just clear tags for this table on this connection.
-                    // We don't have a 'clear_tags' command. I'll stick to 'assign_tag' for now.
-                    // Wait, I can't assign to null.
-
-                    // Actually, if I drop on a Tag, I assign.
-                    // If I drop on Untagged, I should remove tags.
-                    const currentTag = tableTags.find(tt => tt.table_name === tableName);
-                    if (currentTag) {
-                        await invoke('remove_tag_from_table', {
-                            connectionId: connection.id,
-                            tableName: tableName,
-                            tagId: currentTag.tag_id
-                        });
-                    }
-
-                } else {
+                // Add to new tag if target is not Untagged
+                if (toTagId !== null) {
                     await invoke('assign_tag', {
                         connectionId: connection.id,
                         tableName: tableName,
-                        tagId: tagId
+                        tagId: toTagId
                     });
                 }
                 fetchTableTags();
@@ -187,7 +179,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                         position: 'absolute',
                         top: '100%',
                         left: 0,
-                        right: 0,
+                        width: '240px',
                         backgroundColor: 'var(--bg-secondary)',
                         border: '1px solid var(--border-color)',
                         borderRadius: '4px',
@@ -257,14 +249,20 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
             <div className={styles.tableList}>
                 {viewMode === 'az' ? (
-                    tables.map(table => (
-                        <div key={table} className={styles.tableItem} onClick={() => onTableClick(table)}>
-                            <Table size={14} style={{ marginRight: '0.5rem', opacity: 0.7 }} />
-                            {table}
-                        </div>
-                    ))
+                    tables.map(table => {
+                        const tt = tableTags.find(t => t.table_name === table);
+                        const tag = tt ? tags.find(t => t.id === tt.tag_id) : undefined;
+                        const color = tag ? tag.color : undefined;
+
+                        return (
+                            <div key={table} className={styles.tableItem} onClick={() => onTableClick(table)} style={{ color: color || 'inherit' }}>
+                                <Table size={14} style={{ marginRight: '0.5rem', opacity: 0.7, color: color || 'inherit' }} />
+                                {table}
+                            </div>
+                        );
+                    })
                 ) : (
-                    <DndContext onDragEnd={handleDragEnd}>
+                    <DndContext onDragEnd={handleDragEnd} sensors={sensors}>
                         {groups.map(g => (
                             <TagGroup
                                 key={g.tag.id}
@@ -293,7 +291,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                     alignItems: 'center',
                     justifyContent: 'center',
                     zIndex: 2000
-                }} onClick={() => setShowTagManager(false)}>
+                }}>
                     <div onClick={e => e.stopPropagation()}>
                         <TagManager
                             onSuccess={() => { setShowTagManager(false); fetchTags(); }}

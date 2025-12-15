@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { invoke } from '@tauri-apps/api/core';
+import { getCurrentWindow } from '@tauri-apps/api/window';
 import styles from '../styles/MainLayout.module.css';
-import { Connection, QueryResult, PendingChange } from '../types';
-import { RefreshCw, Search, Plus, PanelLeftClose, PanelLeftOpen, Code2, Table, Filter, ArrowUpDown, Trash2, Pencil, ChevronUp, ChevronDown, X, Copy, Download, History } from 'lucide-react';
+import { Connection, QueryResult, PendingChange, Tag, TableTag, LogEntry } from '../types';
+import { RefreshCw, Search, Plus, PanelLeftClose, PanelLeftOpen, Code2, Table, Filter, ArrowUpDown, Trash2, Pencil, ChevronUp, ChevronDown, X, Copy, Download, Activity, ChevronLeft, ChevronRight, Clock, CheckCircle, AlertCircle, Settings, ZoomIn, ZoomOut, Moon, Sun, Monitor, Minus, Square } from 'lucide-react';
 import { ConnectionForm } from './ConnectionForm';
 import { Sidebar } from './Sidebar';
 import { ChangelogSidebar } from './ChangelogSidebar';
@@ -10,6 +11,9 @@ import { QueryEditor } from './QueryEditor';
 import { DataGrid } from './DataGrid';
 import { TableCreator } from './TableCreator';
 import { InsertRowPanel } from './InsertRowPanel';
+import { Navbar } from './Navbar';
+import { PreferencesModal } from './PreferencesModal';
+import { WindowControls } from './WindowControls';
 import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors, DragEndEvent } from '@dnd-kit/core';
 import { SortableContext, arrayMove, sortableKeyboardCoordinates, horizontalListSortingStrategy, useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
@@ -31,33 +35,60 @@ interface SortState {
 }
 
 // Sortable Tab Component
-function SortableTab({ tab, isActive, onClick, onClose }: { tab: any, isActive: boolean, onClick: () => void, onClose: (e: any, id: string) => void }) {
+function SortableTab({ tab, isActive, onClick, onClose, color }: { tab: any, isActive: boolean, onClick: () => void, onClose: (e: any, id: string) => void, color?: string }) {
     const { attributes, listeners, setNodeRef, transform, transition } = useSortable({ id: tab.id });
+    const [isHovered, setIsHovered] = useState(false);
+    const [isCloseHovered, setIsCloseHovered] = useState(false);
+
     const style = {
         transform: CSS.Transform.toString(transform),
         transition,
         cursor: 'pointer',
         padding: '0.5rem 1rem',
-        backgroundColor: isActive ? 'var(--bg-primary)' : 'var(--bg-secondary)',
+        backgroundColor: isActive ? 'var(--bg-primary)' : (isHovered ? 'var(--bg-tertiary)' : 'var(--bg-secondary)'),
         borderRight: '1px solid var(--border-color)',
-        borderTop: isActive ? '2px solid var(--accent-color)' : '2px solid transparent',
+        borderTop: isActive ? `2px solid ${color || 'var(--accent-color)'} ` : '2px solid transparent',
         display: 'flex',
         alignItems: 'center',
         gap: '0.5rem',
         minWidth: '120px',
         maxWidth: '200px',
         justifyContent: 'space-between',
-        color: isActive ? 'var(--text-primary)' : 'var(--text-secondary)',
+        color: isActive ? (color || 'var(--text-primary)') : (isHovered ? (color || 'var(--text-primary)') : 'var(--text-secondary)'),
         userSelect: 'none' as const,
         height: '100%'
     };
     return (
-        <div ref={setNodeRef} style={style} {...attributes} {...listeners} onClick={onClick}>
+        <div
+            ref={setNodeRef}
+            style={style}
+            {...attributes}
+            {...listeners}
+            onClick={onClick}
+            onMouseEnter={() => setIsHovered(true)}
+            onMouseLeave={() => setIsHovered(false)}
+        >
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', overflow: 'hidden' }}>
-                {tab.type === 'query' ? <Code2 size={14} style={{ flexShrink: 0 }} /> : <Table size={14} style={{ flexShrink: 0 }} />}
+                {tab.type === 'query' ? <Code2 size={14} style={{ flexShrink: 0 }} /> : tab.type === 'log' ? <Activity size={14} style={{ flexShrink: 0 }} /> : <Table size={14} style={{ flexShrink: 0, color: color }} />}
                 <span style={{ fontSize: '0.85rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{tab.title}</span>
             </div>
-            <div role="button" onClick={(e) => onClose(e, tab.id)} style={{ opacity: 0.6, cursor: 'pointer', display: 'flex', flexShrink: 0, marginLeft: '4px' }}>
+            <div
+                role="button"
+                onClick={(e) => onClose(e, tab.id)}
+                onMouseEnter={() => setIsCloseHovered(true)}
+                onMouseLeave={() => setIsCloseHovered(false)}
+                style={{
+                    opacity: isCloseHovered ? 1 : 0.6,
+                    cursor: 'pointer',
+                    display: 'flex',
+                    flexShrink: 0,
+                    marginLeft: '4px',
+                    backgroundColor: isCloseHovered ? 'rgba(255, 77, 77, 0.2)' : 'transparent',
+                    borderRadius: '4px',
+                    padding: '2px',
+                    color: isCloseHovered ? '#ff4d4d' : 'inherit'
+                }}
+            >
                 <X size={12} />
             </div>
         </div>
@@ -70,8 +101,55 @@ export const MainInterface: React.FC<MainInterfaceProps> = ({ connection, onSwit
     const [savedConnections, setSavedConnections] = useState<Connection[]>([]);
     const [showNewConnModal, setShowNewConnModal] = useState(false);
 
-    // Tabs state
-    const [tabs, setTabs] = useState<{ id: string; type: 'table' | 'query' | 'create-table'; title: string }[]>([
+    const [showPreferences, setShowPreferences] = useState(false);
+
+    // Preference State
+    const [theme, setTheme] = useState<'blue' | 'gray' | 'amoled' | 'light'>('blue');
+    const [zoom, setZoom] = useState(1);
+    const [showDbMenu, setShowDbMenu] = useState(false);
+
+    // Window Management
+    useEffect(() => {
+        const maximize = async () => {
+            try {
+                // const win = getCurrentWindow();
+                // await win.maximize();
+            } catch (e) { console.error(e) }
+        };
+        maximize();
+    }, [connection]);
+
+    useEffect(() => {
+        // Apply Theme
+        document.documentElement.setAttribute('data-theme', theme);
+    }, [theme]);
+
+    const handleZoom = (delta: number) => {
+        setZoom(prev => Math.max(0.5, Math.min(2.0, prev + delta)));
+    };
+
+    // Keyboard Shortcuts for Zoom
+    useEffect(() => {
+        const handleKeyDown = (e: KeyboardEvent) => {
+            if (e.ctrlKey) {
+                if (e.key === '=' || e.key === '+') {
+                    e.preventDefault();
+                    handleZoom(0.1);
+                } else if (e.key === '-') {
+                    e.preventDefault();
+                    handleZoom(-0.1);
+                } else if (e.key === '0') {
+                    e.preventDefault();
+                    setZoom(1);
+                }
+            }
+        };
+        window.addEventListener('keydown', handleKeyDown);
+        return () => window.removeEventListener('keydown', handleKeyDown);
+    }, []);
+
+    // Tabs State
+    const [tabs, setTabs] = useState<{ id: string; type: 'table' | 'query' | 'create-table' | 'log'; title: string }[]>([
         { id: 'query1', type: 'query', title: 'Query 1' }
     ]);
     const [activeTabId, setActiveTabId] = useState('query1');
@@ -85,11 +163,14 @@ export const MainInterface: React.FC<MainInterfaceProps> = ({ connection, onSwit
     // Results state keyed by tab ID
     const [results, setResults] = useState<Record<string, TabResult>>({});
 
-    // Selection & Sort state
-    const [selectedIndicesMap, setSelectedIndicesMap] = useState<Record<string, Set<number>>>({});
+    // Pagination State
+    const [paginationMap, setPaginationMap] = useState<Record<string, { page: number, pageSize: number, total: number }>>({});
+
+    // Sort State
     const [sortState, setSortState] = useState<SortState | null>(null);
 
-    // Virtual selectedIndices for active tab
+    // Selection State
+    const [selectedIndicesMap, setSelectedIndicesMap] = useState<Record<string, Set<number>>>({});
     const selectedIndices = selectedIndicesMap[activeTabId] || new Set();
     const setSelectedIndices = (action: Set<number> | ((prev: Set<number>) => Set<number>)) => {
         setSelectedIndicesMap(prev => {
@@ -99,6 +180,7 @@ export const MainInterface: React.FC<MainInterfaceProps> = ({ connection, onSwit
         });
     };
 
+    // Insert/Edit Panel State
     const [showInsertPanel, setShowInsertPanel] = useState(false);
     const [panelColumns, setPanelColumns] = useState<string[]>([]);
     const [editData, setEditData] = useState<Record<string, any>[] | undefined>(undefined);
@@ -108,11 +190,34 @@ export const MainInterface: React.FC<MainInterfaceProps> = ({ connection, onSwit
     const [isResizing, setIsResizing] = useState(false);
 
     // Dropdown state for Table View
-    const [activeDropdown, setActiveDropdown] = useState<'copy' | 'export' | null>(null);
+    const [activeDropdown, setActiveDropdown] = useState<'copy' | 'export' | 'pageSize' | null>(null);
 
     // Changelog State
     const [showChangelog, setShowChangelog] = useState(false);
+    const [pendingChanges, setPendingChanges] = useState<Record<string, PendingChange[]>>({});
 
+    // Logs State
+    const [logs, setLogs] = useState<LogEntry[]>([]);
+
+    // Refresh State
+    const [refreshTrigger, setRefreshTrigger] = useState(0);
+
+    // Tags for Coloring
+    const [tags, setTags] = useState<Tag[]>([]);
+    const [tableTags, setTableTags] = useState<TableTag[]>([]);
+
+
+    useEffect(() => {
+        const loadTags = async () => {
+            try {
+                const t = await invoke<Tag[]>('get_tags');
+                setTags(t);
+                const tt = await invoke<TableTag[]>('get_table_tags', { connectionId: connection.id });
+                setTableTags(tt);
+            } catch (e) { console.error(e); }
+        };
+        loadTags();
+    }, [connection, refreshTrigger]);
 
     // DnD Sensors
     const sensors = useSensors(
@@ -183,6 +288,7 @@ export const MainInterface: React.FC<MainInterfaceProps> = ({ connection, onSwit
     }, [sortState]);
 
     const fetchTables = async () => {
+        setRefreshTrigger(prev => prev + 1);
         try {
             const fetchedTables = await invoke<string[]>('get_tables', { connectionString: connection.connection_string });
             setTables(fetchedTables);
@@ -200,33 +306,62 @@ export const MainInterface: React.FC<MainInterfaceProps> = ({ connection, onSwit
         }
     };
 
-    const fetchTableData = async (tabId: string, tableName: string) => {
-        setResults(prev => ({ ...prev, [tabId]: { data: null, loading: true, error: null } }));
+    const fetchTableData = async (tabId: string, tableName: string, pageOverride?: number, pageSizeOverride?: number) => {
+        // Optimistic update for loading state?
+        // Don't clear data immediately if just paging? Maybe. User wants smoother exp.
+        // For now, keep simple.
+        setResults(prev => ({ ...prev, [tabId]: { ...prev[tabId], loading: true, error: null } }));
+
+        const currentPag = paginationMap[tabId] || { page: 1, pageSize: 50, total: 0 };
+        const page = pageOverride !== undefined ? pageOverride : currentPag.page;
+        const pageSize = pageSizeOverride !== undefined ? pageSizeOverride : currentPag.pageSize;
+
         try {
             const isMysql = connection.connection_string.startsWith('mysql:');
             const q = isMysql ? '`' : '"';
+
+            // Get Count
+            // TODO: Optimize by caching count?
+            const countRes = await invoke<QueryResult>('execute_query', {
+                connectionString: connection.connection_string,
+                query: `SELECT COUNT(*) as count FROM ${q}${tableName}${q}`
+            });
+            const total = countRes.rows.length > 0 ? parseInt(countRes.rows[0][0]) : 0;
 
             let query = `SELECT * FROM ${q}${tableName}${q}`;
             if (sortState) {
                 query += ` ORDER BY ${q}${sortState.column}${q} ${sortState.direction}`;
             }
-            query += ` LIMIT 100`;
+            // Ensure valid offset
+            const offset = Math.max(0, (page - 1) * pageSize);
+            query += ` LIMIT ${pageSize} OFFSET ${offset}`;
 
             const res = await invoke<QueryResult>('execute_query', {
                 connectionString: connection.connection_string,
                 query
             });
             setResults(prev => ({ ...prev, [tabId]: { data: res, loading: false, error: null } }));
+            setPaginationMap(prev => ({ ...prev, [tabId]: { page, pageSize, total } }));
         } catch (e) {
             setResults(prev => ({ ...prev, [tabId]: { data: null, loading: false, error: String(e) } }));
         }
     };
 
-    const [pendingChanges, setPendingChanges] = useState<Record<string, PendingChange[]>>({});
-
     const handlePendingDelete = () => {
         if (!activeTab || activeTab.type !== 'table' || !results[activeTab.id]?.data) return;
         const currentData = results[activeTab.id].data!;
+
+        const cols = currentData.columns;
+        const idColIdx = cols.findIndex(c => c.toLowerCase() === 'id');
+        const idColName = idColIdx !== -1 ? cols[idColIdx] : null;
+        const isMysql = connection.connection_string.startsWith('mysql:');
+        const q = isMysql ? '`' : '"';
+
+        const safeVal = (v: any) => {
+            if (v === null || v === 'NULL') return 'NULL';
+            if (!isNaN(Number(v)) && v !== '') return v;
+            return `'${String(v).replace(/'/g, "''")}'`;
+        };
 
         const newChanges: PendingChange[] = [];
         selectedIndices.forEach(idx => {
@@ -234,11 +369,24 @@ export const MainInterface: React.FC<MainInterfaceProps> = ({ connection, onSwit
             // Check if already deleted
             const existing = pendingChanges[activeTab.id]?.find(c => c.type === 'DELETE' && c.rowIndex === idx);
             if (!existing) {
+                let generatedSql = '';
+                if (idColName) {
+                    const idVal = row[idColIdx];
+                    generatedSql = `DELETE FROM ${q}${activeTab.title}${q} WHERE ${q}${idColName}${q} = ${safeVal(idVal)}`;
+                } else {
+                    const whereClause = cols.map((c, i) => {
+                        const val = row[i];
+                        return `${q}${c}${q} ${val === null ? 'IS NULL' : `= ${safeVal(val)}`}`;
+                    }).join(' AND ');
+                    generatedSql = `DELETE FROM ${q}${activeTab.title}${q} WHERE ${whereClause}`;
+                }
+
                 newChanges.push({
                     type: 'DELETE',
                     tableName: activeTab.title,
                     rowIndex: idx,
-                    rowData: row
+                    rowData: row,
+                    generatedSql
                 });
             }
         });
@@ -259,8 +407,10 @@ export const MainInterface: React.FC<MainInterfaceProps> = ({ connection, onSwit
                 query
             });
             setResults(prev => ({ ...prev, [activeTabId]: { data: res, loading: false, error: null } }));
+            addLog(query, 'Success', undefined, undefined, res.rows.length);
         } catch (e) {
             setResults(prev => ({ ...prev, [activeTabId]: { data: null, loading: false, error: String(e) } }));
+            addLog(query, 'Error', undefined, String(e));
         }
     };
 
@@ -364,6 +514,18 @@ export const MainInterface: React.FC<MainInterfaceProps> = ({ connection, onSwit
             const currentData = results[activeTab.id]?.data;
             if (!currentData) return;
 
+            const cols = currentData.columns;
+            const idColIdx = cols.findIndex(c => c.toLowerCase() === 'id');
+            const idColName = idColIdx !== -1 ? cols[idColIdx] : null;
+            const isMysql = connection.connection_string.startsWith('mysql:');
+            const q = isMysql ? '`' : '"';
+
+            const safeVal = (v: any) => {
+                if (v === null || v === 'NULL') return 'NULL';
+                if (!isNaN(Number(v)) && v !== '') return v;
+                return `'${String(v).replace(/'/g, "''")}'`;
+            };
+
             const newChanges: PendingChange[] = [];
 
             data.forEach((newRow, i) => {
@@ -378,14 +540,28 @@ export const MainInterface: React.FC<MainInterfaceProps> = ({ connection, onSwit
                     const newVal = newRow[col];
 
                     if (String(oldVal) !== String(newVal)) {
+                        let generatedSql = '';
+                        if (idColName) {
+                            const idVal = oldRow[idColIdx];
+                            generatedSql = `UPDATE ${q}${activeTab.title}${q} SET ${q}${col}${q} = ${safeVal(newVal)} WHERE ${q}${idColName}${q} = ${safeVal(idVal)}`;
+                        } else {
+                            // Where fallback
+                            const whereClause = cols.map((c, idx) => {
+                                const val = oldRow[idx];
+                                return `${q}${c}${q} ${val === null ? 'IS NULL' : `= ${safeVal(val)}`}`;
+                            }).join(' AND ');
+                            generatedSql = `UPDATE ${q}${activeTab.title}${q} SET ${q}${col}${q} = ${safeVal(newVal)} WHERE ${whereClause}`;
+                        }
+
                         newChanges.push({
                             type: 'UPDATE',
                             tableName: activeTab.title,
-                            rowIndex,
+                            rowIndex: rowIndex,
                             rowData: oldRow,
                             column: col,
                             oldValue: oldVal,
-                            newValue: newVal
+                            newValue: newVal,
+                            generatedSql
                         });
                     }
                 });
@@ -434,9 +610,35 @@ export const MainInterface: React.FC<MainInterfaceProps> = ({ connection, onSwit
             setShowInsertPanel(false);
             setEditData(undefined);
             fetchTableData(activeTab.id, activeTab.title);
+            addLog(query, 'Success', activeTab.title, undefined, valueGroups.length);
         } catch (e) {
             alert(`Insert failed: ${e}`);
+            addLog(`Insert failed: ${e}`, 'Error', activeTab.title, String(e));
         }
+    };
+
+    const addLog = (query: string, status: 'Success' | 'Error', table?: string, error?: string, rows?: number, user?: string) => {
+        const newLog: LogEntry = {
+            id: crypto.randomUUID(),
+            time: new Date().toLocaleTimeString(),
+            status,
+            table,
+            query,
+            error,
+            rows,
+            user: user || connection.name
+        };
+        setLogs(prev => [newLog, ...prev]);
+    };
+
+    const handleRevertChange = (tabId: string, changeIndex: number) => {
+        setPendingChanges(prev => {
+            const list = prev[tabId] || [];
+            if (changeIndex < 0 || changeIndex >= list.length) return prev;
+            const newList = [...list];
+            newList.splice(changeIndex, 1);
+            return { ...prev, [tabId]: newList };
+        });
     };
 
     const handleConfirmChanges = async () => {
@@ -452,28 +654,54 @@ export const MainInterface: React.FC<MainInterfaceProps> = ({ connection, onSwit
 
                 const cols = res.data.columns;
                 const idColIdx = cols.findIndex(c => c.toLowerCase() === 'id');
+                // Use rowid if no ID? SQLite specific.
+                // For now, if no ID, try to use all columns? Too complex.
+                // Just log if ID missing.
                 if (idColIdx === -1) {
-                    alert(`Cannot apply changes for ${changes[0].tableName}: No 'id' column.`);
-                    continue;
+                    // Try to finding a column with 'id' in it?
+                    // alert(`Cannot apply changes for ${changes[0].tableName}: No 'id' column.`);
+                    // continue;
                 }
-                const idColName = cols[idColIdx];
+                const idColName = idColIdx !== -1 ? cols[idColIdx] : null;
 
                 for (const change of changes) {
-                    const row = change.rowData as any[];
-                    const idVal = row[idColIdx];
-                    const safeVal = (v: any) => {
-                        if (v === null || v === 'NULL') return 'NULL';
-                        if (!isNaN(Number(v)) && v !== '') return v;
-                        return `'${String(v).replace(/'/g, "''")}'`;
-                    };
+                    let query = change.generatedSql || '';
+                    if (!query) {
+                        const row = change.rowData as any[];
+                        // Re-construct logic if generatedSql fallback missing
+                        const safeVal = (v: any) => {
+                            if (v === null || v === 'NULL') return 'NULL';
+                            if (!isNaN(Number(v)) && v !== '') return v;
+                            return `'${String(v).replace(/'/g, "''")}'`;
+                        };
 
-                    if (change.type === 'DELETE') {
-                        const query = `DELETE FROM ${q}${change.tableName}${q} WHERE ${q}${idColName}${q} = ${safeVal(idVal)}`;
+                        if (idColName) {
+                            const idVal = row[idColIdx];
+                            if (change.type === 'DELETE') {
+                                query = `DELETE FROM ${q}${change.tableName}${q} WHERE ${q}${idColName}${q} = ${safeVal(idVal)}`;
+                            } else if (change.type === 'UPDATE') {
+                                if (!change.column) continue;
+                                query = `UPDATE ${q}${change.tableName}${q} SET ${q}${change.column}${q} = ${safeVal(change.newValue)} WHERE ${q}${idColName}${q} = ${safeVal(idVal)}`;
+                            }
+                        } else {
+                            // Fallback
+                            const whereClause = cols.map((c, i) => {
+                                const val = row[i];
+                                return `${q}${c}${q} ${val === null ? 'IS NULL' : `= ${safeVal(val)}`}`;
+                            }).join(' AND ');
+
+                            if (change.type === 'DELETE') {
+                                query = `DELETE FROM ${q}${change.tableName}${q} WHERE ${whereClause}`;
+                            } else if (change.type === 'UPDATE') {
+                                if (!change.column) continue;
+                                query = `UPDATE ${q}${change.tableName}${q} SET ${q}${change.column}${q} = ${safeVal(change.newValue)} WHERE ${whereClause}`;
+                            }
+                        }
+                    }
+
+                    if (query) {
                         await invoke('execute_query', { connectionString: connection.connection_string, query });
-                    } else if (change.type === 'UPDATE') {
-                        if (!change.column) continue;
-                        const query = `UPDATE ${q}${change.tableName}${q} SET ${q}${change.column}${q} = ${safeVal(change.newValue)} WHERE ${q}${idColName}${q} = ${safeVal(idVal)}`;
-                        await invoke('execute_query', { connectionString: connection.connection_string, query });
+                        addLog(query, 'Success', change.tableName, undefined, 1);
                     }
                 }
                 const tab = tabs.find(t => t.id === tabId);
@@ -483,6 +711,7 @@ export const MainInterface: React.FC<MainInterfaceProps> = ({ connection, onSwit
             setShowChangelog(false);
         } catch (e) {
             alert(`Failed to apply changes: ${e}`);
+            addLog(`Error applying changes: ${e}`, 'Error', undefined, String(e));
         }
     };
 
@@ -529,8 +758,22 @@ export const MainInterface: React.FC<MainInterfaceProps> = ({ connection, onSwit
     };
 
     const handleCopy = async (format: 'CSV' | 'JSON') => {
-        if (!activeTab || !results[activeTab.id]?.data) return;
-        const text = generateDataText(format, results[activeTab.id].data!, Array.from(selectedIndices));
+        let data: QueryResult | null = null;
+        let indices: number[] = [];
+
+        if (activeTab?.type === 'log') {
+            data = {
+                columns: ['Time', 'Status', 'Table', 'Query', 'Error', 'User', 'Rows'],
+                rows: logs.map(l => [l.time, l.status, l.table || '-', l.query, l.error || '', l.user || '', l.rows ? String(l.rows) : ''])
+            };
+            indices = selectedIndices.size > 0 ? Array.from(selectedIndices) : logs.map((_, i) => i);
+        } else if (activeTab && results[activeTab.id]?.data) {
+            data = results[activeTab.id].data!;
+            indices = Array.from(selectedIndices);
+        }
+
+        if (!data || indices.length === 0) return;
+        const text = generateDataText(format, data, indices);
         try {
             await navigator.clipboard.writeText(text);
         } catch (e) {
@@ -539,8 +782,23 @@ export const MainInterface: React.FC<MainInterfaceProps> = ({ connection, onSwit
     };
 
     const handleExport = (format: 'CSV' | 'JSON') => {
-        if (!activeTab || !results[activeTab.id]?.data) return;
-        const text = generateDataText(format, results[activeTab.id].data!, Array.from(selectedIndices));
+        let data: QueryResult | null = null;
+        let indices: number[] = [];
+
+        if (activeTab?.type === 'log') {
+            data = {
+                columns: ['Time', 'Status', 'Table', 'Query', 'Error', 'User', 'Rows'],
+                rows: logs.map(l => [l.time, l.status, l.table || '-', l.query, l.error || '', l.user || '', l.rows ? String(l.rows) : ''])
+            };
+            indices = selectedIndices.size > 0 ? Array.from(selectedIndices) : logs.map((_, i) => i);
+        } else if (activeTab && results[activeTab.id]?.data) {
+            data = results[activeTab.id].data!;
+            indices = Array.from(selectedIndices);
+        }
+
+        if (!data || indices.length === 0) return;
+        const text = generateDataText(format, data, indices);
+
         const blob = new Blob([text], { type: format === 'JSON' ? 'application/json' : 'text/csv' });
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
@@ -552,10 +810,27 @@ export const MainInterface: React.FC<MainInterfaceProps> = ({ connection, onSwit
         URL.revokeObjectURL(url);
     };
 
+    const handleOpenLogs = () => {
+        const logTabId = 'logs-tab';
+        const existing = tabs.find(t => t.id === logTabId);
+        if (!existing) {
+            setTabs([...tabs, { id: logTabId, type: 'log', title: 'System Logs' }]);
+        }
+        setActiveTabId(logTabId);
+    };
+
     const totalChanges = Object.values(pendingChanges).reduce((acc, curr) => acc + curr.length, 0);
 
     return (
-        <div className={styles.container}>
+        <div className={styles.container} style={{ zoom: zoom, width: `calc(100vw / ${zoom})`, height: `calc(100vh / ${zoom})` } as any}>
+            <PreferencesModal
+                isOpen={showPreferences}
+                onClose={() => setShowPreferences(false)}
+                theme={theme}
+                setTheme={setTheme}
+                zoom={zoom}
+                setZoom={setZoom}
+            />
             <ChangelogSidebar
                 isOpen={showChangelog}
                 onClose={() => setShowChangelog(false)}
@@ -563,47 +838,23 @@ export const MainInterface: React.FC<MainInterfaceProps> = ({ connection, onSwit
                 tabs={tabs}
                 onConfirm={handleConfirmChanges}
                 onDiscard={handleDiscardChanges}
+                onRevert={handleRevertChange}
             />
 
-            {/* Nav Bar */}
-            <div className={styles.navBar}>
-                <div className={styles.navGroup}>
-                    <div style={{ fontWeight: 900, fontSize: '1.1rem', marginRight: '1rem', color: 'var(--text-primary)' }}>DB+</div>
-                    <button className={styles.iconBtn} onClick={handleAddTableTab} title="New Table"><Plus size={18} /></button>
-                    <button className={styles.iconBtn} onClick={fetchTables} title="Refresh Tables"><RefreshCw size={18} /></button>
-                    <button className={styles.iconBtn} title="Search"><Search size={18} /></button>
-                    <button className={styles.iconBtn} onClick={() => setSidebarOpen(!sidebarOpen)} title={sidebarOpen ? "Hide Sidebar" : "Show Sidebar"}>
-                        {sidebarOpen ? <PanelLeftClose size={18} /> : <PanelLeftOpen size={18} />}
-                    </button>
-                    <div className={styles.verticalDivider}></div>
-                    <button className={styles.outlineBtn} onClick={handleAddQuery} title="New SQL Query">SQL</button>
-                </div>
-
-                <div className={styles.navGroup}>
-                    <button
-                        className={styles.iconBtn}
-                        onClick={() => setShowChangelog(!showChangelog)}
-                        title="Changelog"
-                        style={{ position: 'relative', width: 'auto', padding: '0.4rem 0.6rem', gap: '0.4rem' }}
-                    >
-                        <History size={18} />
-                        {totalChanges > 0 && (
-                            <span style={{
-                                backgroundColor: '#f59e0b',
-                                color: '#fff',
-                                fontSize: '0.7rem',
-                                padding: '1px 5px',
-                                borderRadius: '10px',
-                                fontWeight: 700
-                            }}>{totalChanges}</span>
-                        )}
-                        <div style={{
-                            width: 8, height: 8, borderRadius: '50%',
-                            backgroundColor: totalChanges > 0 ? '#f59e0b' : '#10b981',
-                        }} />
-                    </button>
-                </div>
-            </div>
+            <Navbar
+                sidebarOpen={sidebarOpen}
+                setSidebarOpen={setSidebarOpen}
+                showDbMenu={showDbMenu}
+                setShowDbMenu={setShowDbMenu}
+                setShowPreferences={setShowPreferences}
+                handleAddTableTab={handleAddTableTab}
+                fetchTables={fetchTables}
+                handleAddQuery={handleAddQuery}
+                showChangelog={showChangelog}
+                setShowChangelog={setShowChangelog}
+                totalChanges={totalChanges}
+                handleOpenLogs={handleOpenLogs}
+            />
 
             <div className={styles.body}>
                 <Sidebar
@@ -614,6 +865,7 @@ export const MainInterface: React.FC<MainInterfaceProps> = ({ connection, onSwit
                     onSwitchConnection={handleSwitchConnectionWrapper}
                     onTableClick={handleTableClick}
                     onAddConnection={() => setShowNewConnModal(true)}
+                    refreshTrigger={refreshTrigger}
                 />
 
                 <div className={styles.content}>
@@ -621,15 +873,24 @@ export const MainInterface: React.FC<MainInterfaceProps> = ({ connection, onSwit
                         <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
                             <SortableContext items={tabs.map(t => t.id)} strategy={horizontalListSortingStrategy}>
                                 <div className={styles.tabsContainer} style={{ display: 'flex', overflowX: 'auto' }}>
-                                    {tabs.map(tab => (
-                                        <SortableTab
-                                            key={tab.id}
-                                            tab={tab}
-                                            isActive={activeTabId === tab.id}
-                                            onClick={() => setActiveTabId(tab.id)}
-                                            onClose={closeTab}
-                                        />
-                                    ))}
+                                    {tabs.map(tab => {
+                                        let color: string | undefined;
+                                        if (tab.type === 'table') {
+                                            const tt = tableTags.find(t => t.table_name === tab.title);
+                                            const tag = tt ? tags.find(t => t.id === tt.tag_id) : undefined;
+                                            color = tag?.color;
+                                        }
+                                        return (
+                                            <SortableTab
+                                                key={tab.id}
+                                                tab={tab}
+                                                isActive={activeTabId === tab.id}
+                                                onClick={() => setActiveTabId(tab.id)}
+                                                onClose={closeTab}
+                                                color={color}
+                                            />
+                                        );
+                                    })}
                                 </div>
                             </SortableContext>
                         </DndContext>
@@ -691,10 +952,68 @@ export const MainInterface: React.FC<MainInterfaceProps> = ({ connection, onSwit
                                     <div className={styles.verticalDivider} style={{ height: 16 }}></div>
                                     <button className={styles.toolbarBtn}><Filter size={14} /> Filter</button>
                                     <button className={styles.toolbarBtn}><ArrowUpDown size={14} /> Sort</button>
+
+                                    {/* Pagination Controls - Moved to Toolbar */}
+                                    {(() => {
+                                        const pag = paginationMap[activeTab.id] || { page: 1, pageSize: 50, total: 0 };
+                                        const totalPages = Math.ceil(pag.total / pag.pageSize) || 1;
+                                        return (
+                                            <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: '1rem', fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
+                                                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                                    <button
+                                                        className={styles.iconBtn}
+                                                        disabled={pag.page <= 1}
+                                                        onClick={() => fetchTableData(activeTab.id, activeTab.title, pag.page - 1)}
+                                                        style={{ opacity: pag.page <= 1 ? 0.3 : 1 }}
+                                                    >
+                                                        <ChevronLeft size={16} />
+                                                    </button>
+                                                    <span style={{ minWidth: '60px', textAlign: 'center' }}>{pag.page} of {totalPages}</span>
+                                                    <button
+                                                        className={styles.iconBtn}
+                                                        disabled={pag.page >= totalPages}
+                                                        onClick={() => fetchTableData(activeTab.id, activeTab.title, pag.page + 1)}
+                                                        style={{ opacity: pag.page >= totalPages ? 0.3 : 1 }}
+                                                    >
+                                                        <ChevronRight size={16} />
+                                                    </button>
+                                                </div>
+
+                                                <div style={{ position: 'relative' }}>
+                                                    <button
+                                                        className={styles.secondaryBtn}
+                                                        onClick={() => setActiveDropdown(activeDropdown === 'pageSize' ? null : 'pageSize')}
+                                                    >
+                                                        {pag.pageSize} rows <ChevronDown size={12} style={{ marginLeft: 4 }} />
+                                                    </button>
+                                                    {activeDropdown === 'pageSize' && (
+                                                        <div className={styles.dropdownMenu} style={{ position: 'absolute', top: '100%', right: 0, zIndex: 100, backgroundColor: 'var(--bg-primary)', border: '1px solid var(--border-color)', borderRadius: '4px', marginTop: '4px', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)', minWidth: '80px' }}>
+                                                            {[20, 50, 100, 200].map(size => (
+                                                                <div
+                                                                    key={size}
+                                                                    className={styles.dropdownItem}
+                                                                    onClick={() => {
+                                                                        setActiveDropdown(null);
+                                                                        fetchTableData(activeTab.id, activeTab.title, 1, size);
+                                                                    }}
+                                                                    style={{ padding: '8px 12px', cursor: 'pointer', fontSize: '0.9rem', backgroundColor: pag.pageSize === size ? 'var(--bg-tertiary)' : 'transparent' }}
+                                                                >
+                                                                    {size}
+                                                                </div>
+                                                            ))}
+                                                        </div>
+                                                    )}
+                                                </div>
+
+                                                <div style={{ minWidth: '80px', textAlign: 'right' }}>{pag.total} rows</div>
+                                            </div>
+                                        );
+                                    })()}
                                 </div>
-                                <div style={{ flex: 1, padding: '1rem', overflow: 'hidden' }}>
-                                    <div style={{ border: '1px solid var(--border-color)', borderRadius: '6px', background: 'var(--bg-secondary)', height: '100%', overflow: 'hidden' }}>
+                                <div style={{ flex: 1, padding: '1rem', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+                                    <div style={{ flex: 1, border: '1px solid var(--border-color)', borderRadius: '6px', background: 'var(--bg-secondary)', overflow: 'hidden', marginBottom: '0.5rem' }}>
                                         <DataGrid
+                                            key={activeTab.id}
                                             data={results[activeTab.id]?.data || null}
                                             loading={results[activeTab.id]?.loading || false}
                                             error={results[activeTab.id]?.error || null}
@@ -703,6 +1022,96 @@ export const MainInterface: React.FC<MainInterfaceProps> = ({ connection, onSwit
                                             onSort={(col) => setSortState(prev => prev?.column === col && prev.direction === 'ASC' ? { column: col, direction: 'DESC' } : { column: col, direction: 'ASC' })}
                                             pendingChanges={pendingChanges[activeTab.id]}
                                         />
+                                    </div>
+                                </div>
+                            </>
+                        ) : activeTab.type === 'log' ? (
+                            <>
+                                <div className={styles.tableToolbar}>
+                                    <div style={{ fontWeight: 600, display: 'flex', alignItems: 'center', gap: '0.5rem' }}><Activity size={16} /></div>
+
+                                    {/* Copy Dropdown */}
+                                    <div style={{ position: 'relative', marginLeft: '0.5rem', display: 'inline-block' }}>
+                                        <button className={styles.secondaryBtn} onClick={() => setActiveDropdown(activeDropdown === 'copy' ? null : 'copy')}>
+                                            <Copy size={14} style={{ marginRight: 4 }} /> Copy <ChevronDown size={12} style={{ marginLeft: 2 }} />
+                                        </button>
+                                        {activeDropdown === 'copy' && (
+                                            <div className={styles.dropdownMenu} style={{ position: 'absolute', top: '100%', left: 0, zIndex: 100, backgroundColor: 'var(--bg-primary)', border: '1px solid var(--border-color)', borderRadius: '4px', marginTop: '4px', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)', minWidth: '100px' }}>
+                                                <div className={styles.dropdownItem} onClick={() => { handleCopy('CSV'); setActiveDropdown(null); }} style={{ padding: '8px 12px', cursor: 'pointer', fontSize: '0.9rem' }}>As CSV</div>
+                                                <div className={styles.dropdownItem} onClick={() => { handleCopy('JSON'); setActiveDropdown(null); }} style={{ padding: '8px 12px', cursor: 'pointer', fontSize: '0.9rem' }}>As JSON</div>
+                                            </div>
+                                        )}
+                                    </div>
+                                    {/* Export Dropdown */}
+                                    <div style={{ position: 'relative', marginLeft: '0.5rem', display: 'inline-block' }}>
+                                        <button className={styles.secondaryBtn} onClick={() => setActiveDropdown(activeDropdown === 'export' ? null : 'export')}>
+                                            <Download size={14} style={{ marginRight: 4 }} /> Export <ChevronDown size={12} style={{ marginLeft: 2 }} />
+                                        </button>
+                                        {activeDropdown === 'export' && (
+                                            <div className={styles.dropdownMenu} style={{ position: 'absolute', top: '100%', left: 0, zIndex: 100, backgroundColor: 'var(--bg-primary)', border: '1px solid var(--border-color)', borderRadius: '4px', marginTop: '4px', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)', minWidth: '100px' }}>
+                                                <div className={styles.dropdownItem} onClick={() => { handleExport('CSV'); setActiveDropdown(null); }} style={{ padding: '8px 12px', cursor: 'pointer', fontSize: '0.9rem' }}>As CSV</div>
+                                                <div className={styles.dropdownItem} onClick={() => { handleExport('JSON'); setActiveDropdown(null); }} style={{ padding: '8px 12px', cursor: 'pointer', fontSize: '0.9rem' }}>As JSON</div>
+                                            </div>
+                                        )}
+                                    </div>
+
+                                    {/* Pagination Controls */}
+                                    {(() => {
+                                        const pag = paginationMap[activeTab.id] || { page: 1, pageSize: 50, total: logs.length };
+                                        // Update total if mismatch (syncing logs state)
+                                        if (pag.total !== logs.length) pag.total = logs.length;
+
+                                        const totalPages = Math.ceil(pag.total / pag.pageSize) || 1;
+                                        const setPage = (p: number) => setPaginationMap(prev => ({ ...prev, [activeTab.id]: { ...pag, page: p } }));
+                                        const setSize = (s: number) => setPaginationMap(prev => ({ ...prev, [activeTab.id]: { ...pag, pageSize: s, page: 1 } }));
+
+                                        return (
+                                            <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.85rem' }}>
+                                                <button className={styles.iconBtn} disabled={pag.page === 1} onClick={() => setPage(pag.page - 1)}><ChevronLeft size={16} /></button>
+                                                <span>Page {pag.page} of {totalPages}</span>
+                                                <button className={styles.iconBtn} disabled={pag.page === totalPages} onClick={() => setPage(pag.page + 1)}><ChevronRight size={16} /></button>
+
+                                                <div style={{ position: 'relative', marginLeft: '0.5rem' }}>
+                                                    <div style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', border: '1px solid var(--border-color)', borderRadius: '4px', padding: '2px 6px' }} onClick={() => setActiveDropdown(activeDropdown === 'pageSize' ? null : 'pageSize')}>
+                                                        {pag.pageSize} / page <ChevronDown size={12} style={{ marginLeft: 4 }} />
+                                                    </div>
+                                                    {activeDropdown === 'pageSize' && (
+                                                        <div className={styles.dropdownMenu} style={{ position: 'absolute', bottom: '100%', right: 0, marginBottom: '4px', backgroundColor: 'var(--bg-primary)', border: '1px solid var(--border-color)', borderRadius: '4px', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)', minWidth: '80px', zIndex: 100 }}>
+                                                            {[10, 20, 50, 100, 500].map(size => (
+                                                                <div key={size} className={styles.dropdownItem} onClick={() => { setSize(size); setActiveDropdown(null); }} style={{ padding: '8px 12px', cursor: 'pointer', fontSize: '0.9rem', backgroundColor: pag.pageSize === size ? 'var(--bg-tertiary)' : 'transparent' }}>
+                                                                    {size}
+                                                                </div>
+                                                            ))}
+                                                        </div>
+                                                    )}
+                                                </div>
+                                                <div style={{ minWidth: '80px', textAlign: 'right' }}>{pag.total} entries</div>
+                                            </div>
+                                        );
+                                    })()}
+                                </div>
+                                <div style={{ flex: 1, padding: '1rem', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+                                    <div style={{ flex: 1, border: '1px solid var(--border-color)', borderRadius: '6px', background: 'var(--bg-secondary)', overflow: 'hidden' }}>
+                                        {(() => {
+                                            const pag = paginationMap[activeTab.id] || { page: 1, pageSize: 50, total: logs.length };
+                                            const start = (pag.page - 1) * pag.pageSize;
+                                            const end = start + pag.pageSize;
+                                            const paginatedLogs = logs.slice(start, end);
+
+                                            return (
+                                                <DataGrid
+                                                    data={{
+                                                        columns: ['Time', 'Status', 'Table', 'Query', 'Error', 'User', 'Rows'],
+                                                        rows: paginatedLogs.map(l => [l.time, l.status, l.table || '-', l.query, l.error || '', l.user || '', l.rows ? String(l.rows) : '-'])
+                                                    }}
+                                                    loading={false}
+                                                    error={null}
+                                                    selectedIndices={selectedIndices}
+                                                    onSelectionChange={setSelectedIndices}
+                                                    onSort={() => { }}
+                                                />
+                                            );
+                                        })()}
                                     </div>
                                 </div>
                             </>
@@ -760,6 +1169,7 @@ export const MainInterface: React.FC<MainInterfaceProps> = ({ connection, onSwit
                                     {resultsVisible && (
                                         <div style={{ flex: 1, overflow: 'hidden' }}>
                                             <DataGrid
+                                                key={activeTabId}
                                                 data={results[activeTabId]?.data || null}
                                                 loading={results[activeTabId]?.loading || false}
                                                 error={results[activeTabId]?.error || null}

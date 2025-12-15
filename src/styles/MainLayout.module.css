@@ -334,3 +334,14 @@
 .dangerBtn:hover {
     background-color: #dc2626;
 }
+
+/* Panel Header */
+.panelHeader {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0.5rem 1rem;
+    background-color: var(--bg-secondary);
+    border-bottom: 1px solid var(--border-color);
+    min-height: 32px;
+}

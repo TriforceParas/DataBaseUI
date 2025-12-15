@@ -1,5 +1,9 @@
 use crate::db::AppState;
+use chrono::{DateTime, NaiveDateTime, Utc};
 use serde::{Deserialize, Serialize};
+use sqlx::mysql::MySqlConnection;
+use sqlx::postgres::PgConnection;
+use sqlx::sqlite::SqliteConnection;
 use sqlx::{AnyConnection, Column, Connection as SqlxConnection, FromRow, Row, TypeInfo};
 use std::collections::HashMap;
 use tauri::State;
@@ -220,67 +224,99 @@ pub async fn execute_query(
     connection_string: String,
     query: String,
 ) -> Result<QueryResult, String> {
-    let mut conn = <AnyConnection as SqlxConnection>::connect(&connection_string)
-        .await
-        .map_err(|e| format!("Failed to connect: {}", e))?;
+    // Macro to handle row processing generically for concrete row types
+    macro_rules! process_rows {
+        ($rows:expr) => {{
+            if $rows.is_empty() {
+                return Ok(QueryResult {
+                    columns: vec![],
+                    rows: vec![],
+                });
+            }
 
-    let rows = sqlx::query(&query)
-        .fetch_all(&mut conn)
-        .await
-        .map_err(|e| format!("Query failed: {}", e))?;
+            let columns: Vec<String> = $rows[0]
+                .columns()
+                .iter()
+                .map(|c| c.name().to_string())
+                .collect();
 
-    if rows.is_empty() {
-        return Ok(QueryResult {
-            columns: vec![],
-            rows: vec![],
-        });
-    }
+            let mut result_rows = Vec::new();
 
-    let columns: Vec<String> = rows[0]
-        .columns()
-        .iter()
-        .map(|c| c.name().to_string())
-        .collect();
-
-    let mut result_rows = Vec::new();
-
-    for row in rows {
-        let mut result_row = Vec::new();
-        for i in 0..columns.len() {
-            let val_str = if let Ok(s) = row.try_get::<String, _>(i) {
-                s
-            } else if let Ok(v) = row.try_get::<i64, _>(i) {
-                v.to_string()
-            } else if let Ok(v) = row.try_get::<i32, _>(i) {
-                v.to_string()
-            } else if let Ok(v) = row.try_get::<f64, _>(i) {
-                v.to_string()
-            } else if let Ok(v) = row.try_get::<bool, _>(i) {
-                v.to_string()
-            } else if let Ok(v) = row.try_get::<Vec<u8>, _>(i) {
-                // Try to parse bytes as utf8, else show hex
-                String::from_utf8(v.clone())
-                    .unwrap_or_else(|_| format!("<BINARY {} bytes>", v.len()))
-            } else {
-                match row.try_get::<Option<String>, _>(i) {
-                    Ok(None) => "NULL".to_string(),
-                    Err(e) => {
-                        let type_name = row.column(i).type_info().name();
-                        println!("Failed to decode col {} (type {}): {}", i, type_name, e);
-                        format!("ERR[{}]", type_name)
-                    }
-                    Ok(Some(s)) => s, // Should be caught by first branch but just in case
+            for row in $rows {
+                let mut result_row = Vec::new();
+                for i in 0..columns.len() {
+                    let val_str = if let Ok(v) = row.try_get::<String, _>(i) {
+                        v
+                    } else if let Ok(v) = row.try_get::<i64, _>(i) {
+                        v.to_string()
+                    } else if let Ok(v) = row.try_get::<i32, _>(i) {
+                        v.to_string()
+                    } else if let Ok(v) = row.try_get::<f64, _>(i) {
+                        v.to_string()
+                    } else if let Ok(v) = row.try_get::<bool, _>(i) {
+                        v.to_string()
+                    } else if let Ok(v) = row.try_get::<chrono::NaiveDateTime, _>(i) {
+                        v.to_string()
+                    } else if let Ok(v) = row.try_get::<chrono::DateTime<chrono::Utc>, _>(i) {
+                        v.to_string()
+                    } else if let Ok(v) = row.try_get::<Vec<u8>, _>(i) {
+                        String::from_utf8(v.clone())
+                            .unwrap_or_else(|_| format!("<BINARY {} bytes>", v.len()))
+                    } else {
+                        match row.try_get::<Option<String>, _>(i) {
+                            Ok(None) => "NULL".to_string(),
+                            Err(e) => {
+                                let type_name = row.column(i).type_info().name();
+                                format!("ERR[{}]", type_name)
+                            }
+                            Ok(Some(s)) => s,
+                        }
+                    };
+                    result_row.push(val_str);
                 }
-            };
-            result_row.push(val_str);
-        }
-        result_rows.push(result_row);
+                result_rows.push(result_row);
+            }
+
+            Ok(QueryResult {
+                columns,
+                rows: result_rows,
+            })
+        }};
     }
 
-    Ok(QueryResult {
-        columns,
-        rows: result_rows,
-    })
+    if connection_string.starts_with("mysql:") {
+        let mut conn = MySqlConnection::connect(&connection_string)
+            .await
+            .map_err(|e| format!("Connection failed: {}", e))?;
+        let rows = sqlx::query(&query)
+            .fetch_all(&mut conn)
+            .await
+            .map_err(|e| format!("Query failed: {}", e))?;
+        process_rows!(rows)
+    } else if connection_string.starts_with("postgres:") {
+        let mut conn = PgConnection::connect(&connection_string)
+            .await
+            .map_err(|e| format!("Connection failed: {}", e))?;
+        let rows = sqlx::query(&query)
+            .fetch_all(&mut conn)
+            .await
+            .map_err(|e| format!("Query failed: {}", e))?;
+        process_rows!(rows)
+    } else if connection_string.starts_with("sqlite:") {
+        let mut conn = SqliteConnection::connect(&connection_string)
+            .await
+            .map_err(|e| format!("Connection failed: {}", e))?;
+        let rows = sqlx::query(&query)
+            .fetch_all(&mut conn)
+            .await
+            .map_err(|e| format!("Query failed: {}", e))?;
+        process_rows!(rows)
+    } else {
+        Err(
+            "Unsupported database protocol. Only mysql:, postgres:, and sqlite: are supported."
+                .to_string(),
+        )
+    }
 }
 
 #[tauri::command]

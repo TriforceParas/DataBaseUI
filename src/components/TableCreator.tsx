@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { invoke } from '@tauri-apps/api/core';
-import styles from '../styles/ConnectionForm.module.css'; // Reuse form styles
-import { Plus, Trash2, Save } from 'lucide-react';
+import styles from '../styles/TableCreator.module.css';
+import { Plus, Trash2, Key, HelpCircle, X, Shield, Lock, Fingerprint } from 'lucide-react';
 
 interface TableCreatorProps {
     connectionString: string;
@@ -22,12 +22,12 @@ interface ColumnDef {
 export const TableCreator: React.FC<TableCreatorProps> = ({ connectionString, onSuccess }) => {
     const [tableName, setTableName] = useState('');
     const [columns, setColumns] = useState<ColumnDef[]>([
-        { name: 'id', type: 'INTEGER', length: '', defaultValue: '', isNullable: false, isPrimaryKey: true, isAutoIncrement: true, isUnique: false }
+        { name: 'id', type: 'INTEGER', length: '', defaultValue: '', isNullable: false, isPrimaryKey: true, isAutoIncrement: true, isUnique: true }
     ]);
     const [error, setError] = useState<string | null>(null);
 
     const addColumn = () => {
-        setColumns([...columns, { name: '', type: 'TEXT', length: '', defaultValue: '', isNullable: true, isPrimaryKey: false, isAutoIncrement: false, isUnique: false }]);
+        setColumns([...columns, { name: '', type: 'TEXT', length: 'N/A', defaultValue: '', isNullable: true, isPrimaryKey: false, isAutoIncrement: false, isUnique: false }]);
     };
 
     const removeColumn = (idx: number) => {
@@ -60,47 +60,32 @@ export const TableCreator: React.FC<TableCreatorProps> = ({ connectionString, on
         }
 
         const dialect = getDialect(connectionString);
-        // MySQL typically uses backticks, others use double quotes for identifiers
         const q = dialect === 'mysql' ? '`' : '"';
 
-        // Build SQL
         try {
             const colDefs = columns.map(col => {
                 let typeStr = col.type;
-                if ((col.type === 'VARCHAR' || col.type === 'CHAR') && col.length) {
+                if ((col.type === 'VARCHAR' || col.type === 'CHAR') && col.length && col.length !== 'N/A') {
                     typeStr = `${col.type}(${col.length})`;
                 }
 
-                // Quote identifier
                 let def = `${q}${col.name}${q} ${typeStr}`;
 
                 if (col.isPrimaryKey) {
                     def += " PRIMARY KEY";
-
                     if (col.isAutoIncrement) {
-                        if (dialect === 'mysql') {
-                            def += " AUTO_INCREMENT";
-                        } else if (dialect === 'sqlite') {
-                            // SQLite only supports AUTOINCREMENT on INTEGER PRIMARY KEY
-                            if (col.type === 'INTEGER') {
-                                def += " AUTOINCREMENT";
-                            }
-                        } else {
-                            // Postgres usually implies SERIAL via type, but user might select INTEGER+AI
-                            // For minimal compatibility we ignore explicit AUTOINCREMENT keyword if not supported
-                        }
+                        if (dialect === 'mysql') def += " AUTO_INCREMENT";
+                        else if (dialect === 'sqlite' && col.type === 'INTEGER') def += " AUTOINCREMENT";
                     }
                 }
 
                 if (!col.isNullable && !col.isPrimaryKey) def += " NOT NULL";
                 if (col.isUnique && !col.isPrimaryKey) def += " UNIQUE";
 
-                if (col.defaultValue) {
-                    const upperDefault = col.defaultValue.toUpperCase();
-                    // Naive check for unquoting numbers and SQL functions
+                if (col.defaultValue && col.defaultValue !== '') {
+                    // Check if it's a numeric or function or custom string
                     const isNum = !isNaN(Number(col.defaultValue));
-                    const isSqlFunc = ['CURRENT_TIMESTAMP', 'CURRENT_DATE', 'CURRENT_TIME', 'TRUE', 'FALSE', 'NULL'].includes(upperDefault);
-
+                    const isSqlFunc = ['CURRENT_TIMESTAMP', 'NULL', 'TRUE', 'FALSE', 'now()'].includes(col.defaultValue); // now() is function
                     def += ` DEFAULT ${isNum || isSqlFunc ? col.defaultValue : `'${col.defaultValue}'`}`;
                 }
 
@@ -108,7 +93,6 @@ export const TableCreator: React.FC<TableCreatorProps> = ({ connectionString, on
             }).join(', ');
 
             const query = `CREATE TABLE ${q}${tableName}${q} (${colDefs})`;
-
             await invoke('execute_query', { connectionString, query });
             onSuccess();
         } catch (e) {
@@ -117,163 +101,179 @@ export const TableCreator: React.FC<TableCreatorProps> = ({ connectionString, on
         }
     };
 
-    return (
-        <div style={{ padding: '2rem', maxWidth: '1000px', margin: '0 auto', height: '100%', overflowY: 'auto' }}>
-            <h2 className={styles.sectionTitle}>Create New Table</h2>
+    // Helper to check if value is a preset
+    const isPreset = (val: string) => ['', 'NULL', 'now()', 'TRUE', 'FALSE'].includes(val);
 
-            <div style={{ marginBottom: '2rem' }}>
-                <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 500 }}>Table Name</label>
-                <input
-                    className={styles.input}
-                    value={tableName}
-                    onChange={e => setTableName(e.target.value)}
-                    placeholder="e.g. users"
-                />
+    return (
+        <div className={styles.container}>
+            {/* Top Bar */}
+            <div className={styles.topBar}>
+                <div style={{ marginRight: 'auto', display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                    <button className={styles.saveButton} onClick={handleCreate}>
+                        <Shield size={14} /> Save Changes
+                    </button>
+                    {error && <span style={{ color: '#ef4444', fontSize: '0.9rem' }}>{error}</span>}
+                </div>
             </div>
 
-            <div style={{ marginBottom: '1rem' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
-                    <h3 style={{ fontSize: '1rem', fontWeight: 600 }}>Columns</h3>
-                    <button type="button" className={styles.addButton} onClick={addColumn} style={{ padding: '0.25rem 0.5rem', fontSize: '0.8rem' }}>
-                        <Plus size={14} /> Add Column
+            {/* Content */}
+            <div className={styles.section}>
+                {/* Table Name */}
+                <div style={{ marginBottom: '2rem' }}>
+                    <label className={styles.label}>Table Name</label>
+                    <input
+                        className={styles.mainInput}
+                        value={tableName}
+                        onChange={e => setTableName(e.target.value)}
+                        placeholder="Enter table name..."
+                    />
+                </div>
+
+                {/* Columns */}
+                <div style={{ marginBottom: '2rem' }}>
+                    <label className={styles.label}>Columns</label>
+
+                    <div className={styles.columnsHeader}>
+                        <div>#</div>
+                        <div>Name</div>
+                        <div>Type</div>
+                        <div>Parameters</div>
+                        <div>Default Value</div>
+                        <div>Constraints</div>
+                        <div></div>
+                    </div>
+
+                    <div style={{ display: 'flex', flexDirection: 'column' }}>
+                        {columns.map((col, idx) => (
+                            <div key={idx} className={styles.columnRow}>
+                                <div style={{ opacity: 0.5, textAlign: 'center' }}>{idx + 1}</div>
+
+                                {/* Name */}
+                                <input
+                                    className={styles.rowInput}
+                                    value={col.name}
+                                    onChange={e => updateColumn(idx, 'name', e.target.value)}
+                                    placeholder="column_name"
+                                />
+
+                                {/* Type */}
+                                <select
+                                    className={styles.rowSelect}
+                                    value={col.type}
+                                    onChange={e => updateColumn(idx, 'type', e.target.value)}
+                                >
+                                    <option value="INTEGER">int4</option>
+                                    <option value="serial">serial</option>
+                                    <option value="TEXT">text</option>
+                                    <option value="VARCHAR">varchar</option>
+                                    <option value="BOOLEAN">bool</option>
+                                    <option value="jsonb">jsonb</option>
+                                    <option value="timestamp">timestamp</option>
+                                </select>
+
+                                {/* Parameters */}
+                                <input
+                                    className={styles.rowInput}
+                                    value={col.length}
+                                    onChange={e => updateColumn(idx, 'length', e.target.value)}
+                                    placeholder="N/A"
+                                    disabled={col.type !== 'VARCHAR'}
+                                />
+
+                                {/* Default Value - Logic: If preset, show select. If custom, show input. */}
+                                <div>
+                                    {isPreset(col.defaultValue) ? (
+                                        <select
+                                            className={styles.rowSelect}
+                                            value={col.defaultValue}
+                                            onChange={e => {
+                                                const val = e.target.value;
+                                                if (val === '_CUSTOM_') {
+                                                    // Set to space to trigger input mode, or specific placeholder?
+                                                    // Let's set to a placeholder space ' ' which user can delete?
+                                                    // No, let's set to 'custom_value' and select text?
+                                                    // Better: Set to a known non-preset string like ' ' (space)
+                                                    updateColumn(idx, 'defaultValue', ' ');
+                                                } else {
+                                                    updateColumn(idx, 'defaultValue', val);
+                                                }
+                                            }}
+                                        >
+                                            <option value="">Empty</option>
+                                            <option value="NULL">NULL</option>
+                                            <option value="now()">now()</option>
+                                            <option value="_CUSTOM_">Value...</option>
+                                        </select>
+                                    ) : (
+                                        <div style={{ position: 'relative', width: '100%' }}>
+                                            <input
+                                                className={styles.rowInput}
+                                                value={col.defaultValue === ' ' ? '' : col.defaultValue} // Handle init space
+                                                onChange={e => updateColumn(idx, 'defaultValue', e.target.value)}
+                                                placeholder="Enter default..."
+                                                autoFocus
+                                                onBlur={(e) => {
+                                                    if (!e.target.value) {
+                                                        // If empty on blur, revert to 'Empty' preset
+                                                        updateColumn(idx, 'defaultValue', '');
+                                                    }
+                                                }}
+                                            />
+                                            <div
+                                                onClick={() => updateColumn(idx, 'defaultValue', '')}
+                                                style={{
+                                                    position: 'absolute', right: '4px', top: '50%', transform: 'translateY(-50%)',
+                                                    cursor: 'pointer', opacity: 0.5
+                                                }}
+                                                title="Clear"
+                                            >
+                                                <X size={12} />
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
+
+                                {/* Constraints */}
+                                <div className={styles.constraintsGroup}>
+                                    <label className={styles.constraintLabel} title="Primary Key">
+                                        <input type="checkbox" checked={col.isPrimaryKey} onChange={e => updateColumn(idx, 'isPrimaryKey', e.target.checked)} />
+                                        <Key size={12} className={styles.constraintIcon} /> PK
+                                    </label>
+                                    <label className={styles.constraintLabel} title="Unique">
+                                        <input type="checkbox" checked={col.isUnique} onChange={e => updateColumn(idx, 'isUnique', e.target.checked)} />
+                                        <Fingerprint size={12} className={styles.constraintIcon} /> Unique
+                                    </label>
+                                    <label className={styles.constraintLabel} title="Nullable">
+                                        <input type="checkbox" checked={col.isNullable} onChange={e => updateColumn(idx, 'isNullable', e.target.checked)} />
+                                        <span style={{ fontSize: '0.9rem', opacity: 0.7 }}>?</span> Nullable
+                                    </label>
+                                </div>
+
+                                {/* Remove - Trash Icon Red */}
+                                <button
+                                    className={styles.iconButton}
+                                    onClick={() => removeColumn(idx)}
+                                    style={{ color: '#ef4444' }}
+                                    title="Delete Column"
+                                >
+                                    <Trash2 size={16} />
+                                </button>
+                            </div>
+                        ))}
+                    </div>
+
+                    <button className={styles.addColumnBtn} onClick={addColumn}>
+                        <Plus size={16} /> Add Column
                     </button>
                 </div>
 
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                    {columns.map((col, idx) => (
-                        <div key={idx} style={{
-                            display: 'grid',
-                            gridTemplateColumns: '2fr 1.5fr 80px 100px 50px 50px 50px 50px 40px',
-                            gap: '0.5rem',
-                            alignItems: 'center',
-                            backgroundColor: 'var(--bg-secondary)',
-                            padding: '0.5rem',
-                            borderRadius: '4px',
-                            border: '1px solid var(--border-color)'
-                        }}>
-                            {/* Name */}
-                            <input
-                                className={styles.input}
-                                value={col.name}
-                                onChange={e => updateColumn(idx, 'name', e.target.value)}
-                                placeholder="Name"
-                                title="Column Name"
-                            />
-
-                            {/* Type */}
-                            <select
-                                className={styles.input}
-                                value={col.type}
-                                onChange={e => updateColumn(idx, 'type', e.target.value)}
-                                title="Data Type"
-                            >
-                                <option value="INTEGER">INTEGER</option>
-                                <option value="TEXT">TEXT</option>
-                                <option value="VARCHAR">VARCHAR</option>
-                                <option value="CHAR">CHAR</option>
-                                <option value="REAL">REAL</option>
-                                <option value="BLOB">BLOB</option>
-                                <option value="BOOLEAN">BOOLEAN</option>
-                                <option value="DATE">DATE</option>
-                                <option value="DATETIME">DATETIME</option>
-                            </select>
-
-                            {/* Length */}
-                            <input
-                                className={styles.input}
-                                value={col.length}
-                                onChange={e => updateColumn(idx, 'length', e.target.value)}
-                                placeholder="Len"
-                                disabled={col.type !== 'VARCHAR' && col.type !== 'CHAR'}
-                                title="Length (for VARCHAR/CHAR)"
-                            />
-
-                            {/* Default */}
-                            <input
-                                className={styles.input}
-                                value={col.defaultValue}
-                                onChange={e => updateColumn(idx, 'defaultValue', e.target.value)}
-                                placeholder="Default"
-                                title="Default Value"
-                                list={`default-suggestions-${idx}`}
-                            />
-                            <datalist id={`default-suggestions-${idx}`}>
-                                {(col.type === 'DATE' || col.type === 'DATETIME') && (
-                                    <>
-                                        <option value="CURRENT_TIMESTAMP" />
-                                        <option value="CURRENT_DATE" />
-                                        <option value="CURRENT_TIME" />
-                                    </>
-                                )}
-                                {col.type === 'BOOLEAN' && (
-                                    <>
-                                        <option value="TRUE" />
-                                        <option value="FALSE" />
-                                    </>
-                                )}
-                            </datalist>
-
-                            {/* PK */}
-                            <label style={{ fontSize: '0.8rem', display: 'flex', flexDirection: 'column', alignItems: 'center', cursor: 'pointer' }} title="Primary Key">
-                                <span style={{ fontSize: '0.7rem', opacity: 0.7 }}>PK</span>
-                                <input
-                                    type="checkbox"
-                                    checked={col.isPrimaryKey}
-                                    onChange={e => updateColumn(idx, 'isPrimaryKey', e.target.checked)}
-                                />
-                            </label>
-
-                            {/* AI */}
-                            <label style={{ fontSize: '0.8rem', display: 'flex', flexDirection: 'column', alignItems: 'center', cursor: 'pointer' }} title="Auto Increment">
-                                <span style={{ fontSize: '0.7rem', opacity: 0.7 }}>AI</span>
-                                <input
-                                    type="checkbox"
-                                    checked={col.isAutoIncrement}
-                                    onChange={e => updateColumn(idx, 'isAutoIncrement', e.target.checked)}
-                                    disabled={!col.isPrimaryKey || col.type !== 'INTEGER'}
-                                />
-                            </label>
-
-                            {/* NN (Not Null) */}
-                            <label style={{ fontSize: '0.8rem', display: 'flex', flexDirection: 'column', alignItems: 'center', cursor: 'pointer' }} title="Allow Null">
-                                <span style={{ fontSize: '0.7rem', opacity: 0.7 }}>Null</span>
-                                <input
-                                    type="checkbox"
-                                    checked={col.isNullable}
-                                    onChange={e => updateColumn(idx, 'isNullable', e.target.checked)}
-                                />
-                            </label>
-
-                            {/* UQ */}
-                            <label style={{ fontSize: '0.8rem', display: 'flex', flexDirection: 'column', alignItems: 'center', cursor: 'pointer' }} title="Unique">
-                                <span style={{ fontSize: '0.7rem', opacity: 0.7 }}>UQ</span>
-                                <input
-                                    type="checkbox"
-                                    checked={col.isUnique}
-                                    onChange={e => updateColumn(idx, 'isUnique', e.target.checked)}
-                                />
-                            </label>
-
-                            <button
-                                onClick={() => removeColumn(idx)}
-                                style={{ background: 'transparent', border: 'none', color: '#ff4d4d', cursor: 'pointer', display: 'flex', justifyContent: 'center' }}
-                                title="Remove Column"
-                            >
-                                <Trash2 size={16} />
-                            </button>
-                        </div>
-                    ))}
+                {/* Foreign Keys (Placeholder for layout matching) */}
+                <div className={styles.fkSection}>
+                    <label className={styles.label}>Foreign Keys</label>
+                    <button className={styles.addColumnBtn} style={{ marginLeft: 0 }}>
+                        <Plus size={16} /> Add Foreign Key
+                    </button>
                 </div>
-            </div>
-
-            {error && <div style={{ color: '#ff4d4d', marginTop: '1rem', padding: '0.5rem', border: '1px solid #ff4d4d', borderRadius: '4px' }}>
-                Error: {error}
-            </div>}
-
-            <div style={{ marginTop: '2rem', display: 'flex', justifyContent: 'flex-end' }}>
-                <button className={styles.addButton} onClick={handleCreate} style={{ padding: '0.75rem 2rem', fontSize: '1rem' }}>
-                    <Save size={16} /> Create Table
-                </button>
             </div>
         </div>
     );

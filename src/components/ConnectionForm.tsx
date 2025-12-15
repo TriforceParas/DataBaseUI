@@ -17,11 +17,11 @@ export const ConnectionForm: React.FC<ConnectionFormProps> = ({ connectionToEdit
 
     const [newConnProp, setNewConnProp] = useState({
         protocol: '',
-        host: 'localhost',
-        port: '5432',
-        username: 'postgres',
+        host: '',
+        port: '',
+        username: '',
         password: '',
-        database: 'postgres'
+        database: ''
     });
     const [useUrlMode, setUseUrlMode] = useState(false);
 
@@ -43,47 +43,33 @@ export const ConnectionForm: React.FC<ConnectionFormProps> = ({ connectionToEdit
     }, [connectionToEdit]);
 
     const parseConnectionString = (str: string) => {
+        // 1. Handle SQLite explicitly first
+        // (Kept separate because file paths can sometimes confuse standard URL parsers)
+        if (str.startsWith('sqlite://')) {
+            return {
+                protocol: 'sqlite',
+                host: '',
+                port: '',
+                username: '',
+                password: '',
+                database: str.replace('sqlite://', '')
+            };
+        }
+
         try {
-            const regex = /^([a-z0-9]+):\/\/([^:]+)(?::([^@]+))?@([^:]+):(\d+)\/(.+)$/;
-            const match = str.match(regex);
+            // 2. Use the built-in URL API (Safe, Fast, Standard)
+            const url = new URL(str);
 
-            if (match) {
-                return {
-                    protocol: match[1],
-                    username: match[2],
-                    password: match[3] || '',
-                    host: match[4],
-                    port: match[5],
-                    database: match[6]
-                };
-            }
-
-            const simpleRegex = /^([a-z0-9]+):\/\/([^@]+)@([^:]+):(\d+)\/(.+)$/;
-            const simpleMatch = str.match(simpleRegex);
-            if (simpleMatch) {
-                return {
-                    protocol: simpleMatch[1],
-                    username: simpleMatch[2],
-                    password: '',
-                    host: simpleMatch[3],
-                    port: simpleMatch[4],
-                    database: simpleMatch[5]
-                };
-            }
-
-            if (str.startsWith('sqlite://')) {
-                return {
-                    protocol: 'sqlite',
-                    host: '',
-                    port: '',
-                    username: '',
-                    password: '',
-                    database: str.replace('sqlite://', '')
-                };
-            }
-            return null;
+            return {
+                protocol: url.protocol.replace(':', ''), // removes the trailing ':'
+                username: url.username,                  // automatically extracts user
+                password: url.password,                  // automatically extracts pass (or empty string)
+                host: url.hostname,
+                port: url.port,
+                database: url.pathname.slice(1)          // removes the leading '/'
+            };
         } catch (e) {
-            console.error(e);
+            // 3. If the string is not a valid URL, return null
             return null;
         }
     };

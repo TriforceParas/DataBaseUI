@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { invoke } from '@tauri-apps/api/core';
+import { X } from 'lucide-react';
 import styles from '../styles/ConnectionForm.module.css'; // Reusing form styles
 
 interface TagManagerProps {
@@ -25,7 +26,12 @@ export const TagManager: React.FC<TagManagerProps> = ({ onSuccess, onCancel }) =
 
     return (
         <form className={styles.form} onSubmit={handleSubmit} style={{ minWidth: '300px' }}>
-            <h3 className={styles.sectionTitle}>Create New Tag</h3>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+                <h3 className={styles.sectionTitle} style={{ margin: 0 }}>Create New Tag</h3>
+                <button type="button" onClick={onCancel} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-secondary)' }}>
+                    <X size={18} />
+                </button>
+            </div>
 
             <input
                 className={styles.input}

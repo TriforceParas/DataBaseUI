@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { invoke } from '@tauri-apps/api/core';
+import { getCurrentWindow } from '@tauri-apps/api/window';
 import styles from '../styles/Welcome.module.css';
 import { Connection } from '../types';
 import { Pencil, Trash2 } from 'lucide-react';
@@ -30,6 +31,7 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onConnect }) => {
 
     useEffect(() => {
         fetchConnections();
+        getCurrentWindow().center();
     }, []);
 
     const handleEdit = (conn: Connection) => {

@@ -69,7 +69,7 @@ export const DataGrid: React.FC<DataGridProps> = ({
                 <thead>
                     <tr>
                         <th style={{
-                            width: '40px',
+                            width: '50px',
                             textAlign: 'center',
                             borderBottom: '1px solid var(--border-color)',
                             borderRight: '1px solid var(--border-color)',

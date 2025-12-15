@@ -13,10 +13,30 @@ interface QueryEditorProps {
     onExport?: (format: 'CSV' | 'JSON') => void;
 }
 
+const extractQueryAtLine = (model: any, lineNumber: number): string | null => {
+    const val = model.getValue();
+    const semiIndices = [...val.matchAll(/;/g)].map((m: any) => m.index!);
+    const lineStartOff = model.getOffsetAt({ lineNumber: lineNumber, column: 1 });
+
+    // Find nearest preceding ; (or -1)
+    const start = semiIndices.filter((i: number) => i < lineStartOff).pop() ?? -1;
+
+    // Find nearest succeeding ; (or end)
+    let end = semiIndices.find((i: number) => i >= lineStartOff);
+    if (end === undefined) end = val.length;
+
+    const text = val.substring(start + 1, end).trim();
+    return text || null;
+};
+
 export const QueryEditor: React.FC<QueryEditorProps> = ({ value, onChange, onRunQuery, selectedRowCount = 0, onCopy, onExport }) => {
     const editorRef = useRef<any>(null);
     const monacoRef = useRef<any>(null);
     const providerRef = useRef<any>(null);
+    const commandRef = useRef<any>(null);
+
+    // Unique command ID for this editor instance to avoid collisions and stale closures
+    const commandId = useRef('cmd.runQuery.' + crypto.randomUUID()).current;
 
     // Dropdown state
     const [activeDropdown, setActiveDropdown] = useState<'copy' | 'export' | null>(null);
@@ -31,18 +51,58 @@ export const QueryEditor: React.FC<QueryEditorProps> = ({ value, onChange, onRun
         editorRef.current = editor;
         monacoRef.current = monaco;
 
-        // Register Command
-        editor.addCommand(0, (_: any, ...args: any[]) => {
-            const queryToRun = args[0];
-            if (queryToRun) {
-                onRunQuery(queryToRun);
+        // Clean up previous if any
+        if (commandRef.current) {
+            commandRef.current.dispose();
+        }
+
+        // Register Instance-Specific Command
+        // We use a unique ID so this specific editor instance handles its own CodeLens clicks.
+        // This ensures 'editor' and 'onRunQuery' in closure are correct.
+        commandRef.current = monaco.editor.addCommand({
+            id: commandId,
+            run: (_: any, lineNumber: number) => {
+                const model = editor.getModel();
+                const query = extractQueryAtLine(model, lineNumber);
+                if (query) {
+                    onRunQuery(query);
+                }
             }
-        }, '');
+        });
 
         // Register CodeLens Provider
+        // Note: We register this globally for 'sql', but we filter lenses or just provide them.
+        // Since it's global registration, multiple editors might trigger this?
+        // Actually `registerCodeLensProvider` is global for language.
+        // It provides lenses for ALL models of that language.
+        // We need to make sure we only provide lenses for THIS editor's model?
+        // Or if we provide for all, we need to make sure the command ID is correct for THAT model.
+        // Monaco calls provideCodeLenses(model).
+        // We can check if `model === editor.getModel()`?
+        // OR better: The provider itself should be global? NO.
+        // If we register multiple providers for 'sql', they pile up.
+        // ISSUE: `registerCodeLensProvider` IS GLOBAL.
+        // If we have 3 tabs, we have 3 providers registered.
+        // Each provider will get called for ANY sql model.
+        // Provider A (Tab A) called for Model B (Tab B).
+        // Provider A checks Model B. Generates lenses with Command A (Tab A).
+        // User clicks lens in Tab B. Command A executes.
+        // Command A uses `editor` (Tab A).
+        // `editor.getModel()` is Model A. `onRunQuery` is Tab A's.
+        // User clicked in Tab B, but Tab A runs?
+        // AND query extracted from Model A?
+
+        // CORRECTION:
+        // We must ensure the provider ONLY returns lenses if the model matches THIS editor instance.
+
         if (!providerRef.current) {
             providerRef.current = monaco.languages.registerCodeLensProvider('sql', {
                 provideCodeLenses: function (model: any) {
+                    // Critical check: Only provide lenses if this model belongs to this editor instance.
+                    if (editor.getModel() !== model) {
+                        return { lenses: [], dispose: () => { } };
+                    }
+
                     const fullText = model.getValue();
                     const lensRanges: Set<number> = new Set();
 
@@ -57,7 +117,6 @@ export const QueryEditor: React.FC<QueryEditorProps> = ({ value, onChange, onRun
                     let match;
                     const re = /;/g;
                     while ((match = re.exec(fullText)) !== null) {
-                        // Find next non-whitespace after this semi-colon
                         const nextCharIdx = match.index + 1;
                         if (nextCharIdx >= fullText.length) continue;
 
@@ -80,7 +139,7 @@ export const QueryEditor: React.FC<QueryEditorProps> = ({ value, onChange, onRun
                                 endColumn: 1
                             },
                             command: {
-                                id: 'cmd.runQuery',
+                                id: commandId,
                                 title: '▶ Run',
                                 arguments: [line]
                             }
@@ -88,68 +147,31 @@ export const QueryEditor: React.FC<QueryEditorProps> = ({ value, onChange, onRun
                         dispose: () => { }
                     };
                 },
-                resolveCodeLens: function (model: any, codeLens: any) {
+                resolveCodeLens: function (_model: any, codeLens: any) {
                     return codeLens;
-                }
-            });
-
-            // Register command that the lens triggers
-            monaco.editor.addCommand({
-                id: 'cmd.runQuery',
-                run: (ctx: any, lineNumber: number) => {
-                    const model = ctx.getModel();
-                    const val = model.getValue();
-
-                    // Find logic: extracts text bounded by semi-colons around the target line
-                    const semiIndices = [...val.matchAll(/;/g)].map((m: any) => m.index!);
-
-                    // Convert lineNumber to offset
-                    const lineStartOff = model.getOffsetAt({ lineNumber: lineNumber, column: 1 });
-
-                    // Find nearest preceding ; (or 0)
-                    const start = semiIndices.filter((i: number) => i < lineStartOff).pop() ?? -1;
-
-                    // Find nearest succeeding ; (or end)
-                    let end = semiIndices.find((i: number) => i >= lineStartOff);
-                    if (end === undefined) end = val.length;
-
-                    const text = val.substring(start + 1, end).trim();
-                    if (text) {
-                        onRunQuery(text);
-                    }
                 }
             });
         }
     };
 
-    // Cleanup provider on unmount
+    // Cleanup
     useEffect(() => {
         return () => {
             if (providerRef.current) {
                 providerRef.current.dispose();
             }
+            if (commandRef.current) {
+                commandRef.current.dispose();
+            }
         };
     }, []);
 
-    // Close dropdowns on outside click (simplified)
+    // Close dropdowns
     useEffect(() => {
         const handleClick = () => setActiveDropdown(null);
         window.addEventListener('click', handleClick);
         return () => window.removeEventListener('click', handleClick);
     }, []);
-
-    // Command handler logic (moved out of monaco init for state cleanliness if needed, 
-    // but monaco commands are static. The `run` function captures closure if defined there.)
-    // Note: `monaco.editor.addCommand` is global. This might crash if we add it twice.
-    // Safe way: Check if command exists? Monaco doesn't expose `hasCommand`.
-    // Exception swallowing or unique IDs (e.g. app instance ID) helps.
-    // For this MVP, we risk valid console warning on re-register.
-
-    // Better: Define the command behavior via `editor.addCommand` which is scoped to editor instance?
-    // CodeLens `command` string must invoke a known command service ID. 
-    // `editor.addCommand` adds it to that editor instance, but accessible via ID?
-    // Try: use a specific ID `runQuery_${ uniqueId } `?
-    // Let's stick to global `cmd.runQuery` and overwrite it safely or ignore error.
 
     return (
         <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
@@ -166,7 +188,7 @@ export const QueryEditor: React.FC<QueryEditorProps> = ({ value, onChange, onRun
                     <button
                         className={styles.primaryBtn}
                         onClick={() => onRunQuery(value)}
-                        title="Run all queries"
+                        title="Run all queries (Ctrl+Enter)"
                     >
                         <Play size={14} fill="currentColor" /> Run All
                     </button>
@@ -255,7 +277,7 @@ export const QueryEditor: React.FC<QueryEditorProps> = ({ value, onChange, onRun
                 </div>
 
                 <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
-                    Ctrl+Enter to run selected
+                    Ctrl+Enter to run
                 </div>
             </div>
 
@@ -275,7 +297,6 @@ export const QueryEditor: React.FC<QueryEditorProps> = ({ value, onChange, onRun
                         lineNumbers: 'on',
                         padding: { top: 10 },
                         glyphMargin: false,
-                        // Enable code lens
                         codeLens: true
                     }}
                 />

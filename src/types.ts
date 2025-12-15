@@ -29,4 +29,16 @@ export interface PendingChange {
     column?: string; // For updates
     oldValue?: any;
     newValue?: any;
+    generatedSql?: string; // Preview
+}
+
+export interface LogEntry {
+    id: string;
+    time: string;
+    status: 'Success' | 'Error';
+    table?: string;
+    query: string;
+    error?: string;
+    rows?: number;
+    user?: string;
 }

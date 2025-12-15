@@ -6,7 +6,7 @@ use sqlx::postgres::PgConnection;
 use sqlx::sqlite::SqliteConnection;
 use sqlx::{AnyConnection, Column, Connection as SqlxConnection, FromRow, Row, TypeInfo};
 use std::collections::HashMap;
-use tauri::State;
+use tauri::{Manager, State, WebviewUrl, WebviewWindowBuilder};
 
 #[derive(Serialize, Deserialize, Clone, Debug, FromRow)]
 pub struct Connection {
@@ -356,4 +356,26 @@ pub async fn get_columns(
         .collect();
 
     Ok(columns)
+}
+#[tauri::command]
+pub async fn open_connection_window<R: tauri::Runtime>(
+    app: tauri::AppHandle<R>,
+    connection_id: i64,
+) -> Result<(), String> {
+    let label = format!("connection-{}", connection_id);
+    let url = format!("index.html?connection_id={}", connection_id);
+
+    if let Some(win) = app.get_webview_window(&label) {
+        let _ = win.set_focus();
+        return Ok(());
+    }
+
+    WebviewWindowBuilder::new(&app, &label, WebviewUrl::App(url.into()))
+        .title("Connection")
+        .inner_size(1200.0, 800.0)
+        .decorations(false)
+        .build()
+        .map_err(|e| e.to_string())?;
+
+    Ok(())
 }

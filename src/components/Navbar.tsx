@@ -1,6 +1,8 @@
 import React from 'react';
 import styles from '../styles/MainLayout.module.css';
-import { RefreshCw, Search, Plus, PanelLeftClose, PanelLeftOpen, Settings, Activity, Minus, Square, X } from 'lucide-react';
+import { RefreshCw, Search, Plus, PanelLeftClose, PanelLeftOpen, Settings, Activity } from 'lucide-react';
+import { WindowControls } from './WindowControls';
+
 
 
 interface NavbarProps {
@@ -33,7 +35,7 @@ export const Navbar: React.FC<NavbarProps> = ({
     handleOpenLogs
 }) => {
     return (
-        <div className={styles.navBar}>
+        <div className={styles.navBar} data-tauri-drag-region>
             <div className={styles.navGroup}>
                 {/* DB+ Menu */}
                 <div style={{ position: 'relative' }}>
@@ -98,7 +100,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                 </button>
 
                 <div className={styles.verticalDivider} style={{ margin: '0 1rem' }}></div>
-
+                <WindowControls />
 
             </div>
         </div>

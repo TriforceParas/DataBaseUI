@@ -20,7 +20,8 @@ pub fn run() {
             commands::remove_tag_from_table,
             commands::get_table_tags,
             commands::execute_query,
-            commands::get_columns
+            commands::get_columns,
+            commands::open_connection_window
         ])
         .setup(|app| {
             if cfg!(debug_assertions) {

@@ -1,6 +1,7 @@
 import React from 'react';
 import { getCurrentWindow } from '@tauri-apps/api/window';
 import { Minus, Square, X } from 'lucide-react';
+import styles from '../styles/WindowControls.module.css';
 
 interface WindowControlsProps {
     showMinimize?: boolean;
@@ -14,33 +15,33 @@ export const WindowControls: React.FC<WindowControlsProps> = ({
     showClose = true
 }) => {
     const handleControl = async (e: React.MouseEvent, action: 'minimize' | 'maximize' | 'close') => {
-        // Prevent event from bubbling to drag regions
         e.stopPropagation();
         try {
             const win = getCurrentWindow();
             if (action === 'minimize') await win.minimize();
             if (action === 'maximize') await win.toggleMaximize();
             if (action === 'close') await win.close();
-        } catch (e) {
-            console.error("Window control error:", e);
+        } catch (err) {
+            console.error("Window control error:", err);
         }
     };
 
-    // Prevent drag on mouse down
     const stopDrag = (e: React.MouseEvent) => {
         e.stopPropagation();
     };
 
     return (
         <div
+            className={styles.container}
             onMouseDown={stopDrag}
-            style={{ display: 'flex', gap: '4px', zIndex: 99999 }}
+            data-tauri-drag-region={false}
         >
             {showMinimize && (
                 <button
                     type="button"
                     onClick={(e) => handleControl(e, 'minimize')}
-                    style={{ background: 'transparent', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer', padding: '4px', display: 'flex', alignItems: 'center' }}
+                    className={styles.button}
+                    title="Minimize"
                 >
                     <Minus size={16} />
                 </button>
@@ -49,7 +50,8 @@ export const WindowControls: React.FC<WindowControlsProps> = ({
                 <button
                     type="button"
                     onClick={(e) => handleControl(e, 'maximize')}
-                    style={{ background: 'transparent', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer', padding: '4px', display: 'flex', alignItems: 'center' }}
+                    className={styles.button}
+                    title="Maximize"
                 >
                     <Square size={14} />
                 </button>
@@ -58,7 +60,8 @@ export const WindowControls: React.FC<WindowControlsProps> = ({
                 <button
                     type="button"
                     onClick={(e) => handleControl(e, 'close')}
-                    style={{ background: 'transparent', border: 'none', color: '#ef4444', cursor: 'pointer', padding: '4px', display: 'flex', alignItems: 'center' }}
+                    className={`${styles.button} ${styles.closeButton}`}
+                    title="Close"
                 >
                     <X size={18} />
                 </button>

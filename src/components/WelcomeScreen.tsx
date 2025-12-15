@@ -3,8 +3,10 @@ import { invoke } from '@tauri-apps/api/core';
 import { getCurrentWindow } from '@tauri-apps/api/window';
 import styles from '../styles/Welcome.module.css';
 import { Connection } from '../types';
-import { Pencil, Trash2 } from 'lucide-react';
+import { Pencil, Trash2, Zap, Plus, FlaskConical } from 'lucide-react';
 import { ConnectionForm } from './ConnectionForm';
+
+
 
 interface WelcomeScreenProps {
     onConnect: (connection: Connection) => void;
@@ -16,8 +18,6 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onConnect }) => {
     const [editId, setEditId] = useState<number | null>(null);
     const [isConnecting, setIsConnecting] = useState(false);
     const [error, setError] = useState<string | null>(null);
-
-    // Keep track of connection being edited
     const [connectionToEdit, setConnectionToEdit] = useState<Connection | null>(null);
 
     const fetchConnections = async () => {
@@ -100,6 +100,7 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onConnect }) => {
 
     return (
         <div className={styles.container}>
+            {/* Left Panel - Branding */}
             <div className={styles.leftPanel}>
                 <h1 className={styles.title}>DB+</h1>
                 <p className={styles.subtitle}>Premium SQL Client</p>
@@ -107,20 +108,35 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onConnect }) => {
                     ❖
                 </div>
             </div>
+
+            {/* Right Panel - Form */}
             <div className={styles.rightPanel}>
-                <div className={styles.headerContainer}>
-                    <h2 className={styles.sectionTitle} style={{ marginBottom: 0 }}>Saved Connections</h2>
-                    <button
-                        className={`${styles.addButton} ${showForm ? styles.closeButton : ''}`}
-                        onClick={toggleForm}
-                    >
-                        {showForm ? 'X Close' : '+ New Connection'}
+
+                {/* Window Controls embedded nicely top right */}
+
+
+                <div className={styles.headerRow}>
+                    <h2 className={styles.sectionTitle}>Recent Connections</h2>
+                    <button className={styles.newBtn} onClick={toggleForm}>
+                        <Plus size={16} /> New
                     </button>
                 </div>
 
-                {/* Form opens on top */}
+                {isConnecting && (
+                    <div style={{ color: 'var(--accent-primary)', marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                        Connecting<span className={styles.dots}></span>
+                    </div>
+                )}
+
+                {error && (
+                    <div style={{ color: '#ef4444', marginBottom: '1rem', fontSize: '0.9rem' }}>
+                        Error: {error}
+                    </div>
+                )}
+
+                {/* Form */}
                 {showForm && (
-                    <div style={{ marginBottom: '1.5rem' }}>
+                    <div className={styles.formContainer}>
                         <ConnectionForm
                             connectionToEdit={connectionToEdit}
                             onSuccess={handleFormSuccess}
@@ -129,70 +145,59 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onConnect }) => {
                     </div>
                 )}
 
-                {error && (
-                    <div style={{ color: '#ff4d4d', marginBottom: '1rem', fontSize: '0.9rem', padding: '0.5rem', border: '1px solid #ff4d4d', borderRadius: '4px', backgroundColor: 'rgba(255, 77, 77, 0.1)' }}>
-                        ⚠️ {error}
-                    </div>
-                )}
-
-                {isConnecting && (
-                    <div style={{ color: 'var(--accent-primary)', marginBottom: '1rem', fontSize: '0.9rem' }}>
-                        Connecting<span className={styles.dots}></span>
-                    </div>
-                )}
-
+                {/* Connections List */}
                 <div className={styles.connectionList}>
                     {connections.map(conn => (
-                        <div
-                            key={conn.id}
-                            className={styles.connectionItem}
-                            onClick={() => handleConnect(conn)}
-                            style={{ pointerEvents: isConnecting ? 'none' : 'auto', opacity: isConnecting ? 0.7 : 1 }}
-                        >
-                            <div>
-                                <strong>{conn.name}</strong>
-                                <div style={{ fontSize: '0.8rem', opacity: 0.7 }}>{conn.connection_string}</div>
+                        <div key={conn.id} className={styles.connectionCard} onClick={() => handleConnect(conn)}>
+                            <div className={styles.iconPlaceholder}>
+                                <Zap size={20} fill="currentColor" />
                             </div>
-                            <div className={styles.actionButtons}>
-                                <button
-                                    className={styles.actionIcon}
-                                    onClick={(e) => { e.stopPropagation(); handleEdit(conn); }}
-                                    title="Edit"
-                                >
+                            <div className={styles.cardDetails}>
+                                <div className={styles.cardTitle}>{conn.name}</div>
+                                <div className={styles.cardSubtitle}>{conn.connection_string}</div>
+                            </div>
+
+                            <div className={styles.cardActions}>
+                                <button className={styles.actionBtn} onClick={(e) => { e.stopPropagation(); handleEdit(conn); }}>
                                     <Pencil size={14} />
                                 </button>
-                                <button
-                                    className={styles.actionIcon}
-                                    onClick={(e) => handleDeleteClick(e, conn.id)}
-                                    title="Delete"
-                                >
+                                <button className={styles.actionBtn} onClick={(e) => handleDeleteClick(e, conn.id)}>
                                     <Trash2 size={14} />
                                 </button>
                             </div>
                         </div>
                     ))}
                     {connections.length === 0 && !showForm && (
-                        <p style={{ color: 'var(--text-muted)', textAlign: 'center', marginTop: '2rem' }}>
-                            No connections yet. Click "+ New Connection" to start.
-                        </p>
+                        <div style={{ color: 'var(--text-secondary)', textAlign: 'center', padding: '2rem' }}>
+                            No recent connections.
+                        </div>
                     )}
                 </div>
 
-                {deleteTargetId && (
-                    <div className={styles.modalOverlay} onClick={() => setDeleteTargetId(null)}>
-                        <div className={styles.modalContent} onClick={e => e.stopPropagation()}>
-                            <h3 className={styles.sectionTitle}>Delete Connection?</h3>
-                            <p style={{ color: 'var(--text-secondary)' }}>
-                                Are you sure you want to delete this connection? This action cannot be undone.
-                            </p>
-                            <div className={styles.modalActions}>
-                                <button className={styles.cancelButton} onClick={() => setDeleteTargetId(null)}>Cancel</button>
-                                <button className={styles.deleteButton} onClick={confirmDelete}>Delete</button>
-                            </div>
+                {/* Footer */}
+                <div className={styles.footer}>
+                    <div>Version 0.1.0</div>
+                    <div className={styles.footerRight}>
+                        <div className={styles.testConnection}>
+                            <FlaskConical size={14} /> Test Connections
                         </div>
                     </div>
-                )}
+                </div>
             </div>
+
+            {/* Delete Modal */}
+            {deleteTargetId && (
+                <div className={styles.modalOverlay} onClick={() => setDeleteTargetId(null)}>
+                    <div className={styles.modalContent} onClick={e => e.stopPropagation()}>
+                        <h3 className={styles.sectionTitle} style={{ marginTop: 0 }}>Delete?</h3>
+                        <p style={{ color: 'var(--text-secondary)' }}>Remove this connection?</p>
+                        <div className={styles.modalActions}>
+                            <button className={styles.cancelButton} onClick={() => setDeleteTargetId(null)}>Cancel</button>
+                            <button className={styles.deleteButton} onClick={confirmDelete}>Delete</button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 };

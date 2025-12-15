@@ -3,7 +3,7 @@ import { invoke } from '@tauri-apps/api/core';
 import { getCurrentWindow } from '@tauri-apps/api/window';
 import styles from '../styles/MainLayout.module.css';
 import { Connection, QueryResult, PendingChange, Tag, TableTag, LogEntry } from '../types';
-import { RefreshCw, Search, Plus, PanelLeftClose, PanelLeftOpen, Code2, Table, Filter, ArrowUpDown, Trash2, Pencil, ChevronUp, ChevronDown, X, Copy, Download, Activity, ChevronLeft, ChevronRight, Clock, CheckCircle, AlertCircle, Settings, ZoomIn, ZoomOut, Moon, Sun, Monitor, Minus, Square } from 'lucide-react';
+import { Code2, Table, Filter, ArrowUpDown, Trash2, Pencil, ChevronUp, ChevronDown, X, Copy, Download, Activity, ChevronLeft, ChevronRight, Clock, CheckCircle, AlertCircle } from 'lucide-react';
 import { ConnectionForm } from './ConnectionForm';
 import { Sidebar } from './Sidebar';
 import { ChangelogSidebar } from './ChangelogSidebar';

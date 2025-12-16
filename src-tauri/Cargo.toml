@@ -24,5 +24,6 @@ log = "0.4"
 tauri = { version = "2.9.5", features = [] }
 tauri-plugin-log = "2"
 chrono = { version = "0.4", features = ["serde"] }
-sqlx = { version = "0.7", features = ["runtime-tokio-rustls", "any", "sqlite", "postgres", "mysql", "chrono"] }
+sqlx = { version = "0.7", features = ["runtime-tokio-rustls", "any", "sqlite", "postgres", "mysql", "chrono", "rust_decimal"] }
+rust_decimal = "1.33"
 tokio = { version = "1", features = ["full"] }

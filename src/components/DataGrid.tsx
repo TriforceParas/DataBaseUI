@@ -1,6 +1,7 @@
-import React from 'react';
+import React, { useRef, useEffect } from 'react';
 import { QueryResult, PendingChange } from '../types';
 import { ChevronUp, ChevronDown } from 'lucide-react';
+import styles from '../styles/MainLayout.module.css';
 
 interface DataGridProps {
     data: QueryResult | null;
@@ -10,6 +11,7 @@ interface DataGridProps {
     onSelectionChange?: (indices: Set<number>) => void;
     onSort?: (column: string) => void;
     pendingChanges?: PendingChange[];
+    highlightRowIndex?: number | null;
 }
 
 export const DataGrid: React.FC<DataGridProps> = ({
@@ -19,8 +21,20 @@ export const DataGrid: React.FC<DataGridProps> = ({
     selectedIndices = new Set(),
     onSelectionChange,
     onSort,
-    pendingChanges = []
+    pendingChanges = [],
+    highlightRowIndex
 }) => {
+    const rowRefs = useRef<Map<number, HTMLTableRowElement>>(new Map());
+
+    useEffect(() => {
+        if (highlightRowIndex !== undefined && highlightRowIndex !== null) {
+            const row = rowRefs.current.get(highlightRowIndex);
+            if (row) {
+                row.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            }
+        }
+    }, [highlightRowIndex]);
+
     if (loading) {
         return <div style={{ padding: '2rem', textAlign: 'center', color: 'var(--text-secondary)' }}>Loading...</div>;
     }
@@ -34,6 +48,8 @@ export const DataGrid: React.FC<DataGridProps> = ({
     if (!data || data.columns.length === 0) {
         return <div style={{ padding: '2rem', textAlign: 'center', color: 'var(--text-muted)' }}>No data to display</div>;
     }
+
+    const hasRows = data.rows.length > 0;
 
     const handleSelectAll = (e: React.ChangeEvent<HTMLInputElement>) => {
         if (!onSelectionChange) return;
@@ -58,8 +74,6 @@ export const DataGrid: React.FC<DataGridProps> = ({
 
     return (
         <div style={{ width: '100%', height: '100%', overflow: 'auto' }}>
-            {/* Debug log */}
-            {console.log('DataGrid Rendering:', { columns: data?.columns, firstRow: data?.rows?.[0] })}
             <table style={{
                 width: '100%',
                 borderCollapse: 'collapse',
@@ -69,12 +83,15 @@ export const DataGrid: React.FC<DataGridProps> = ({
                 <thead>
                     <tr>
                         <th style={{
-                            width: '50px',
+                            width: '40px',
+                            minWidth: '40px',
+                            maxWidth: '40px',
                             textAlign: 'center',
                             borderBottom: '1px solid var(--border-color)',
                             borderRight: '1px solid var(--border-color)',
                             backgroundColor: 'var(--bg-secondary)',
-                            position: 'sticky', top: 0, zIndex: 1
+                            position: 'sticky', top: 0, zIndex: 1,
+                            padding: '0.5rem'
                         }}>
                             <input
                                 type="checkbox"
@@ -115,6 +132,7 @@ export const DataGrid: React.FC<DataGridProps> = ({
                 <tbody>
                     {data.rows.map((row, rIdx) => {
                         const isSelected = selectedIndices.has(rIdx);
+                        const isHighlighted = highlightRowIndex === rIdx;
                         const pendingDelete = pendingChanges.some(c => c.type === 'DELETE' && c.rowIndex === rIdx);
 
                         // Style priority: Delete Red > Selected Blue > Default
@@ -122,11 +140,23 @@ export const DataGrid: React.FC<DataGridProps> = ({
                         const rowStyle = { backgroundColor: rowBg };
 
                         return (
-                            <tr key={rIdx} style={rowStyle}>
+                            <tr
+                                key={rIdx}
+                                style={rowStyle}
+                                ref={el => {
+                                    if (el) rowRefs.current.set(rIdx, el);
+                                    else rowRefs.current.delete(rIdx);
+                                }}
+                                className={`${styles.tableRow} ${isHighlighted ? styles.highlightRow : ''}`}
+                            >
                                 <td style={{
+                                    width: '40px',
+                                    minWidth: '40px',
+                                    maxWidth: '40px',
                                     textAlign: 'center',
                                     borderBottom: '1px solid var(--border-color)',
                                     borderRight: '1px solid var(--border-color)',
+                                    padding: '0.5rem'
                                 }}>
                                     <input
                                         type="checkbox"
@@ -171,6 +201,22 @@ export const DataGrid: React.FC<DataGridProps> = ({
                             </tr>
                         );
                     })}
+                    {!hasRows && (
+                        <tr>
+                            <td
+                                colSpan={data.columns.length + 1}
+                                style={{
+                                    padding: '2rem',
+                                    textAlign: 'center',
+                                    color: 'var(--text-muted)',
+                                    fontStyle: 'italic',
+                                    borderBottom: '1px solid var(--border-color)'
+                                }}
+                            >
+                                No data in Table
+                            </td>
+                        </tr>
+                    )}
                 </tbody>
             </table>
         </div>

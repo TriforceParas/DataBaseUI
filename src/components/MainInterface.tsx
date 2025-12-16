@@ -2,8 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import { getCurrentWindow } from '@tauri-apps/api/window';
 import styles from '../styles/MainLayout.module.css';
-import { Connection, QueryResult, PendingChange, Tag, TableTag, LogEntry } from '../types';
-import { Code2, Table, Filter, ArrowUpDown, Trash2, Pencil, ChevronUp, ChevronDown, X, Copy, Download, Activity, ChevronLeft, ChevronRight, Clock, CheckCircle, AlertCircle } from 'lucide-react';
+import { Connection, QueryResult, PendingChange, Tag, TableTag, LogEntry, ColumnSchema } from '../types';
+import { Plus, Code2, Table, Filter, ArrowUpDown, Trash2, Pencil, ChevronUp, ChevronDown, X, Copy, Download, Activity, ChevronLeft, ChevronRight, Clock, CheckCircle, AlertCircle, RefreshCw } from 'lucide-react';
 import { ConnectionForm } from './ConnectionForm';
 import { Sidebar } from './Sidebar';
 import { ChangelogSidebar } from './ChangelogSidebar';
@@ -14,6 +14,8 @@ import { InsertRowPanel } from './InsertRowPanel';
 import { Navbar } from './Navbar';
 import { PreferencesModal } from './PreferencesModal';
 import { WindowControls } from './WindowControls';
+import { ConfirmModal } from './ConfirmModal';
+import { DuplicateTableModal } from './DuplicateTableModal';
 import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors, DragEndEvent } from '@dnd-kit/core';
 import { SortableContext, arrayMove, sortableKeyboardCoordinates, horizontalListSortingStrategy, useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
@@ -35,7 +37,7 @@ interface SortState {
 }
 
 // Sortable Tab Component
-function SortableTab({ tab, isActive, onClick, onClose, color }: { tab: any, isActive: boolean, onClick: () => void, onClose: (e: any, id: string) => void, color?: string }) {
+function SortableTab({ tab, isActive, onClick, onClose, onDoubleClick, color }: { tab: any, isActive: boolean, onClick: () => void, onClose: (e: any, id: string) => void, onDoubleClick?: () => void, color?: string }) {
     const { attributes, listeners, setNodeRef, transform, transition } = useSortable({ id: tab.id });
     const [isHovered, setIsHovered] = useState(false);
     const [isCloseHovered, setIsCloseHovered] = useState(false);
@@ -65,12 +67,23 @@ function SortableTab({ tab, isActive, onClick, onClose, color }: { tab: any, isA
             {...attributes}
             {...listeners}
             onClick={onClick}
+            onDoubleClick={onDoubleClick}
             onMouseEnter={() => setIsHovered(true)}
             onMouseLeave={() => setIsHovered(false)}
         >
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', overflow: 'hidden' }}>
-                {tab.type === 'query' ? <Code2 size={14} style={{ flexShrink: 0 }} /> : tab.type === 'log' ? <Activity size={14} style={{ flexShrink: 0 }} /> : <Table size={14} style={{ flexShrink: 0, color: color }} />}
-                <span style={{ fontSize: '0.85rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{tab.title}</span>
+                {tab.type === 'query' ? <Code2 size={14} style={{ flexShrink: 0, color: 'var(--accent-color)' }} /> :
+                    tab.type === 'table' ? <Table size={14} style={{ flexShrink: 0, color: color || 'var(--text-primary)' }} /> :
+                        tab.type === 'log' ? <Activity size={14} style={{ flexShrink: 0, color: '#a855f7' }} /> :
+                            tab.type === 'create-table' ? <Plus size={14} style={{ flexShrink: 0, color: 'var(--accent-primary)' }} /> :
+                                <Table size={14} style={{ flexShrink: 0 }} />}
+                <span style={{
+                    fontSize: '0.85rem',
+                    whiteSpace: 'nowrap',
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                    fontStyle: tab.isPreview ? 'italic' : 'normal'
+                }}>{tab.title}</span>
             </div>
             <div
                 role="button"
@@ -103,9 +116,15 @@ export const MainInterface: React.FC<MainInterfaceProps> = ({ connection, onSwit
 
     const [showPreferences, setShowPreferences] = useState(false);
 
-    // Preference State
-    const [theme, setTheme] = useState<'blue' | 'gray' | 'amoled' | 'light'>('blue');
-    const [zoom, setZoom] = useState(1);
+    // Preference State - Load from localStorage
+    const [theme, setTheme] = useState<'blue' | 'gray' | 'amoled' | 'light'>(() => {
+        const saved = localStorage.getItem('app-theme');
+        return (saved as 'blue' | 'gray' | 'amoled' | 'light') || 'blue';
+    });
+    const [zoom, setZoom] = useState(() => {
+        const saved = localStorage.getItem('app-zoom');
+        return saved ? parseFloat(saved) : 1;
+    });
     const [showDbMenu, setShowDbMenu] = useState(false);
 
     // Window Management
@@ -119,10 +138,16 @@ export const MainInterface: React.FC<MainInterfaceProps> = ({ connection, onSwit
         maximize();
     }, [connection]);
 
+    // Save and apply theme
     useEffect(() => {
-        // Apply Theme
         document.documentElement.setAttribute('data-theme', theme);
+        localStorage.setItem('app-theme', theme);
     }, [theme]);
+
+    // Save zoom
+    useEffect(() => {
+        localStorage.setItem('app-zoom', zoom.toString());
+    }, [zoom]);
 
     const handleZoom = (delta: number) => {
         setZoom(prev => Math.max(0.5, Math.min(2.0, prev + delta)));
@@ -148,16 +173,16 @@ export const MainInterface: React.FC<MainInterfaceProps> = ({ connection, onSwit
         return () => window.removeEventListener('keydown', handleKeyDown);
     }, []);
 
-    // Tabs State
-    const [tabs, setTabs] = useState<{ id: string; type: 'table' | 'query' | 'create-table' | 'log'; title: string }[]>([
+    // Tabs State - isPreview indicates tab is in preview mode (italic title, can be replaced)
+    const [tabs, setTabs] = useState<{ id: string; type: 'table' | 'query' | 'create-table' | 'log'; title: string; isPreview?: boolean }[]>([
         { id: 'query1', type: 'query', title: 'Query 1' }
     ]);
     const [activeTabId, setActiveTabId] = useState('query1');
     const [resultsVisible, setResultsVisible] = useState(true);
 
-    // Query Texts State (Persist per tab)
+    // Query Texts State (Persist per tab) - Start with empty query
     const [tabQueries, setTabQueries] = useState<Record<string, string>>({
-        'query1': '-- Write your SQL query here\nSELECT * FROM '
+        'query1': ''
     });
 
     // Results state keyed by tab ID
@@ -172,7 +197,17 @@ export const MainInterface: React.FC<MainInterfaceProps> = ({ connection, onSwit
     // Selection State
     const [selectedIndicesMap, setSelectedIndicesMap] = useState<Record<string, Set<number>>>({});
     const selectedIndices = selectedIndicesMap[activeTabId] || new Set();
+
+    // Auto-pin tab when user interacts with it
+    const pinActiveTab = () => {
+        setTabs(prevTabs => prevTabs.map(t =>
+            t.id === activeTabId && t.isPreview ? { ...t, isPreview: false } : t
+        ));
+    };
+
     const setSelectedIndices = (action: Set<number> | ((prev: Set<number>) => Set<number>)) => {
+        // Pin tab when user selects rows (indicates interaction)
+        pinActiveTab();
         setSelectedIndicesMap(prev => {
             const current = prev[activeTabId] || new Set();
             const next = typeof action === 'function' ? action(current) : action;
@@ -201,6 +236,17 @@ export const MainInterface: React.FC<MainInterfaceProps> = ({ connection, onSwit
 
     // Refresh State
     const [refreshTrigger, setRefreshTrigger] = useState(0);
+
+    // Table Operation Confirmation Modal State
+    const [tableConfirmModal, setTableConfirmModal] = useState<{
+        type: 'truncate' | 'drop';
+        tableName: string;
+    } | null>(null);
+
+    // Duplicate Table Modal State
+    const [duplicateTableModal, setDuplicateTableModal] = useState<string | null>(null);
+    const [highlightRowIndex, setHighlightRowIndex] = useState<number | null>(null);
+    const [changelogConfirm, setChangelogConfirm] = useState<{ type: 'confirm' | 'discard' } | null>(null);
 
     // Tags for Coloring
     const [tags, setTags] = useState<Tag[]>([]);
@@ -426,15 +472,159 @@ export const MainInterface: React.FC<MainInterfaceProps> = ({ connection, onSwit
         setActiveTabId(newId);
     };
 
+    // Single click opens table in preview mode (italic title, can be replaced by next single-click)
+    // Double-click on tab pins it (removes preview mode)
     const handleTableClick = (tableName: string) => {
-        const existing = tabs.find(t => t.title === tableName && t.type === 'table');
-        if (existing) {
-            setActiveTabId(existing.id);
+        // Check if already exists as a pinned tab
+        const existingPinned = tabs.find(t => t.title === tableName && t.type === 'table' && !t.isPreview);
+        if (existingPinned) {
+            setActiveTabId(existingPinned.id);
             return;
         }
-        const newTabId = `table-${tableName}`;
-        setTabs([...tabs, { id: newTabId, type: 'table', title: tableName }]);
-        setActiveTabId(newTabId);
+
+        // Check if this table is already the preview tab
+        const existingPreview = tabs.find(t => t.title === tableName && t.type === 'table' && t.isPreview);
+        if (existingPreview) {
+            setActiveTabId(existingPreview.id);
+            return;
+        }
+
+        // Find any existing preview tab (to replace it)
+        const previewTab = tabs.find(t => t.isPreview);
+
+        if (previewTab) {
+            // Replace the preview tab with the new table
+            setTabs(tabs.map(t =>
+                t.id === previewTab.id
+                    ? { ...t, id: `table-${tableName}`, title: tableName, isPreview: true }
+                    : t
+            ));
+            // Clear results for old preview tab
+            const newResults = { ...results };
+            delete newResults[previewTab.id];
+            setResults(newResults);
+            setActiveTabId(`table-${tableName}`);
+        } else {
+            // Create new preview tab
+            const newTabId = `table-${tableName}`;
+            setTabs([...tabs, { id: newTabId, type: 'table', title: tableName, isPreview: true }]);
+            setActiveTabId(newTabId);
+        }
+    };
+
+    // Pin tab (remove preview mode) - called on double-click
+    const pinTab = (tabId: string) => {
+        setTabs(tabs.map(t =>
+            t.id === tabId ? { ...t, isPreview: false } : t
+        ));
+    };
+
+    // ---- Table Context Menu Actions ----
+
+    // Get Table Schema - Opens a tab showing the schema
+    const handleGetTableSchema = async (tableName: string) => {
+        try {
+            const schema = await invoke<ColumnSchema[]>('get_table_schema', {
+                connectionString: connection.connection_string,
+                tableName
+            });
+
+            // Convert schema to QueryResult format for display in DataGrid
+            const schemaResult: QueryResult = {
+                columns: ['Column', 'Type', 'Nullable', 'Default', 'Key'],
+                rows: schema.map(col => [
+                    col.name,
+                    col.data_type,
+                    col.is_nullable,
+                    col.column_default || 'NULL',
+                    col.column_key
+                ])
+            };
+
+            // Create a schema tab
+            const tabId = `schema-${tableName}`;
+            const existingTab = tabs.find(t => t.id === tabId);
+            if (!existingTab) {
+                setTabs([...tabs, { id: tabId, type: 'table', title: `Schema: ${tableName}` }]);
+            }
+            setActiveTabId(tabId);
+            setResults(prev => ({
+                ...prev,
+                [tabId]: { data: schemaResult, loading: false, error: null }
+            }));
+        } catch (e) {
+            console.error('Failed to get table schema:', e);
+        }
+    };
+
+    // Edit Table Schema - Opens the TableCreator with existing schema
+    const handleEditTableSchema = (tableName: string) => {
+        // Open Add Table tab - in a real implementation, you'd prefill with existing schema
+        const tabId = `create-table-${Date.now()}`;
+        setTabs([...tabs, { id: tabId, type: 'create-table', title: `Edit: ${tableName}` }]);
+        setActiveTabId(tabId);
+    };
+
+    // Duplicate Table - Show modal
+    const handleDuplicateTable = (tableName: string) => {
+        setDuplicateTableModal(tableName);
+    };
+
+    // Confirm Duplicate Table
+    const confirmDuplicateTable = async (newName: string, includeData: boolean) => {
+        if (!duplicateTableModal) return;
+
+        try {
+            await invoke('duplicate_table', {
+                connectionString: connection.connection_string,
+                sourceTable: duplicateTableModal,
+                newTable: newName,
+                includeData
+            });
+            setRefreshTrigger(prev => prev + 1);
+            fetchTables();
+        } catch (e) {
+            console.error('Failed to duplicate table:', e);
+            alert(`Failed to duplicate table: ${e}`);
+        }
+        setDuplicateTableModal(null);
+    };
+
+    // Truncate Table - Show confirmation modal
+    const handleTruncateTable = (tableName: string) => {
+        setTableConfirmModal({ type: 'truncate', tableName });
+    };
+
+    // Drop Table - Show confirmation modal
+    const handleDropTable = (tableName: string) => {
+        setTableConfirmModal({ type: 'drop', tableName });
+    };
+
+    // Confirm table operation
+    const confirmTableOperation = async () => {
+        if (!tableConfirmModal) return;
+
+        try {
+            if (tableConfirmModal.type === 'truncate') {
+                await invoke('truncate_table', {
+                    connectionString: connection.connection_string,
+                    tableName: tableConfirmModal.tableName
+                });
+            } else if (tableConfirmModal.type === 'drop') {
+                await invoke('drop_table', {
+                    connectionString: connection.connection_string,
+                    tableName: tableConfirmModal.tableName
+                });
+                // Close any tabs for this table
+                setTabs(tabs.filter(t => t.title !== tableConfirmModal.tableName));
+            }
+            setRefreshTrigger(prev => prev + 1);
+            fetchTables();
+        } catch (e) {
+            console.error(`Failed to ${tableConfirmModal.type} table:`, e);
+            alert(`Failed to ${tableConfirmModal.type} table: ${e}`);
+        }
+        setTableConfirmModal(null);
     };
 
     const closeTab = (e: React.MouseEvent, id: string) => {
@@ -463,6 +653,7 @@ export const MainInterface: React.FC<MainInterfaceProps> = ({ connection, onSwit
 
     const handleOpenInsert = async () => {
         if (!activeTab || activeTab.type !== 'table') return;
+        pinActiveTab(); // Pin tab when user opens insert panel
 
         setEditData(undefined); // Reset edit data
         setShowInsertPanel(true);
@@ -483,6 +674,7 @@ export const MainInterface: React.FC<MainInterfaceProps> = ({ connection, onSwit
 
     const handleOpenEdit = async () => {
         if (!activeTab || activeTab.type !== 'table') return;
+        pinActiveTab(); // Pin tab when user opens edit panel
         const currentData = results[activeTab.id]?.data;
         if (!currentData) return;
 
@@ -642,6 +834,10 @@ export const MainInterface: React.FC<MainInterfaceProps> = ({ connection, onSwit
     };
 
     const handleConfirmChanges = async () => {
+        setChangelogConfirm({ type: 'confirm' });
+    };
+
+    const executeConfirmChanges = async () => {
         const isMysql = connection.connection_string.startsWith('mysql:');
         const q = isMysql ? '`' : '"';
 
@@ -709,18 +905,39 @@ export const MainInterface: React.FC<MainInterfaceProps> = ({ connection, onSwit
             }
             setPendingChanges({});
             setShowChangelog(false);
+            setChangelogConfirm(null);
         } catch (e) {
             alert(`Failed to apply changes: ${e}`);
             addLog(`Error applying changes: ${e}`, 'Error', undefined, String(e));
+            setChangelogConfirm(null);
         }
     };
 
     const handleDiscardChanges = () => {
-        if (confirm("Discard all pending changes?")) {
-            setPendingChanges({});
-            setShowChangelog(false);
-            setSelectedIndices(new Set());
+        setChangelogConfirm({ type: 'discard' });
+    };
+
+    const executeDiscardChanges = () => {
+        setPendingChanges({});
+        setShowChangelog(false);
+        setSelectedIndices(new Set());
+        setChangelogConfirm(null);
+    };
+
+    const handleNavigateToChange = (tabId: string, rowIndex: number) => {
+        const existingTab = tabs.find(t => t.id === tabId);
+        if (existingTab) {
+            setActiveTabId(tabId);
+        } else {
+            // Try to re-open closed tab
+            const changes = pendingChanges[tabId];
+            if (changes && changes.length > 0) {
+                const tableName = changes[0].tableName;
+                if (tableName) handleTableClick(tableName);
+            }
         }
+        setHighlightRowIndex(rowIndex);
+        setTimeout(() => setHighlightRowIndex(null), 2000);
     };
 
     const handleSwitchConnectionWrapper = (conn: Connection) => {
@@ -831,15 +1048,7 @@ export const MainInterface: React.FC<MainInterfaceProps> = ({ connection, onSwit
                 zoom={zoom}
                 setZoom={setZoom}
             />
-            <ChangelogSidebar
-                isOpen={showChangelog}
-                onClose={() => setShowChangelog(false)}
-                changes={pendingChanges}
-                tabs={tabs}
-                onConfirm={handleConfirmChanges}
-                onDiscard={handleDiscardChanges}
-                onRevert={handleRevertChange}
-            />
+
 
             <Navbar
                 sidebarOpen={sidebarOpen}
@@ -866,6 +1075,11 @@ export const MainInterface: React.FC<MainInterfaceProps> = ({ connection, onSwit
                     onTableClick={handleTableClick}
                     onAddConnection={() => setShowNewConnModal(true)}
                     refreshTrigger={refreshTrigger}
+                    onGetTableSchema={handleGetTableSchema}
+                    onEditTableSchema={handleEditTableSchema}
+                    onDuplicateTable={handleDuplicateTable}
+                    onTruncateTable={handleTruncateTable}
+                    onDropTable={handleDropTable}
                 />
 
                 <div className={styles.content}>
@@ -887,6 +1101,7 @@ export const MainInterface: React.FC<MainInterfaceProps> = ({ connection, onSwit
                                                 isActive={activeTabId === tab.id}
                                                 onClick={() => setActiveTabId(tab.id)}
                                                 onClose={closeTab}
+                                                onDoubleClick={() => pinTab(tab.id)}
                                                 color={color}
                                             />
                                         );
@@ -1021,6 +1236,7 @@ export const MainInterface: React.FC<MainInterfaceProps> = ({ connection, onSwit
                                             onSelectionChange={setSelectedIndices}
                                             onSort={(col) => setSortState(prev => prev?.column === col && prev.direction === 'ASC' ? { column: col, direction: 'DESC' } : { column: col, direction: 'ASC' })}
                                             pendingChanges={pendingChanges[activeTab.id]}
+                                            highlightRowIndex={activeTabId === activeTab.id ? highlightRowIndex : null}
                                         />
                                     </div>
                                 </div>
@@ -1121,12 +1337,13 @@ export const MainInterface: React.FC<MainInterfaceProps> = ({ connection, onSwit
                             <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
                                 <div style={{ flex: 1, minHeight: 0, overflow: 'hidden' }}>
                                     <QueryEditor
-                                        value={tabQueries[activeTabId] || '-- Write your SQL query here\nSELECT * FROM '}
+                                        value={tabQueries[activeTabId] || ''}
                                         onChange={(val) => setTabQueries(prev => ({ ...prev, [activeTabId]: val }))}
                                         onRunQuery={handleRunQuery}
                                         selectedRowCount={selectedIndices.size}
                                         onCopy={handleCopy}
                                         onExport={handleExport}
+                                        theme={theme}
                                     />
                                 </div>
 
@@ -1184,6 +1401,16 @@ export const MainInterface: React.FC<MainInterfaceProps> = ({ connection, onSwit
                         )}
                     </div>
                 </div>
+                <ChangelogSidebar
+                    isOpen={showChangelog}
+                    onClose={() => setShowChangelog(false)}
+                    changes={pendingChanges}
+                    tabs={tabs}
+                    onConfirm={handleConfirmChanges}
+                    onDiscard={handleDiscardChanges}
+                    onRevert={handleRevertChange}
+                    onNavigate={handleNavigateToChange}
+                />
             </div>
 
             <InsertRowPanel
@@ -1204,6 +1431,47 @@ export const MainInterface: React.FC<MainInterfaceProps> = ({ connection, onSwit
                     </div>
                 )
             }
-        </div >
+
+            {/* Table Operation Confirmation Modal */}
+            {tableConfirmModal && (
+                <ConfirmModal
+                    title={tableConfirmModal.type === 'truncate' ? 'Truncate Table' : 'Drop Table'}
+                    message={
+                        tableConfirmModal.type === 'truncate'
+                            ? `Are you sure you want to TRUNCATE "${tableConfirmModal.tableName}"? This will permanently delete ALL data in the table but keep the table structure.`
+                            : `Are you sure you want to DROP "${tableConfirmModal.tableName}"? This will permanently delete the table and ALL its data. This action cannot be undone.`
+                    }
+                    confirmText={tableConfirmModal.type === 'truncate' ? 'Truncate' : 'Drop'}
+                    onConfirm={confirmTableOperation}
+                    onCancel={() => setTableConfirmModal(null)}
+                />
+            )}
+
+            {/* Changelog Confirmation Modal */}
+            {changelogConfirm && (
+                <ConfirmModal
+                    title={changelogConfirm.type === 'confirm' ? 'Confirm Changes' : 'Discard Changes'}
+                    message={
+                        changelogConfirm.type === 'confirm'
+                            ? `Are you sure you want to apply ${Object.values(pendingChanges).flat().length} pending changes?`
+                            : `Are you sure you want to discard ALL ${Object.values(pendingChanges).flat().length} pending changes? This action cannot be undone.`
+                    }
+                    confirmText={changelogConfirm.type === 'confirm' ? 'Apply' : 'Discard'}
+                    onConfirm={changelogConfirm.type === 'confirm' ? executeConfirmChanges : executeDiscardChanges}
+                    onCancel={() => setChangelogConfirm(null)}
+                />
+            )}
+
+            {/* Duplicate Table Modal */}
+            {duplicateTableModal && (
+                <DuplicateTableModal
+                    tableName={duplicateTableModal}
+                    onConfirm={confirmDuplicateTable}
+                    onCancel={() => setDuplicateTableModal(null)}
+                />
+            )}
+
+
+        </div>
     );
 };

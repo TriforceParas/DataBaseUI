@@ -11,6 +11,7 @@ interface QueryEditorProps {
     selectedRowCount?: number;
     onCopy?: (format: 'CSV' | 'JSON') => void;
     onExport?: (format: 'CSV' | 'JSON') => void;
+    theme?: 'blue' | 'gray' | 'amoled' | 'light';
 }
 
 const extractQueryAtLine = (model: any, lineNumber: number): string | null => {
@@ -29,7 +30,8 @@ const extractQueryAtLine = (model: any, lineNumber: number): string | null => {
     return text || null;
 };
 
-export const QueryEditor: React.FC<QueryEditorProps> = ({ value, onChange, onRunQuery, selectedRowCount = 0, onCopy, onExport }) => {
+export const QueryEditor: React.FC<QueryEditorProps> = ({ value, onChange, onRunQuery, selectedRowCount = 0, onCopy, onExport, theme = 'blue' }) => {
+    const editorTheme = theme === 'light' ? 'light' : 'vs-dark';
     const editorRef = useRef<any>(null);
     const monacoRef = useRef<any>(null);
     const providerRef = useRef<any>(null);
@@ -275,10 +277,6 @@ export const QueryEditor: React.FC<QueryEditorProps> = ({ value, onChange, onRun
                         </>
                     )}
                 </div>
-
-                <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
-                    Ctrl+Enter to run
-                </div>
             </div>
 
             <div style={{ flex: 1, overflow: 'hidden' }}>
@@ -288,7 +286,7 @@ export const QueryEditor: React.FC<QueryEditorProps> = ({ value, onChange, onRun
                     value={value}
                     onChange={handleEditorChange}
                     onMount={handleEditorDidMount}
-                    theme="vs-dark"
+                    theme={editorTheme}
                     options={{
                         minimap: { enabled: false },
                         scrollBeyondLastLine: false,

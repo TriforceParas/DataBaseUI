@@ -30,7 +30,7 @@ export const PreferencesModal: React.FC<PreferencesModalProps> = ({ isOpen, onCl
                     <h3 style={{ fontSize: '0.9rem', color: 'var(--text-secondary)', marginBottom: '0.8rem', textTransform: 'uppercase' }}>Theme</h3>
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.8rem' }}>
                         {[
-                            { id: 'blue', label: 'Blue', color: '#0f111a' },
+                            { id: 'blue', label: 'Midnight Blue', color: '#0f111a' },
                             { id: 'gray', label: 'Dark', color: '#202020' },
                             { id: 'amoled', label: 'AMOLED', color: '#000' },
                             { id: 'light', label: 'Light', color: '#fff' }

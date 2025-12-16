@@ -1,6 +1,5 @@
 use sqlx::{migrate::MigrateDatabase, sqlite::SqlitePoolOptions, Pool, Sqlite};
 use std::fs;
-use std::path::PathBuf;
 use tauri::{AppHandle, Manager, Runtime};
 
 pub struct AppState {

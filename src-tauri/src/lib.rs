@@ -15,13 +15,19 @@ pub fn run() {
             commands::update_connection,
             commands::get_tables,
             commands::create_tag,
+            commands::update_tag,
+            commands::delete_tag,
             commands::get_tags,
             commands::assign_tag,
             commands::remove_tag_from_table,
             commands::get_table_tags,
             commands::execute_query,
             commands::get_columns,
-            commands::open_connection_window
+            commands::open_connection_window,
+            commands::get_table_schema,
+            commands::truncate_table,
+            commands::drop_table,
+            commands::duplicate_table
         ])
         .setup(|app| {
             if cfg!(debug_assertions) {

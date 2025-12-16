@@ -1,22 +1,25 @@
 .container {
     display: flex;
-    gap: 4px;
-    z-index: 99999;
+    align-items: center;
+    height: 100%;
     -webkit-app-region: no-drag;
-    /* Critical for standard drag regions */
 }
 
 .button {
     background: transparent;
     border: none;
     cursor: pointer;
-    padding: 6px;
+    width: 46px;
+    /* Larger hit target */
+    height: 100%;
+    /* Fill navbar height */
     display: flex;
     align-items: center;
     justify-content: center;
-    border-radius: 4px;
     color: var(--text-secondary);
     transition: background-color 0.2s, color 0.2s;
+    border-radius: 0;
+    /* Square edges for corners */
 }
 
 .button:hover {
@@ -31,4 +34,73 @@
 .closeButton:hover {
     background-color: #ef4444;
     color: white;
+}
+
+.modalOverlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: rgba(0, 0, 0, 0.5);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 100000;
+}
+
+.modalContent {
+    background-color: var(--bg-secondary);
+    padding: 1.5rem;
+    border-radius: 8px;
+    border: 1px solid var(--border-color);
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+    min-width: 300px;
+}
+
+.modalTitle {
+    margin: 0 0 0.5rem 0;
+    font-size: 1.1rem;
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+.modalText {
+    margin: 0 0 1.5rem 0;
+    color: var(--text-secondary);
+    font-size: 0.9rem;
+}
+
+.modalButtons {
+    display: flex;
+    justify-content: flex-end;
+    gap: 0.75rem;
+}
+
+.cancelBtn {
+    background: transparent;
+    border: 1px solid var(--border-color);
+    color: var(--text-primary);
+    padding: 0.5rem 1rem;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 0.9rem;
+}
+
+.confirmBtn {
+    background: #ef4444;
+    border: none;
+    color: white;
+    padding: 0.5rem 1rem;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 0.9rem;
+}
+
+.cancelBtn:hover {
+    background-color: var(--bg-tertiary);
+}
+
+.confirmBtn:hover {
+    background-color: #dc2626;
 }

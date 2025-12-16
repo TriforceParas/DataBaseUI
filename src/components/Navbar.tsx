@@ -72,9 +72,9 @@ export const Navbar: React.FC<NavbarProps> = ({
                 <button className={styles.outlineBtn} onClick={handleAddQuery} title="New SQL Query">SQL</button>
             </div>
 
-            <div className={styles.navGroup}>
+            <div className={styles.navGroup} style={{ marginRight: '180px' }}>
                 <button
-                    className={styles.iconBtn}
+                    className={`${styles.iconBtn} ${totalChanges > 0 ? styles.changesBtnPending : ''}`}
                     onClick={() => setShowChangelog(!showChangelog)}
                     title="Pending Changes"
                     style={{
@@ -100,8 +100,11 @@ export const Navbar: React.FC<NavbarProps> = ({
                 </button>
 
                 <div className={styles.verticalDivider} style={{ margin: '0 1rem' }}></div>
-                <WindowControls />
 
+
+            </div>
+            <div style={{ position: 'absolute', top: 0, right: 0, height: '44px', zIndex: 50 }}>
+                <WindowControls />
             </div>
         </div>
     );

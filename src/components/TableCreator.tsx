@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import styles from '../styles/TableCreator.module.css';
 import { Plus, Trash2, Key, HelpCircle, X, Shield, Lock, Fingerprint } from 'lucide-react';
@@ -19,11 +19,23 @@ interface ColumnDef {
     isUnique: boolean;
 }
 
+interface ForeignKeyDef {
+    column: string;
+    refTable: string;
+    refColumn: string;
+    onDelete: string;
+    onUpdate: string;
+}
+
 export const TableCreator: React.FC<TableCreatorProps> = ({ connectionString, onSuccess }) => {
     const [tableName, setTableName] = useState('');
     const [columns, setColumns] = useState<ColumnDef[]>([
         { name: 'id', type: 'INTEGER', length: '', defaultValue: '', isNullable: false, isPrimaryKey: true, isAutoIncrement: true, isUnique: true }
     ]);
+    const [foreignKeys, setForeignKeys] = useState<ForeignKeyDef[]>([]);
+    const [availableTables, setAvailableTables] = useState<string[]>([]);
+    const [refTableColumns, setRefTableColumns] = useState<Record<string, string[]>>({});
+
     const [error, setError] = useState<string | null>(null);
 
     const addColumn = () => {
@@ -38,7 +50,17 @@ export const TableCreator: React.FC<TableCreatorProps> = ({ connectionString, on
 
     const updateColumn = (idx: number, field: keyof ColumnDef, value: any) => {
         const newCols = [...columns];
-        newCols[idx] = { ...newCols[idx], [field]: value };
+        const col = newCols[idx];
+
+        // Validation logic
+        if (field === 'isNullable' && value === false) {
+            // If unchecking Nullable, and default is NULL, clear it
+            if (col.defaultValue === 'NULL') {
+                col.defaultValue = '';
+            }
+        }
+
+        newCols[idx] = { ...col, [field]: value };
         setColumns(newCols);
     };
 
@@ -46,6 +68,50 @@ export const TableCreator: React.FC<TableCreatorProps> = ({ connectionString, on
         if (connStr.startsWith('mysql:')) return 'mysql';
         if (connStr.startsWith('postgres:')) return 'postgres';
         return 'sqlite';
+    };
+
+    useEffect(() => {
+        const fetchTables = async () => {
+            try {
+                const tables = await invoke<string[]>('get_tables', { connectionString });
+                setAvailableTables(tables);
+            } catch (e) {
+                console.error("Failed to fetch tables", e);
+            }
+        };
+        fetchTables();
+    }, [connectionString]);
+
+    const fetchColumnsForTable = async (tableName: string) => {
+        if (refTableColumns[tableName]) return;
+        try {
+            const cols = await invoke<string[]>('get_columns', { connectionString, tableName });
+            setRefTableColumns(prev => ({ ...prev, [tableName]: cols }));
+        } catch (e) {
+            console.error("Failed to fetch columns", e);
+        }
+    };
+
+    const addForeignKey = () => {
+        setForeignKeys([...foreignKeys, { column: '', refTable: '', refColumn: '', onDelete: 'NO ACTION', onUpdate: 'NO ACTION' }]);
+    };
+
+    const removeForeignKey = (idx: number) => {
+        const newFks = [...foreignKeys];
+        newFks.splice(idx, 1);
+        setForeignKeys(newFks);
+    };
+
+    const updateForeignKey = (idx: number, field: keyof ForeignKeyDef, value: any) => {
+        const newFks = [...foreignKeys];
+        newFks[idx] = { ...newFks[idx], [field]: value };
+
+        if (field === 'refTable') {
+            fetchColumnsForTable(value);
+            newFks[idx].refColumn = '';
+        }
+
+        setForeignKeys(newFks);
     };
 
     const handleCreate = async () => {
@@ -92,7 +158,13 @@ export const TableCreator: React.FC<TableCreatorProps> = ({ connectionString, on
                 return def;
             }).join(', ');
 
-            const query = `CREATE TABLE ${q}${tableName}${q} (${colDefs})`;
+            const fkDefs = foreignKeys.filter(fk => fk.column && fk.refTable && fk.refColumn).map(fk => {
+                return `FOREIGN KEY (${q}${fk.column}${q}) REFERENCES ${q}${fk.refTable}${q}(${q}${fk.refColumn}${q}) ON DELETE ${fk.onDelete} ON UPDATE ${fk.onUpdate}`;
+            });
+
+            const allDefs = [colDefs, ...fkDefs].join(', ');
+
+            const query = `CREATE TABLE ${q}${tableName}${q} (${allDefs})`;
             await invoke('execute_query', { connectionString, query });
             onSuccess();
         } catch (e) {
@@ -189,18 +261,14 @@ export const TableCreator: React.FC<TableCreatorProps> = ({ connectionString, on
                                             onChange={e => {
                                                 const val = e.target.value;
                                                 if (val === '_CUSTOM_') {
-                                                    // Set to space to trigger input mode, or specific placeholder?
-                                                    // Let's set to a placeholder space ' ' which user can delete?
-                                                    // No, let's set to 'custom_value' and select text?
-                                                    // Better: Set to a known non-preset string like ' ' (space)
                                                     updateColumn(idx, 'defaultValue', ' ');
                                                 } else {
                                                     updateColumn(idx, 'defaultValue', val);
                                                 }
                                             }}
                                         >
-                                            <option value="">Empty</option>
-                                            <option value="NULL">NULL</option>
+                                            <option value="">None</option>
+                                            {col.isNullable && <option value="NULL">NULL</option>}
                                             <option value="now()">now()</option>
                                             <option value="_CUSTOM_">Value...</option>
                                         </select>
@@ -267,10 +335,80 @@ export const TableCreator: React.FC<TableCreatorProps> = ({ connectionString, on
                     </button>
                 </div>
 
-                {/* Foreign Keys (Placeholder for layout matching) */}
-                <div className={styles.fkSection}>
+                {/* Foreign Keys */}
+                <div style={{ marginBottom: '2rem' }}>
                     <label className={styles.label}>Foreign Keys</label>
-                    <button className={styles.addColumnBtn} style={{ marginLeft: 0 }}>
+
+                    <div className={styles.columnsHeader} style={{ gridTemplateColumns: '40px 1fr 1fr 1fr 0.8fr 0.8fr 40px' }}>
+                        <div>#</div>
+                        <div>Column</div>
+                        <div>Ref Table</div>
+                        <div>Ref Column</div>
+                        <div>On Delete</div>
+                        <div>On Update</div>
+                        <div></div>
+                    </div>
+
+                    <div style={{ display: 'flex', flexDirection: 'column' }}>
+                        {foreignKeys.map((fk, idx) => (
+                            <div key={idx} className={styles.columnRow} style={{ gridTemplateColumns: '40px 1fr 1fr 1fr 0.8fr 0.8fr 40px' }}>
+                                <div style={{ opacity: 0.5, textAlign: 'center' }}>{idx + 1}</div>
+
+                                <select
+                                    className={styles.rowSelect}
+                                    value={fk.column}
+                                    onChange={e => updateForeignKey(idx, 'column', e.target.value)}
+                                >
+                                    <option value="">Select Col...</option>
+                                    {columns.filter(c => c.name).map(c => <option key={c.name} value={c.name}>{c.name}</option>)}
+                                </select>
+
+                                <select
+                                    className={styles.rowSelect}
+                                    value={fk.refTable}
+                                    onChange={e => updateForeignKey(idx, 'refTable', e.target.value)}
+                                >
+                                    <option value="">Select Table...</option>
+                                    {availableTables.map(t => <option key={t} value={t}>{t}</option>)}
+                                </select>
+
+                                <select
+                                    className={styles.rowSelect}
+                                    value={fk.refColumn}
+                                    onChange={e => updateForeignKey(idx, 'refColumn', e.target.value)}
+                                    disabled={!fk.refTable}
+                                >
+                                    <option value="">Ref Col...</option>
+                                    {(refTableColumns[fk.refTable] || []).map(c => <option key={c} value={c}>{c}</option>)}
+                                </select>
+
+                                <select className={styles.rowSelect} value={fk.onDelete} onChange={e => updateForeignKey(idx, 'onDelete', e.target.value)}>
+                                    <option value="NO ACTION">No Action</option>
+                                    <option value="CASCADE">Cascade</option>
+                                    <option value="SET NULL">Set Null</option>
+                                    <option value="RESTRICT">Restrict</option>
+                                </select>
+
+                                <select className={styles.rowSelect} value={fk.onUpdate} onChange={e => updateForeignKey(idx, 'onUpdate', e.target.value)}>
+                                    <option value="NO ACTION">No Action</option>
+                                    <option value="CASCADE">Cascade</option>
+                                    <option value="SET NULL">Set Null</option>
+                                    <option value="RESTRICT">Restrict</option>
+                                </select>
+
+                                <button
+                                    className={styles.iconButton}
+                                    onClick={() => removeForeignKey(idx)}
+                                    style={{ color: '#ef4444' }}
+                                    title="Delete FK"
+                                >
+                                    <Trash2 size={16} />
+                                </button>
+                            </div>
+                        ))}
+                    </div>
+
+                    <button className={styles.addColumnBtn} onClick={addForeignKey}>
                         <Plus size={16} /> Add Foreign Key
                     </button>
                 </div>

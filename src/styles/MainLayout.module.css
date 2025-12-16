@@ -12,7 +12,8 @@
     display: flex;
     justify-content: space-between;
     align-items: center;
-    padding: 0 1rem;
+    padding: 0 0 0 1rem;
+    /* Right padding 0 for edge controls */
     background-color: var(--bg-secondary);
 }
 
@@ -72,7 +73,8 @@
 
 /* Sidebar Styles */
 .sidebarConnection {
-    padding: 1rem;
+    padding: 0.5rem 1rem;
+    height: 40px;
     display: flex;
     align-items: center;
     justify-content: space-between;
@@ -85,7 +87,7 @@
 }
 
 .sidebarControls {
-    padding: 0 1rem 1rem 1rem;
+    padding: 1rem;
     display: flex;
     justify-content: space-between;
     align-items: center;
@@ -248,11 +250,76 @@
     background-color: var(--bg-tertiary);
 }
 
-/* Layout Containers */
+@keyframes borderDataRotator {
+    from {
+        transform: rotate(0deg);
+    }
+
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+.changesBtnPending {
+    position: relative;
+    z-index: 1;
+    overflow: hidden;
+    background-color: var(--bg-secondary) !important;
+    /* Ensure background to cover gradient center */
+    border: 1px solid var(--border-color) !important;
+    /* Replaces border with gradient */
+}
+
+/* The rotating gradient */
+.changesBtnPending::before {
+    content: '';
+    position: absolute;
+    /* Center a large fixed square */
+    top: 50%;
+    left: 50%;
+    width: 200px;
+    height: 200px;
+    margin-left: -100px;
+    margin-top: -100px;
+    background: conic-gradient(transparent, transparent, #f59e0b);
+    animation: borderDataRotator 2s linear infinite;
+    z-index: 0;
+}
+
+/* The inner mask to create the border effect */
+.changesBtnPending::after {
+    content: '';
+    position: absolute;
+    inset: 1px;
+    background: var(--bg-secondary);
+    border-radius: 5px;
+    z-index: 1;
+}
+
+/* Ensure button content is above everything */
+.changesBtnPending>* {
+    position: relative;
+    z-index: 2;
+}
+
 .body {
     flex: 1;
     display: flex;
     overflow: hidden;
+}
+
+@keyframes highlightFade {
+    0% {
+        background-color: rgba(245, 158, 11, 0.4);
+    }
+
+    100% {
+        background-color: transparent;
+    }
+}
+
+.highlightRow {
+    animation: highlightFade 2s ease-out;
 }
 
 .sidebar {
@@ -261,13 +328,19 @@
     background-color: var(--bg-secondary);
     display: flex;
     flex-direction: column;
-    transition: width 0.3s ease, opacity 0.3s ease;
+    flex-shrink: 0;
+    transition: width 0.3s ease;
+    overflow: hidden;
+    white-space: nowrap;
+}
+
+.sidebar>* {
+    min-width: 250px;
 }
 
 .sidebar.closed {
     width: 0;
     border: none;
-    opacity: 0;
     overflow: hidden;
 }
 
@@ -283,6 +356,7 @@
 .tableList {
     flex: 1;
     overflow-y: auto;
+    overflow-x: hidden;
     padding: 0 0.5rem;
 }
 

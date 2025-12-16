@@ -21,6 +21,14 @@ export interface QueryResult {
     rows: string[][];
 }
 
+export interface ColumnSchema {
+    name: string;
+    data_type: string;
+    is_nullable: string;
+    column_default: string | null;
+    column_key: string;
+}
+
 export interface PendingChange {
     type: 'UPDATE' | 'DELETE';
     tableName: string;

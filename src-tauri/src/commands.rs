@@ -584,6 +584,8 @@ pub async fn truncate_table(connection_string: String, table_name: String) -> Re
     // SQLite doesn't support TRUNCATE, use DELETE instead
     let query = if db_type == "sqlite" {
         format!("DELETE FROM \"{}\"", table_name)
+    } else if db_type == "mysql" {
+        format!("TRUNCATE TABLE `{}`", table_name)
     } else {
         format!("TRUNCATE TABLE \"{}\"", table_name)
     };
@@ -602,7 +604,11 @@ pub async fn drop_table(connection_string: String, table_name: String) -> Result
         .await
         .map_err(|e| format!("Failed to connect: {}", e))?;
 
-    let query = format!("DROP TABLE \"{}\"", table_name);
+    let query = if connection_string.starts_with("mysql://") {
+        format!("DROP TABLE `{}`", table_name)
+    } else {
+        format!("DROP TABLE \"{}\"", table_name)
+    };
 
     sqlx::query(&query)
         .execute(&mut conn)

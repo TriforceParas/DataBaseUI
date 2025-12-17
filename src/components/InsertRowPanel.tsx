@@ -9,9 +9,12 @@ interface InsertRowPanelProps {
     onInsert: (data: Record<string, any>[]) => void;
     tableName: string;
     initialData?: Record<string, any>[]; // For Edit Mode
+    onAddRow?: () => void;
+    onUpdateRow?: (rowIndex: number, column: string, value: any) => void;
+    onRemoveRow?: (rowIndex: number) => void;
 }
 
-export const InsertRowPanel: React.FC<InsertRowPanelProps> = ({ isOpen, onClose, columns, onInsert, tableName, initialData }) => {
+export const InsertRowPanel: React.FC<InsertRowPanelProps> = ({ isOpen, onClose, columns, onInsert, tableName, initialData, onAddRow, onUpdateRow, onRemoveRow }) => {
     const [mode, setMode] = useState<'form' | 'json'>('form');
     // Array of rows. Each row is a Record<column, value>
     const [rows, setRows] = useState<Record<string, string>[]>([{}]);
@@ -43,7 +46,21 @@ export const InsertRowPanel: React.FC<InsertRowPanelProps> = ({ isOpen, onClose,
 
     }, [columns, isOpen, initialData]);
 
+    useEffect(() => {
+        const handleKeyDown = (e: KeyboardEvent) => {
+            if (e.key === 'Escape' && isOpen) {
+                onClose();
+            }
+        };
+        window.addEventListener('keydown', handleKeyDown);
+        return () => window.removeEventListener('keydown', handleKeyDown);
+    }, [isOpen, onClose]);
+
     const handleFieldChange = (rowIdx: number, col: string, val: string) => {
+        if (onUpdateRow) {
+            onUpdateRow(rowIdx, col, val);
+            return;
+        }
         const newRows = [...rows];
         if (!newRows[rowIdx]) newRows[rowIdx] = {};
         newRows[rowIdx][col] = val;
@@ -51,12 +68,20 @@ export const InsertRowPanel: React.FC<InsertRowPanelProps> = ({ isOpen, onClose,
     };
 
     const handleAddRow = () => {
+        if (onAddRow) {
+            onAddRow();
+            return;
+        }
         const newRow: Record<string, string> = {};
         columns.forEach(c => newRow[c] = '');
         setRows([...rows, newRow]);
     };
 
     const handleRemoveRow = (idx: number) => {
+        if (onRemoveRow) {
+            onRemoveRow(idx);
+            return;
+        }
         const newRows = rows.filter((_, i) => i !== idx);
         setRows(newRows.length ? newRows : [{}]); // Keep at least one
     };
@@ -83,27 +108,26 @@ export const InsertRowPanel: React.FC<InsertRowPanelProps> = ({ isOpen, onClose,
         }
     };
 
-    if (!isOpen) return null;
+    // if (!isOpen) return null; // Removed for animation
 
     return (
         <div style={{
             position: 'absolute',
-            top: 0, right: 0, bottom: 0,
+            top: '44px', right: 0, bottom: 0,
             width: '450px',
             backgroundColor: 'var(--bg-primary)',
             borderLeft: '1px solid var(--border-color)',
             boxShadow: '-4px 0 15px rgba(0,0,0,0.3)',
             zIndex: 100,
             display: 'flex',
-            flexDirection: 'column'
+            flexDirection: 'column',
+            transform: isOpen ? 'translateX(0)' : 'translateX(100%)',
+            transition: 'transform 0.3s ease-in-out',
+            pointerEvents: isOpen ? 'auto' : 'none'
         }}>
             {/* Header */}
-            <div style={{ padding: '1rem', borderBottom: '1px solid var(--border-color)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <h3 style={{ margin: 0 }}>{initialData ? 'Edit Rows' : `Insert into ${tableName}`}</h3>
-                <button onClick={onClose} style={{ background: 'none', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer' }}>
-                    <X size={20} />
-                </button>
-            </div>
+            {/* Header Removed */}
+            <div style={{ height: '44px', display: 'none' }} />
 
             {/* Toggle */}
             <div style={{ display: 'flex', padding: '1rem', gap: '1rem' }}>
@@ -147,7 +171,12 @@ export const InsertRowPanel: React.FC<InsertRowPanelProps> = ({ isOpen, onClose,
 
             {/* Content */}
             <div style={{ flex: 1, overflowY: 'auto', padding: '1rem' }}>
-                {mode === 'form' ? (
+                {initialData && initialData.length === 0 ? (
+                    <div style={{ height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: 'var(--text-secondary)' }}>
+                        <div style={{ marginBottom: '1rem', opacity: 0.5 }}>No rows selected</div>
+                        <div style={{ fontSize: '0.85rem' }}>Select rows in the grid to edit them here.</div>
+                    </div>
+                ) : mode === 'form' ? (
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
                         {columns.length === 0 && <div style={{ color: 'var(--text-muted)' }}>No columns found.</div>}
 

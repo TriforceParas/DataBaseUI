@@ -3,7 +3,7 @@ import { invoke } from '@tauri-apps/api/core';
 import { getCurrentWindow } from '@tauri-apps/api/window';
 import styles from '../styles/MainLayout.module.css';
 import { Connection, QueryResult, PendingChange, Tag, TableTag, LogEntry, ColumnSchema } from '../types';
-import { Plus, Code2, Table, Filter, ArrowUpDown, Trash2, Pencil, ChevronUp, ChevronDown, X, Copy, Download, Activity, ChevronLeft, ChevronRight, Clock, CheckCircle, AlertCircle, RefreshCw } from 'lucide-react';
+import { Plus, Code2, Table, Filter, Trash2, ChevronUp, ChevronDown, X, Copy, Download, Activity, ChevronLeft, ChevronRight, Clock, CheckCircle, AlertCircle, RefreshCw } from 'lucide-react';
 import { ConnectionForm } from './ConnectionForm';
 import { Sidebar } from './Sidebar';
 import { ChangelogSidebar } from './ChangelogSidebar';
@@ -148,6 +148,26 @@ export const MainInterface: React.FC<MainInterfaceProps> = ({ connection, onSwit
     useEffect(() => {
         localStorage.setItem('app-zoom', zoom.toString());
     }, [zoom]);
+
+    // Close dropdowns on outside click with ignore logic
+    useEffect(() => {
+        const handleClickOutside = (event: MouseEvent) => {
+            const target = event.target as HTMLElement;
+            // If clicking inside a dropdown or on a trigger, ignore
+            if (target.closest('[data-dropdown="true"]') || target.closest('[data-dropdown-trigger="true"]')) {
+                return;
+            }
+            if (showDbMenu) setShowDbMenu(false);
+            // Remove showConnDropdown from here, handled in Sidebar
+        };
+        document.addEventListener('mousedown', handleClickOutside);
+        return () => {
+            document.removeEventListener('mousedown', handleClickOutside);
+        };
+    }, [showDbMenu]);
+
+    const [tableSchemas, setTableSchemas] = useState<Record<string, ColumnSchema[]>>({});
+    const [showEditWindow, setShowEditWindow] = useState(false);
 
     const handleZoom = (delta: number) => {
         setZoom(prev => Math.max(0.5, Math.min(2.0, prev + delta)));
@@ -362,9 +382,25 @@ export const MainInterface: React.FC<MainInterfaceProps> = ({ connection, onSwit
         const page = pageOverride !== undefined ? pageOverride : currentPag.page;
         const pageSize = pageSizeOverride !== undefined ? pageSizeOverride : currentPag.pageSize;
 
+        // Skip fetching data for special tabs like "Schema: [table]"
+        if (tableName.startsWith('Schema: ')) return;
+
         try {
             const isMysql = connection.connection_string.startsWith('mysql:');
             const q = isMysql ? '`' : '"';
+
+            // Get Schema if not cached (for PK detection)
+            if (!tableSchemas[tableName]) {
+                try {
+                    const schema = await invoke<ColumnSchema[]>('get_table_schema', {
+                        connectionString: connection.connection_string,
+                        tableName
+                    });
+                    setTableSchemas(prev => ({ ...prev, [tableName]: schema }));
+                } catch (e) {
+                    console.error('Failed to fetch schema for', tableName, e);
+                }
+            }
 
             // Get Count
             // TODO: Optimize by caching count?
@@ -651,47 +687,45 @@ export const MainInterface: React.FC<MainInterfaceProps> = ({ connection, onSwit
         }
     };
 
-    const handleOpenInsert = async () => {
+    const handleInsertRow = () => {
+        if (!activeTab || activeTab.type !== 'table' || !results[activeTab.id]?.data) return;
+        const currentData = results[activeTab.id].data!;
+
+        // Create empty row data based on columns
+        // const newRow: any = {};
+        // currentData.columns.forEach(c => newRow[c] = '');
+        const newRowArray = currentData.columns.map(() => '');
+
+        const newChange: PendingChange = {
+            type: 'INSERT',
+            tableName: activeTab.title,
+            rowIndex: currentData.rows.length + (pendingChanges[activeTab.id]?.filter(p => p.type === 'INSERT').length || 0),
+            rowData: newRowArray
+        };
+
+        setPendingChanges(prev => ({
+            ...prev,
+            [activeTab.id]: [...(prev[activeTab.id] || []), newChange]
+        }));
+
+        // Select the new virtual row
+        const newIdx = currentData.rows.length + (pendingChanges[activeTab.id]?.filter(p => p.type === 'INSERT').length || 0);
+        setSelectedIndices(new Set([newIdx]));
+    };
+
+    const handleOpenInsertSidebar = () => {
         if (!activeTab || activeTab.type !== 'table') return;
-        pinActiveTab(); // Pin tab when user opens insert panel
 
-        setEditData(undefined); // Reset edit data
-        setShowInsertPanel(true);
-
-        try {
-            const cols = await invoke<string[]>('get_columns', {
-                connectionString: connection.connection_string,
-                tableName: activeTab.title
-            });
-            setPanelColumns(cols);
-        } catch (e) {
-            console.error("Failed to fetch columns", e);
-            if (results[activeTab.id]?.data?.columns) {
-                setPanelColumns(results[activeTab.id].data!.columns);
-            }
+        if (showEditWindow) {
+            setShowEditWindow(false);
+        } else {
+            setShowChangelog(false);
+            setPanelColumns(results[activeTab.id]?.data?.columns || []);
+            setShowEditWindow(true);
         }
     };
 
-    const handleOpenEdit = async () => {
-        if (!activeTab || activeTab.type !== 'table') return;
-        pinActiveTab(); // Pin tab when user opens edit panel
-        const currentData = results[activeTab.id]?.data;
-        if (!currentData) return;
-
-        // Get selected rows
-        const rowsToEdit = Array.from(selectedIndices).map(idx => {
-            const rowArr = currentData.rows[idx];
-            const rowObj: Record<string, any> = {};
-            currentData.columns.forEach((col, i) => rowObj[col] = rowArr[i]);
-            return rowObj;
-        });
-
-        if (rowsToEdit.length === 0) return;
-
-        setEditData(rowsToEdit);
-        setPanelColumns(currentData.columns);
-        setShowInsertPanel(true);
-    };
+    // handleOpenEdit removed
 
     const handleDeleteRows = async () => {
         handlePendingDelete();
@@ -940,6 +974,65 @@ export const MainInterface: React.FC<MainInterfaceProps> = ({ connection, onSwit
         setTimeout(() => setHighlightRowIndex(null), 2000);
     };
 
+    const handleCellEdit = (rowIndex: number, column: string, value: any) => {
+        if (!activeTab || activeTab.type !== 'table') return;
+        const currentData = results[activeTab.id]?.data;
+        if (!currentData) return;
+
+        const row = currentData.rows[rowIndex];
+        const colIdx = currentData.columns.indexOf(column);
+        if (colIdx === -1) return;
+        const oldValue = row[colIdx];
+
+        // Don't register change if value hasn't effectively changed (basic check)
+        if (String(oldValue) === String(value)) return;
+
+        setPendingChanges(prev => {
+            const tabChanges = prev[activeTab.id] || [];
+            // Check if we already have a change for this cell
+            const existingIdx = tabChanges.findIndex(c => c.type === 'UPDATE' && c.rowIndex === rowIndex && c.column === column);
+
+            let newChanges = [...tabChanges];
+
+            if (existingIdx !== -1) {
+                // Update existing change
+                newChanges[existingIdx] = {
+                    ...newChanges[existingIdx],
+                    newValue: value
+                };
+            } else {
+                // Determine ID column for generatedSql (best effort)
+                const idColIdx = currentData.columns.findIndex(c => c.toLowerCase() === 'id');
+                const idVal = idColIdx !== -1 ? row[idColIdx] : null;
+                const isMysql = connection.connection_string.startsWith('mysql:');
+                const q = isMysql ? '`' : '"';
+
+                // Basic SQL generation (can be improved or done server-side)
+                let generatedSql = '';
+                if (idVal !== null) {
+                    const safeVal = (v: any) => {
+                        if (v === null || v === 'NULL') return 'NULL';
+                        if (!isNaN(Number(v)) && v !== '') return v;
+                        return `'${String(v).replace(/'/g, "''")}'`;
+                    };
+                    generatedSql = `UPDATE ${q}${activeTab.title}${q} SET ${q}${column}${q} = ${safeVal(value)} WHERE ${q}${currentData.columns[idColIdx]}${q} = ${safeVal(idVal)}`;
+                }
+
+                newChanges.push({
+                    type: 'UPDATE',
+                    tableName: activeTab.title,
+                    rowIndex,
+                    rowData: row,
+                    column,
+                    oldValue,
+                    newValue: value,
+                    generatedSql
+                });
+            }
+            return { ...prev, [activeTab.id]: newChanges };
+        });
+    };
+
     const handleSwitchConnectionWrapper = (conn: Connection) => {
         const hasChanges = Object.values(pendingChanges).some(list => list.length > 0);
         if (hasChanges) {
@@ -1063,6 +1156,18 @@ export const MainInterface: React.FC<MainInterfaceProps> = ({ connection, onSwit
                 setShowChangelog={setShowChangelog}
                 totalChanges={totalChanges}
                 handleOpenLogs={handleOpenLogs}
+                handleOpenEditWindow={handleOpenInsertSidebar}
+                showEditWindow={showEditWindow}
+                handleOpenSchema={() => {
+                    if (activeTab && activeTab.type === 'table') {
+                        // Refresh schema view if checking a schema tab, or get schema for a table
+                        if (activeTab.title.startsWith('Schema: ')) {
+                            handleGetTableSchema(activeTab.title.replace('Schema: ', ''));
+                        } else {
+                            handleGetTableSchema(activeTab.title);
+                        }
+                    }
+                }}
             />
 
             <div className={styles.body}>
@@ -1121,17 +1226,24 @@ export const MainInterface: React.FC<MainInterfaceProps> = ({ connection, onSwit
                         ) : activeTab.type === 'table' ? (
                             <>
                                 <div className={styles.tableToolbar}>
-                                    {selectedIndices.size > 0 ? (
+                                    <button className={styles.primaryBtn} onClick={handleInsertRow}>
+                                        <Plus size={14} /> Insert
+                                    </button>
+
+                                    <button className={styles.toolbarBtn} onClick={() => fetchTableData(activeTab.id, activeTab.title)}>
+                                        <RefreshCw size={14} /> Refresh
+                                    </button>
+                                    <div className={styles.verticalDivider} style={{ height: 16 }}></div>
+                                    <button className={styles.toolbarBtn}><Filter size={14} /> Filter</button>
+
+                                    {selectedIndices.size > 0 && (
                                         <>
                                             <button className={styles.dangerBtn} onClick={handleDeleteRows} style={{ marginRight: '0.5rem' }}>
-                                                <Trash2 size={14} style={{ marginRight: 4 }} /> Delete ({selectedIndices.size})
-                                            </button>
-                                            <button className={styles.primaryBtn} onClick={handleOpenEdit} style={{ marginRight: '0.5rem' }}>
-                                                <Pencil size={14} style={{ marginRight: 4 }} /> Edit
+                                                <Trash2 size={14} style={{ marginRight: 4 }} /> ({selectedIndices.size})
                                             </button>
 
                                             {/* Copy Dropdown */}
-                                            <div style={{ position: 'relative', marginLeft: '0.5rem', display: 'inline-block' }}>
+                                            <div style={{ position: 'relative', display: 'inline-block', marginRight: '0.5rem' }}>
                                                 <button className={styles.secondaryBtn} onClick={() => setActiveDropdown(activeDropdown === 'copy' ? null : 'copy')}>
                                                     <Copy size={14} style={{ marginRight: 4 }} /> Copy <ChevronDown size={12} style={{ marginLeft: 2 }} />
                                                 </button>
@@ -1143,7 +1255,7 @@ export const MainInterface: React.FC<MainInterfaceProps> = ({ connection, onSwit
                                                 )}
                                             </div>
                                             {/* Export Dropdown */}
-                                            <div style={{ position: 'relative', marginLeft: '0.5rem', display: 'inline-block' }}>
+                                            <div style={{ position: 'relative', display: 'inline-block' }}>
                                                 <button className={styles.secondaryBtn} onClick={() => setActiveDropdown(activeDropdown === 'export' ? null : 'export')}>
                                                     <Download size={14} style={{ marginRight: 4 }} /> Export <ChevronDown size={12} style={{ marginLeft: 2 }} />
                                                 </button>
@@ -1155,18 +1267,7 @@ export const MainInterface: React.FC<MainInterfaceProps> = ({ connection, onSwit
                                                 )}
                                             </div>
                                         </>
-                                    ) : (
-                                        <button className={styles.primaryBtn} onClick={handleOpenInsert}>
-                                            <Plus size={14} /> Insert
-                                        </button>
                                     )}
-
-                                    <button className={styles.toolbarBtn} onClick={() => fetchTableData(activeTab.id, activeTab.title)}>
-                                        <RefreshCw size={14} /> Refresh
-                                    </button>
-                                    <div className={styles.verticalDivider} style={{ height: 16 }}></div>
-                                    <button className={styles.toolbarBtn}><Filter size={14} /> Filter</button>
-                                    <button className={styles.toolbarBtn}><ArrowUpDown size={14} /> Sort</button>
 
                                     {/* Pagination Controls - Moved to Toolbar */}
                                     {(() => {
@@ -1237,6 +1338,8 @@ export const MainInterface: React.FC<MainInterfaceProps> = ({ connection, onSwit
                                             onSort={(col) => setSortState(prev => prev?.column === col && prev.direction === 'ASC' ? { column: col, direction: 'DESC' } : { column: col, direction: 'ASC' })}
                                             pendingChanges={pendingChanges[activeTab.id]}
                                             highlightRowIndex={activeTabId === activeTab.id ? highlightRowIndex : null}
+                                            onCellEdit={handleCellEdit}
+                                            primaryKeys={new Set(tableSchemas[activeTab.title]?.filter(c => c.column_key === 'PRI').map(c => c.name) || [])}
                                         />
                                     </div>
                                 </div>
@@ -1413,14 +1516,96 @@ export const MainInterface: React.FC<MainInterfaceProps> = ({ connection, onSwit
                 />
             </div>
 
-            <InsertRowPanel
-                isOpen={showInsertPanel}
-                onClose={() => setShowInsertPanel(false)}
-                columns={panelColumns}
-                onInsert={handlePanelSubmit}
-                tableName={activeTab?.type === 'table' ? activeTab.title : ''}
-                initialData={editData}
-            />
+            {(() => {
+                // Logic to prepare initialData for Edit Pane based on Selection
+                let initialDataForPane: Record<string, any>[] = [];
+                const currentData = activeTabId && results[activeTabId]?.data;
+
+                if (activeTabId && currentData && selectedIndices.size > 0) {
+                    // Populate from selection
+                    const sortedIndices = Array.from(selectedIndices).sort((a, b) => a - b);
+                    initialDataForPane = sortedIndices.map(idx => {
+                        const rowObj: Record<string, any> = {};
+                        // Check if it's an existing row or a pending insert
+                        if (idx < currentData.rows.length) {
+                            currentData.columns.forEach((col, cIdx) => {
+                                rowObj[col] = currentData.rows[idx][cIdx];
+                            });
+                        } else {
+                            // It's a pending insert
+                            const pendingList = pendingChanges[activeTabId] || [];
+                            const inserts = pendingList.filter(c => c.type === 'INSERT');
+                            // The 'idx' relative to INSERTs is (idx - data.rows.length)
+                            const insertIdx = idx - currentData.rows.length;
+                            const pending = inserts[insertIdx];
+                            if (pending) {
+                                currentData.columns.forEach((col, cIdx) => {
+                                    rowObj[col] = pending.rowData[cIdx];
+                                });
+                            }
+                        }
+                        return rowObj;
+                    });
+                } else {
+                    // Empty state (user will see "No rows selected")
+                    initialDataForPane = [];
+                }
+
+                return (
+                    <InsertRowPanel
+                        isOpen={showEditWindow}
+                        onClose={() => setShowEditWindow(false)}
+                        columns={panelColumns.length > 0 ? panelColumns : (activeTabId && results[activeTabId]?.data?.columns ? results[activeTabId].data!.columns : [])}
+                        onInsert={handlePanelSubmit}
+                        tableName={activeTab?.type === 'table' ? activeTab.title : ''}
+                        initialData={initialDataForPane}
+                        onAddRow={handleInsertRow}
+                        onUpdateRow={(formRowIdx, col, val) => {
+                            if (!activeTabId) return;
+                            // Map formRowIdx back to actual rowIndex
+                            const sortedIndices = Array.from(selectedIndices).sort((a, b) => a - b);
+                            const actualRowIndex = sortedIndices[formRowIdx];
+                            if (actualRowIndex !== undefined) {
+                                handleCellEdit(actualRowIndex, col, val);
+                            }
+                        }}
+                        onRemoveRow={(formRowIdx) => {
+                            if (!activeTabId) return;
+                            const sortedIndices = Array.from(selectedIndices).sort((a, b) => a - b);
+                            const actualRowIndex = sortedIndices[formRowIdx];
+                            if (actualRowIndex !== undefined) {
+                                // If it's a pending insert, remove it entirely
+                                const currentData = results[activeTabId]?.data;
+                                if (currentData && actualRowIndex >= currentData.rows.length) {
+                                    // It's an INSERT change
+                                    // Find the specific change object
+                                    const changes = pendingChanges[activeTabId] || [];
+                                    const change = changes.find(c => c.type === 'INSERT' && c.rowIndex === actualRowIndex);
+                                    if (change) {
+                                        setPendingChanges(prev => ({
+                                            ...prev,
+                                            [activeTabId]: prev[activeTabId].filter(c => c !== change)
+                                        }));
+                                        const newSet = new Set(selectedIndices);
+                                        newSet.delete(actualRowIndex);
+                                        setSelectedIndices(newSet);
+                                    }
+                                } else {
+                                    // Existing row - Trigger Delete?
+                                    // User probably expects visual removal or queuing for delete
+                                    // For now, let's treat it as "remove from selection"?
+                                    // Or queue delete?
+                                    // "Delete" button handles deletes. Sidebar remove might be confusing if it deletes from DB.
+                                    // Let's assume for now it just removes from the 'edit list' (selection).
+                                    const newSet = new Set(selectedIndices);
+                                    newSet.delete(actualRowIndex);
+                                    setSelectedIndices(newSet);
+                                }
+                            }
+                        }}
+                    />
+                );
+            })()}
 
             {
                 showNewConnModal && (
@@ -1462,10 +1647,10 @@ export const MainInterface: React.FC<MainInterfaceProps> = ({ connection, onSwit
                 />
             )}
 
-            {/* Duplicate Table Modal */}
             {duplicateTableModal && (
                 <DuplicateTableModal
                     tableName={duplicateTableModal}
+                    existingTables={tables} // Pass existing tables
                     onConfirm={confirmDuplicateTable}
                     onCancel={() => setDuplicateTableModal(null)}
                 />

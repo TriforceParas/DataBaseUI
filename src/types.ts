@@ -30,7 +30,7 @@ export interface ColumnSchema {
 }
 
 export interface PendingChange {
-    type: 'UPDATE' | 'DELETE';
+    type: 'UPDATE' | 'DELETE' | 'INSERT';
     tableName: string;
     rowIndex: number; // Index in the current results array
     rowData: any; // Full row data (for deletes or reference)

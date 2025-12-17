@@ -16,7 +16,8 @@ interface ChangelogSidebarProps {
 
 export const ChangelogSidebar: React.FC<ChangelogSidebarProps> = ({
     isOpen,
-    changes, // Removed onClose
+    onClose,
+    changes,
     tabs,
     onConfirm,
     onDiscard,
@@ -26,6 +27,17 @@ export const ChangelogSidebar: React.FC<ChangelogSidebarProps> = ({
     const [viewMode, setViewMode] = useState<'visual' | 'sql'>('visual');
 
     const totalChanges = Object.values(changes).reduce((acc, curr) => acc + curr.length, 0);
+
+    // Close on Escape
+    React.useEffect(() => {
+        const handleKeyDown = (e: KeyboardEvent) => {
+            if (e.key === 'Escape' && isOpen) {
+                onClose();
+            }
+        };
+        window.addEventListener('keydown', handleKeyDown);
+        return () => window.removeEventListener('keydown', handleKeyDown);
+    }, [isOpen, onClose]);
 
     return (
         <div style={{

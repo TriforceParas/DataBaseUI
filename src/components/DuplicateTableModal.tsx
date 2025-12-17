@@ -4,22 +4,31 @@ import styles from '../styles/ConnectionForm.module.css';
 
 interface DuplicateTableModalProps {
     tableName: string;
+    existingTables: string[]; // Pass existing tables to check for duplicates
     onConfirm: (newName: string, includeData: boolean) => void;
     onCancel: () => void;
 }
 
 export const DuplicateTableModal: React.FC<DuplicateTableModalProps> = ({
     tableName,
+    existingTables,
     onConfirm,
     onCancel
 }) => {
     const [newName, setNewName] = useState(`${tableName}_copy`);
     const [duplicateType, setDuplicateType] = useState<'schema' | 'everything'>('everything');
+    const [error, setError] = useState<string | null>(null);
 
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
-        if (newName.trim()) {
-            onConfirm(newName.trim(), duplicateType === 'everything');
+        setError(null);
+        const name = newName.trim();
+        if (name) {
+            if (existingTables.includes(name)) {
+                setError(`Table "${name}" already exists.`);
+                return;
+            }
+            onConfirm(name, duplicateType === 'everything');
         }
     };
 
@@ -93,6 +102,11 @@ export const DuplicateTableModal: React.FC<DuplicateTableModalProps> = ({
                             autoFocus
                             required
                         />
+                        {error && (
+                            <div style={{ color: '#ef4444', fontSize: '0.85rem', marginTop: '0.5rem', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                <span>⚠️</span> {error}
+                            </div>
+                        )}
                     </div>
 
                     <div style={{ marginBottom: '1.5rem' }}>

@@ -1,9 +1,7 @@
 import React from 'react';
 import styles from '../styles/MainLayout.module.css';
-import { RefreshCw, Search, Plus, PanelLeftClose, PanelLeftOpen, Settings, Activity } from 'lucide-react';
+import { RefreshCw, Search, Plus, PanelLeftClose, PanelLeftOpen, Settings, Activity, ListPlus, Workflow } from 'lucide-react';
 import { WindowControls } from './WindowControls';
-
-
 
 interface NavbarProps {
     sidebarOpen: boolean;
@@ -18,6 +16,9 @@ interface NavbarProps {
     setShowChangelog: (v: boolean) => void;
     totalChanges: number;
     handleOpenLogs: () => void;
+    handleOpenEditWindow: () => void;
+    showEditWindow: boolean; // New prop for active state
+    handleOpenSchema: () => void;
 }
 
 export const Navbar: React.FC<NavbarProps> = ({
@@ -32,7 +33,10 @@ export const Navbar: React.FC<NavbarProps> = ({
     showChangelog,
     setShowChangelog,
     totalChanges,
-    handleOpenLogs
+    handleOpenLogs,
+    handleOpenEditWindow,
+    showEditWindow,
+    handleOpenSchema
 }) => {
     return (
         <div className={styles.navBar} data-tauri-drag-region>
@@ -41,16 +45,21 @@ export const Navbar: React.FC<NavbarProps> = ({
                 <div style={{ position: 'relative' }}>
                     <div
                         onClick={() => setShowDbMenu(!showDbMenu)}
+                        data-dropdown-trigger="true" // Mark as trigger
                         style={{
                             fontWeight: 900, fontSize: '1.2rem', marginRight: '1rem', color: 'var(--text-primary)',
                             cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px',
                             userSelect: 'none'
                         }}
                     >
-                        <div style={{ background: 'var(--accent-primary)', color: '#fff', borderRadius: '4px', padding: '0 4px' }}>DB</div>+
+                        <div style={{ background: 'var(--accent-primary)', color: '#fff', borderRadius: '4px', padding: '0 4px', pointerEvents: 'none' }}>DB</div>+
                     </div>
                     {showDbMenu && (
-                        <div className={styles.dropdownMenu} style={{ position: 'absolute', top: '100%', left: 0, zIndex: 200, backgroundColor: 'var(--bg-secondary)', border: '1px solid var(--border-color)', borderRadius: '6px', marginTop: '8px', boxShadow: 'var(--shadow-lg)', minWidth: '150px', padding: '0.4rem' }}>
+                        <div
+                            className={styles.dropdownMenu}
+                            data-dropdown="true" // Mark as dropdown content
+                            style={{ position: 'absolute', top: '100%', left: 0, zIndex: 200, backgroundColor: 'var(--bg-secondary)', border: '1px solid var(--border-color)', borderRadius: '6px', marginTop: '8px', boxShadow: 'var(--shadow-lg)', minWidth: '150px', padding: '0.4rem' }}
+                        >
                             <div
                                 className={styles.dropdownItem}
                                 onClick={() => { setShowPreferences(true); setShowDbMenu(false); }}
@@ -75,7 +84,14 @@ export const Navbar: React.FC<NavbarProps> = ({
             <div className={styles.navGroup} style={{ marginRight: '180px' }}>
                 <button
                     className={`${styles.iconBtn} ${totalChanges > 0 ? styles.changesBtnPending : ''}`}
-                    onClick={() => setShowChangelog(!showChangelog)}
+                    onClick={() => {
+                        if (showChangelog) {
+                            setShowChangelog(false);
+                        } else {
+                            if (showEditWindow) handleOpenEditWindow(); // Toggle/Close it
+                            setShowChangelog(true);
+                        }
+                    }}
                     title="Pending Changes"
                     style={{
                         width: 'auto',
@@ -95,9 +111,25 @@ export const Navbar: React.FC<NavbarProps> = ({
                     }} />
                 </button>
                 <div className={styles.verticalDivider}></div>
-                <button className={styles.iconBtn} onClick={handleOpenLogs} title="Logs">
-                    <Activity size={18} />
-                </button>
+                <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
+                    <button className={styles.iconBtn} onClick={handleOpenLogs} title="Logs">
+                        <Activity size={18} />
+                    </button>
+                    <button className={styles.iconBtn} onClick={handleOpenSchema} title="Schema">
+                        <Workflow size={18} />
+                    </button>
+                    <button
+                        className={styles.iconBtn}
+                        onClick={handleOpenEditWindow}
+                        title={showEditWindow ? "Close Edit Pane" : "Open Edit Pane"}
+                        style={{
+                            backgroundColor: showEditWindow ? 'var(--bg-tertiary)' : 'transparent',
+                            color: showEditWindow ? 'var(--text-primary)' : 'var(--text-secondary)'
+                        }}
+                    >
+                        <ListPlus size={18} />
+                    </button>
+                </div>
 
                 <div className={styles.verticalDivider} style={{ margin: '0 1rem' }}></div>
 

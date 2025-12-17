@@ -1,6 +1,6 @@
 {
   "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
-  "productName": "tauri-app",
+  "productName": "SQL UI",
   "version": "0.1.0",
   "identifier": "com.sqlui.dev",
   "build": {
@@ -12,7 +12,7 @@
   "app": {
     "windows": [
       {
-        "title": "tauri-app",
+        "title": "SQL UI",
         "width": 800,
         "height": 600,
         "resizable": true,

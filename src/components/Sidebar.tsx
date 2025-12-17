@@ -22,6 +22,7 @@ interface SidebarProps {
     onDuplicateTable?: (tableName: string) => void;
     onTruncateTable?: (tableName: string) => void;
     onDropTable?: (tableName: string) => void;
+    style?: React.CSSProperties; // Add style for color support
 }
 
 // Draggable Table Item with Context Menu
@@ -33,7 +34,8 @@ const DraggableTableItem = ({
     onEditSchema,
     onDuplicate,
     onTruncate,
-    onDrop
+    onDrop,
+    style
 }: {
     table: string;
     onClick: () => void;
@@ -43,6 +45,7 @@ const DraggableTableItem = ({
     onDuplicate?: (t: string) => void;
     onTruncate?: (t: string) => void;
     onDrop?: (t: string) => void;
+    style?: React.CSSProperties;
 }) => {
     const { attributes, listeners, setNodeRef, transform } = useDraggable({
         id: `table-${table}`,
@@ -50,6 +53,7 @@ const DraggableTableItem = ({
     });
 
     const [contextMenu, setContextMenu] = useState<{ x: number, y: number } | null>(null);
+    const [isHovered, setIsHovered] = useState(false);
 
     const handleContextMenu = (e: React.MouseEvent) => {
         e.preventDefault();
@@ -60,13 +64,11 @@ const DraggableTableItem = ({
     // Close context menu on click
     useEffect(() => {
         const handleClick = () => setContextMenu(null);
-        if (contextMenu) {
-            window.addEventListener('click', handleClick);
-            return () => window.removeEventListener('click', handleClick);
-        }
+        window.addEventListener('click', handleClick);
+        return () => window.removeEventListener('click', handleClick);
     }, [contextMenu]);
 
-    const style = transform ? {
+    const transformStyle = transform ? {
         transform: `translate3d(${transform.x}px, ${transform.y}px, 0)`,
         zIndex: 1000,
         opacity: 0.8
@@ -84,12 +86,23 @@ const DraggableTableItem = ({
         <>
             <div
                 ref={setNodeRef}
+                style={{
+                    ...style,
+                    ...transformStyle,
+                    marginBottom: '2px', // Add slight gap
+                    cursor: 'pointer', // Force pointer cursor
+                    backgroundColor: isHovered ? 'var(--bg-tertiary)' : 'transparent', // Hover highlight
+                    transition: 'background-color 0.2s',
+                    borderRadius: '4px', // Rounded corners
+                    padding: '4px 8px' // Increase touch area
+                }}
                 {...listeners}
                 {...attributes}
-                className={styles.tableItem}
-                style={style}
+                className={styles.sidebarItem}
                 onClick={onClick}
                 onContextMenu={handleContextMenu}
+                onMouseEnter={() => setIsHovered(true)}
+                onMouseLeave={() => setIsHovered(false)}
             >
                 <Table size={14} style={{ marginRight: '0.5rem', opacity: 0.7 }} />
                 {table}
@@ -352,6 +365,19 @@ export const Sidebar: React.FC<SidebarProps> = ({
 }) => {
     const [viewMode, setViewMode] = useState<'az' | 'tags'>('az');
     const [showConnDropdown, setShowConnDropdown] = useState(false);
+
+    // Close on outside click
+    useEffect(() => {
+        const handleClickOutside = (event: MouseEvent) => {
+            const target = event.target as HTMLElement;
+            if (showConnDropdown && !target.closest('[data-conn-dropdown="true"]') && !target.closest('[data-conn-trigger="true"]')) {
+                setShowConnDropdown(false);
+            }
+        };
+        document.addEventListener('mousedown', handleClickOutside);
+        return () => document.removeEventListener('mousedown', handleClickOutside);
+    }, [showConnDropdown]);
+
     const [tags, setTags] = useState<Tag[]>([]);
     const [tableTags, setTableTags] = useState<TableTag[]>([]);
     const [showTagManager, setShowTagManager] = useState(false);
@@ -484,6 +510,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
             <div
                 className={styles.sidebarConnection}
                 onClick={() => setShowConnDropdown(!showConnDropdown)}
+                data-conn-trigger="true" // Ensure trigger is marked
                 style={{ position: 'relative' }}
             >
                 <span style={{ fontWeight: 600, fontSize: '1rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginRight: '0.5rem' }}>
@@ -590,6 +617,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                                         onDuplicate={onDuplicateTable}
                                         onTruncate={onTruncateTable}
                                         onDrop={onDropTable}
+                                        style={{ color: color || 'var(--text-primary)' }} // Pass color to item
                                     />
                                 );
                             })}

@@ -419,3 +419,73 @@
     border-bottom: 1px solid var(--border-color);
     min-height: 32px;
 }
+
+/* Excel-like Cell Styles */
+.cellSelected {
+    background-color: rgba(66, 133, 244, 0.2) !important;
+}
+
+.cellActive {
+    outline: 2px solid #4285f4;
+    outline-offset: -2px;
+    z-index: 10;
+    /* Ensure border is on top */
+}
+
+/* Edit Guide Overlay */
+/* Edit Guide Overlay */
+.editGuide {
+    position: absolute;
+    top: 100%;
+    right: -1px;
+    /* Align with right border including width */
+    margin-top: 0;
+    background-color: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-top: none;
+    border-top-left-radius: 0;
+    border-top-right-radius: 0;
+    padding: 0.25rem 0.75rem;
+    /* Smaller padding */
+    border-bottom-left-radius: 6px;
+    border-bottom-right-radius: 6px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    z-index: 2000;
+    font-size: 0.8rem;
+    color: var(--text-primary);
+    white-space: nowrap;
+    animation: fadeIn 0.15s ease-out;
+    pointer-events: none;
+    /* Don't block clicks */
+}
+
+.keyBadge {
+    background-color: var(--bg-tertiary);
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    padding: 2px 4px;
+    /* Slightly tighter */
+    font-family: monospace;
+    font-size: 0.75rem;
+    font-weight: 600;
+    margin-right: 4px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 20px;
+}
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: translateX(-5px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateX(0);
+    }
+}

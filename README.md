@@ -47,7 +47,7 @@ A modern, high-performance desktop SQL client built with Tauri, React, and Rust.
 1. Clone the repository:
 
    ```bash
-   git clone <your-repo-url>
+   git clone https://github.com/TriforceParas/DataBaseUI.git
    cd SQL-UI
    ```
 

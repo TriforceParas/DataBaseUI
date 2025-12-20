@@ -452,12 +452,22 @@ export const MainInterface: React.FC<MainInterfaceProps> = ({ connection, onSwit
             return `'${String(v).replace(/'/g, "''")}'`;
         };
 
+        const existingRowsCount = currentData.rows.length;
         const newChanges: PendingChange[] = [];
+        const insertIndicesToRemove: number[] = [];
+
         selectedIndices.forEach(idx => {
+            // Check if this is an INSERT (virtual) row
+            if (idx >= existingRowsCount) {
+                // Track which INSERT to remove
+                insertIndicesToRemove.push(idx);
+                return;
+            }
+
             const row = currentData.rows[idx];
             // Check if already deleted
             const existing = pendingChanges[activeTab.id]?.find(c => c.type === 'DELETE' && c.rowIndex === idx);
-            if (!existing) {
+            if (!existing && row) {
                 let generatedSql = '';
                 if (idColName) {
                     const idVal = row[idColIdx];
@@ -480,10 +490,26 @@ export const MainInterface: React.FC<MainInterfaceProps> = ({ connection, onSwit
             }
         });
 
-        setPendingChanges(prev => ({
-            ...prev,
-            [activeTab.id]: [...(prev[activeTab.id] || []), ...newChanges]
-        }));
+        // Remove INSERT pending changes for virtual rows that were selected
+        setPendingChanges(prev => {
+            let tabChanges = [...(prev[activeTab.id] || [])];
+
+            // Remove INSERT rows by their offset
+            if (insertIndicesToRemove.length > 0) {
+                const insertChanges = tabChanges.filter(c => c.type === 'INSERT');
+                const insertOffsetsToRemove = insertIndicesToRemove.map(idx => idx - existingRowsCount);
+                const insertsToRemove = insertOffsetsToRemove
+                    .filter(offset => offset >= 0 && offset < insertChanges.length)
+                    .map(offset => insertChanges[offset]);
+                tabChanges = tabChanges.filter(c => !insertsToRemove.includes(c));
+            }
+
+            // Add new DELETE changes
+            return {
+                ...prev,
+                [activeTab.id]: [...tabChanges, ...newChanges]
+            };
+        });
         setSelectedIndices(new Set());
     };
 
@@ -715,9 +741,9 @@ export const MainInterface: React.FC<MainInterfaceProps> = ({ connection, onSwit
             [activeTab.id]: [...(prev[activeTab.id] || []), newChange]
         }));
 
-        // Select the new virtual row
+        // Select the new virtual row (ADD to existing selection)
         const newIdx = currentData.rows.length + (pendingChanges[activeTab.id]?.filter(p => p.type === 'INSERT').length || 0);
-        setSelectedIndices(new Set([newIdx]));
+        setSelectedIndices(prev => new Set([...prev, newIdx]));
     };
 
     const handleOpenInsertSidebar = () => {
@@ -919,6 +945,10 @@ export const MainInterface: React.FC<MainInterfaceProps> = ({ connection, onSwit
                             } else if (change.type === 'UPDATE') {
                                 if (!change.column) continue;
                                 query = `UPDATE ${q}${change.tableName}${q} SET ${q}${change.column}${q} = ${safeVal(change.newValue)} WHERE ${q}${idColName}${q} = ${safeVal(idVal)}`;
+                            } else if (change.type === 'INSERT') {
+                                const colNames = cols.map(c => `${q}${c}${q}`).join(', ');
+                                const values = row.map((v: any) => safeVal(v)).join(', ');
+                                query = `INSERT INTO ${q}${change.tableName}${q} (${colNames}) VALUES (${values})`;
                             }
                         } else {
                             // Fallback
@@ -932,6 +962,10 @@ export const MainInterface: React.FC<MainInterfaceProps> = ({ connection, onSwit
                             } else if (change.type === 'UPDATE') {
                                 if (!change.column) continue;
                                 query = `UPDATE ${q}${change.tableName}${q} SET ${q}${change.column}${q} = ${safeVal(change.newValue)} WHERE ${whereClause}`;
+                            } else if (change.type === 'INSERT') {
+                                const colNames = cols.map(c => `${q}${c}${q}`).join(', ');
+                                const values = row.map((v: any) => safeVal(v)).join(', ');
+                                query = `INSERT INTO ${q}${change.tableName}${q} (${colNames}) VALUES (${values})`;
                             }
                         }
                     }
@@ -986,20 +1020,51 @@ export const MainInterface: React.FC<MainInterfaceProps> = ({ connection, onSwit
         const currentData = results[activeTab.id]?.data;
         if (!currentData) return;
 
-        const row = currentData.rows[rowIndex];
         const colIdx = currentData.columns.indexOf(column);
         if (colIdx === -1) return;
+
+        const tabId = activeTab.id;
+        const existingRows = currentData.rows;
+
+        // Check if this is a virtual INSERT row
+        if (rowIndex >= existingRows.length) {
+            // This is an INSERT row - update the rowData in the INSERT pending change
+            const insertRowOffset = rowIndex - existingRows.length;
+            setPendingChanges(prev => {
+                const tabChanges = [...(prev[tabId] || [])];
+                const insertChanges = tabChanges.filter(c => c.type === 'INSERT');
+                if (insertRowOffset < insertChanges.length) {
+                    const insertChange = insertChanges[insertRowOffset];
+                    const newRowData = [...(insertChange.rowData as any[])];
+                    newRowData[colIdx] = value;
+                    // Find and update the actual change in tabChanges
+                    const actualIdx = tabChanges.findIndex(c => c === insertChange);
+                    if (actualIdx !== -1) {
+                        tabChanges[actualIdx] = { ...insertChange, rowData: newRowData };
+                    }
+                }
+                return { ...prev, [tabId]: tabChanges };
+            });
+            return;
+        }
+
+        // This is an existing row - UPDATE logic
+        const row = existingRows[rowIndex];
         const oldValue = row[colIdx];
 
-        // Don't register change if value hasn't effectively changed (basic check)
-        if (String(oldValue) === String(value)) return;
-
         setPendingChanges(prev => {
-            const tabChanges = prev[activeTab.id] || [];
-            // Check if we already have a change for this cell
+            const tabChanges = prev[tabId] || [];
             const existingIdx = tabChanges.findIndex(c => c.type === 'UPDATE' && c.rowIndex === rowIndex && c.column === column);
 
             let newChanges = [...tabChanges];
+
+            // If reverting to original value, remove the pending change
+            if (String(oldValue) === String(value)) {
+                if (existingIdx !== -1) {
+                    newChanges.splice(existingIdx, 1);
+                }
+                return { ...prev, [tabId]: newChanges };
+            }
 
             if (existingIdx !== -1) {
                 // Update existing change
@@ -1036,7 +1101,7 @@ export const MainInterface: React.FC<MainInterfaceProps> = ({ connection, onSwit
                     generatedSql
                 });
             }
-            return { ...prev, [activeTab.id]: newChanges };
+            return { ...prev, [tabId]: newChanges };
         });
     };
 
@@ -1348,13 +1413,38 @@ export const MainInterface: React.FC<MainInterfaceProps> = ({ connection, onSwit
                                             onCellEdit={handleCellEdit}
                                             primaryKeys={new Set(tableSchemas[activeTab.title]?.filter(c => c.column_key === 'PRI').map(c => c.name) || [])}
                                             onDeleteRow={(rowIndex) => {
-                                                console.log('onDeleteRow called', { rowIndex, activeTabId: activeTab.id });
+                                                const existingRowsCount = results[activeTab.id]?.data?.rows?.length || 0;
+
+                                                // Check if this is an INSERT (virtual) row
+                                                if (rowIndex >= existingRowsCount) {
+                                                    // Remove the INSERT pending change for this row
+                                                    const insertRowOffset = rowIndex - existingRowsCount;
+                                                    setPendingChanges(prev => {
+                                                        const tabChanges = [...(prev[activeTab.id] || [])];
+                                                        const insertChanges = tabChanges.filter(c => c.type === 'INSERT');
+                                                        if (insertRowOffset < insertChanges.length) {
+                                                            const insertToRemove = insertChanges[insertRowOffset];
+                                                            return {
+                                                                ...prev,
+                                                                [activeTab.id]: tabChanges.filter(c => c !== insertToRemove)
+                                                            };
+                                                        }
+                                                        return prev;
+                                                    });
+                                                    // Also remove from selection
+                                                    setSelectedIndices(prev => {
+                                                        const newSet = new Set(prev);
+                                                        newSet.delete(rowIndex);
+                                                        return newSet;
+                                                    });
+                                                    return;
+                                                }
+
+                                                // Existing row - add DELETE change
                                                 const displayRows = [...(results[activeTab.id]?.data?.rows || []), ...(pendingChanges[activeTab.id] || []).filter(c => c.type === 'INSERT').map(c => c.rowData)];
                                                 const rowData = displayRows[rowIndex];
-                                                console.log('rowData for delete', { rowData, displayRowsLength: displayRows.length });
                                                 if (rowData) {
                                                     const newChange = { type: 'DELETE' as const, tableName: activeTab.title, rowIndex, rowData };
-                                                    console.log('Adding DELETE change', newChange);
                                                     setPendingChanges(prev => ({
                                                         ...prev,
                                                         [activeTab.id]: [...(prev[activeTab.id] || []), newChange]

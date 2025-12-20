@@ -95,7 +95,9 @@ export const ChangelogSidebar: React.FC<ChangelogSidebarProps> = ({
                             <div key={tabId}>
                                 {tabChanges.map((change, idx) => {
                                     const isUpdate = change.type === 'UPDATE';
+                                    const isInsert = change.type === 'INSERT';
                                     const updateColor = '#f59e0b'; // Orange
+                                    const insertColor = '#22c55e'; // Green
                                     const deleteColor = '#ff4d4d'; // Red
 
                                     return (
@@ -116,15 +118,15 @@ export const ChangelogSidebar: React.FC<ChangelogSidebarProps> = ({
                                             <div style={{ display: 'flex', alignItems: 'center', marginBottom: '0.5rem', color: 'var(--text-secondary)', fontSize: '0.8rem', justifyContent: 'space-between' }}>
                                                 <div style={{ display: 'flex', alignItems: 'center' }}>
                                                     <span style={{
-                                                        backgroundColor: isUpdate ? 'rgba(245, 158, 11, 0.2)' : 'rgba(255, 77, 77, 0.2)',
-                                                        color: isUpdate ? updateColor : deleteColor,
+                                                        backgroundColor: isUpdate ? 'rgba(245, 158, 11, 0.2)' : isInsert ? 'rgba(34, 197, 94, 0.2)' : 'rgba(255, 77, 77, 0.2)',
+                                                        color: isUpdate ? updateColor : isInsert ? insertColor : deleteColor,
                                                         borderRadius: '3px',
                                                         width: 18, height: 18,
                                                         display: 'flex', alignItems: 'center', justifyContent: 'center',
                                                         fontWeight: 700, marginRight: '0.5rem',
                                                         fontSize: '0.65rem'
                                                     }}>
-                                                        {isUpdate ? 'U' : 'D'}
+                                                        {isUpdate ? 'U' : isInsert ? 'I' : 'D'}
                                                     </span>
                                                     <span style={{ fontFamily: 'monospace', fontWeight: 500 }}>
                                                         {tableName}
@@ -148,17 +150,7 @@ export const ChangelogSidebar: React.FC<ChangelogSidebarProps> = ({
                                             </div>
 
                                             <div style={{ fontSize: '0.85rem' }}>
-                                                <div style={{
-                                                    color: '#ff6b6b',
-                                                    marginBottom: '4px',
-                                                    fontFamily: 'monospace',
-                                                    display: 'flex',
-                                                    alignItems: 'center'
-                                                }}>
-                                                    <span style={{ marginRight: '0.5rem', opacity: 0.6, width: '10px', display: 'inline-block' }}>-</span>
-                                                    <span style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-all' }}>{isUpdate ? String(change.oldValue) : 'Deleted Row'}</span>
-                                                </div>
-                                                {isUpdate && (
+                                                {isInsert ? (
                                                     <div style={{
                                                         color: '#34d399',
                                                         fontFamily: 'monospace',
@@ -166,8 +158,32 @@ export const ChangelogSidebar: React.FC<ChangelogSidebarProps> = ({
                                                         alignItems: 'center'
                                                     }}>
                                                         <span style={{ marginRight: '0.5rem', opacity: 0.6, width: '10px', display: 'inline-block' }}>+</span>
-                                                        <span style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-all' }}>{String(change.newValue)}</span>
+                                                        <span style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-all' }}>New Row</span>
                                                     </div>
+                                                ) : (
+                                                    <>
+                                                        <div style={{
+                                                            color: '#ff6b6b',
+                                                            marginBottom: '4px',
+                                                            fontFamily: 'monospace',
+                                                            display: 'flex',
+                                                            alignItems: 'center'
+                                                        }}>
+                                                            <span style={{ marginRight: '0.5rem', opacity: 0.6, width: '10px', display: 'inline-block' }}>-</span>
+                                                            <span style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-all' }}>{isUpdate ? String(change.oldValue) : 'Deleted Row'}</span>
+                                                        </div>
+                                                        {isUpdate && (
+                                                            <div style={{
+                                                                color: '#34d399',
+                                                                fontFamily: 'monospace',
+                                                                display: 'flex',
+                                                                alignItems: 'center'
+                                                            }}>
+                                                                <span style={{ marginRight: '0.5rem', opacity: 0.6, width: '10px', display: 'inline-block' }}>+</span>
+                                                                <span style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-all' }}>{String(change.newValue)}</span>
+                                                            </div>
+                                                        )}
+                                                    </>
                                                 )}
                                             </div>
                                         </div>

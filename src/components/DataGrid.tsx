@@ -575,6 +575,36 @@ export const DataGrid: React.FC<DataGridProps> = ({
                         </div>
                         {(() => {
                             const isPendingDelete = pendingChanges.some(c => c.type === 'DELETE' && c.rowIndex === cellContextMenu.r);
+                            const isInsertRow = cellContextMenu.r >= (data?.rows?.length || 0);
+
+                            // For INSERT rows, always show "Remove Row" (removes the pending INSERT)
+                            if (isInsertRow) {
+                                return (
+                                    <div
+                                        onClick={() => {
+                                            if (onDeleteRow) {
+                                                onDeleteRow(cellContextMenu.r);
+                                            }
+                                            setCellContextMenu(null);
+                                        }}
+                                        style={{
+                                            padding: '0.6rem 0.8rem',
+                                            cursor: 'pointer',
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            gap: '0.5rem',
+                                            fontSize: '0.9rem',
+                                            color: '#ef4444',
+                                            borderTop: '1px solid var(--border-color)'
+                                        }}
+                                        onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--bg-tertiary)'}
+                                        onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+                                    >
+                                        <Trash2 size={14} /> Remove Row
+                                    </div>
+                                );
+                            }
+
                             return isPendingDelete ? (
                                 <div
                                     onClick={() => {

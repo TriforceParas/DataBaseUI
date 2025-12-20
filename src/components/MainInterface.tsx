@@ -16,6 +16,7 @@ import { PreferencesModal } from './PreferencesModal';
 import { WindowControls } from './WindowControls';
 import { ConfirmModal } from './ConfirmModal';
 import { DuplicateTableModal } from './DuplicateTableModal';
+import { SchemaVisualizer } from './SchemaVisualizer';
 import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors, DragEndEvent } from '@dnd-kit/core';
 import { SortableContext, arrayMove, sortableKeyboardCoordinates, horizontalListSortingStrategy, useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
@@ -83,7 +84,8 @@ function SortableTab({ tab, isActive, onClick, onClose, onDoubleClick, color }: 
                     tab.type === 'table' ? <Table size={14} style={{ flexShrink: 0, color: color || 'var(--text-primary)' }} /> :
                         tab.type === 'log' ? <Activity size={14} style={{ flexShrink: 0, color: '#a855f7' }} /> :
                             tab.type === 'create-table' ? <Plus size={14} style={{ flexShrink: 0, color: 'var(--accent-primary)' }} /> :
-                                <Table size={14} style={{ flexShrink: 0 }} />}
+                                (tab.type as string) === 'schema-diagram' ? <Activity size={14} style={{ flexShrink: 0, color: '#10b981' }} /> :
+                                    <Table size={14} style={{ flexShrink: 0 }} />}
                 <span style={{
                     fontSize: '0.85rem',
                     whiteSpace: 'nowrap',
@@ -1231,13 +1233,29 @@ export const MainInterface: React.FC<MainInterfaceProps> = ({ connection, onSwit
                 handleOpenEditWindow={handleOpenInsertSidebar}
                 showEditWindow={showEditWindow}
                 handleOpenSchema={() => {
-                    if (activeTab && activeTab.type === 'table') {
-                        // Refresh schema view if checking a schema tab, or get schema for a table
-                        if (activeTab.title.startsWith('Schema: ')) {
-                            handleGetTableSchema(activeTab.title.replace('Schema: ', ''));
-                        } else {
-                            handleGetTableSchema(activeTab.title);
-                        }
+                    // Open Database Schema Diagram tab
+                    const tabId = 'schema-diagram';
+                    const existingTab = tabs.find(t => t.id === tabId);
+                    if (existingTab) {
+                        setActiveTabId(tabId);
+                    } else {
+                        // Fetch all table schemas first
+                        Promise.all(tables.map(async (tableName) => {
+                            if (!tableSchemas[tableName]) {
+                                try {
+                                    const schema = await invoke<ColumnSchema[]>('get_table_schema', {
+                                        connectionString: connection.connection_string,
+                                        tableName
+                                    });
+                                    setTableSchemas(prev => ({ ...prev, [tableName]: schema }));
+                                } catch (e) {
+                                    console.error(`Failed to get schema for ${tableName}`, e);
+                                }
+                            }
+                        })).then(() => {
+                            setTabs([...tabs, { id: tabId, type: 'schema-diagram' as any, title: 'Database Schema' }]);
+                            setActiveTabId(tabId);
+                        });
                     }
                 }}
             />
@@ -1554,6 +1572,15 @@ export const MainInterface: React.FC<MainInterfaceProps> = ({ connection, onSwit
                             </>
                         ) : activeTab.type === 'create-table' ? (
                             <TableCreator connectionString={connection.connection_string} onSuccess={handleTableCreated} />
+                        ) : (activeTab as any).type === 'schema-diagram' ? (
+                            <div style={{ height: '100%', width: '100%' }}>
+                                <SchemaVisualizer
+                                    tables={tables}
+                                    tableSchemas={tableSchemas}
+                                    onTableClick={(tableName) => handleTableClick(tableName)}
+                                    theme={theme}
+                                />
+                            </div>
                         ) : (
                             <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
                                 <div style={{ flex: 1, minHeight: 0, overflow: 'hidden' }}>

@@ -16,6 +16,9 @@
     "@monaco-editor/react": "^4.7.0",
     "@tauri-apps/api": "^2.9.1",
     "@tauri-apps/plugin-opener": "^2",
+    "@types/dagre": "^0.7.53",
+    "@xyflow/react": "^12.10.0",
+    "dagre": "^0.8.5",
     "lucide-react": "^0.560.0",
     "react": "^19.1.0",
     "react-dom": "^19.1.0"

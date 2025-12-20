@@ -68,6 +68,13 @@ function SortableTab({ tab, isActive, onClick, onClose, onDoubleClick, color }: 
             {...listeners}
             onClick={onClick}
             onDoubleClick={onDoubleClick}
+            onAuxClick={(e) => {
+                // Middle-click (button 1) closes the tab
+                if (e.button === 1) {
+                    e.preventDefault();
+                    onClose(e, tab.id);
+                }
+            }}
             onMouseEnter={() => setIsHovered(true)}
             onMouseLeave={() => setIsHovered(false)}
         >
@@ -1226,20 +1233,20 @@ export const MainInterface: React.FC<MainInterfaceProps> = ({ connection, onSwit
                         ) : activeTab.type === 'table' ? (
                             <>
                                 <div className={styles.tableToolbar}>
-                                    <button className={styles.primaryBtn} onClick={handleInsertRow}>
+                                    <button className={styles.outlineBtn} onClick={handleInsertRow} style={{ border: '1px solid var(--accent-primary)', color: 'var(--accent-primary)', backgroundColor: 'transparent' }}>
                                         <Plus size={14} /> Insert
                                     </button>
 
-                                    <button className={styles.toolbarBtn} onClick={() => fetchTableData(activeTab.id, activeTab.title)}>
-                                        <RefreshCw size={14} /> Refresh
+                                    <button className={styles.toolbarBtn} onClick={() => fetchTableData(activeTab.id, activeTab.title)} title="Refresh">
+                                        <RefreshCw size={14} />
                                     </button>
                                     <div className={styles.verticalDivider} style={{ height: 16 }}></div>
-                                    <button className={styles.toolbarBtn}><Filter size={14} /> Filter</button>
+                                    <button className={styles.toolbarBtn} title="Filter"><Filter size={14} /></button>
 
                                     {selectedIndices.size > 0 && (
                                         <>
-                                            <button className={styles.dangerBtn} onClick={handleDeleteRows} style={{ marginRight: '0.5rem' }}>
-                                                <Trash2 size={14} style={{ marginRight: 4 }} /> ({selectedIndices.size})
+                                            <button className={styles.outlineBtn} onClick={handleDeleteRows} style={{ border: '1px solid #ef4444', color: '#ef4444', backgroundColor: 'transparent', marginRight: '0.5rem' }}>
+                                                <Trash2 size={14} style={{ marginRight: 4 }} /> Delete ({selectedIndices.size})
                                             </button>
 
                                             {/* Copy Dropdown */}
@@ -1340,6 +1347,27 @@ export const MainInterface: React.FC<MainInterfaceProps> = ({ connection, onSwit
                                             highlightRowIndex={activeTabId === activeTab.id ? highlightRowIndex : null}
                                             onCellEdit={handleCellEdit}
                                             primaryKeys={new Set(tableSchemas[activeTab.title]?.filter(c => c.column_key === 'PRI').map(c => c.name) || [])}
+                                            onDeleteRow={(rowIndex) => {
+                                                console.log('onDeleteRow called', { rowIndex, activeTabId: activeTab.id });
+                                                const displayRows = [...(results[activeTab.id]?.data?.rows || []), ...(pendingChanges[activeTab.id] || []).filter(c => c.type === 'INSERT').map(c => c.rowData)];
+                                                const rowData = displayRows[rowIndex];
+                                                console.log('rowData for delete', { rowData, displayRowsLength: displayRows.length });
+                                                if (rowData) {
+                                                    const newChange = { type: 'DELETE' as const, tableName: activeTab.title, rowIndex, rowData };
+                                                    console.log('Adding DELETE change', newChange);
+                                                    setPendingChanges(prev => ({
+                                                        ...prev,
+                                                        [activeTab.id]: [...(prev[activeTab.id] || []), newChange]
+                                                    }));
+                                                }
+                                            }}
+                                            onRecoverRow={(rowIndex) => {
+                                                // Remove the DELETE pending change for this row
+                                                setPendingChanges(prev => ({
+                                                    ...prev,
+                                                    [activeTab.id]: (prev[activeTab.id] || []).filter(c => !(c.type === 'DELETE' && c.rowIndex === rowIndex))
+                                                }));
+                                            }}
                                         />
                                     </div>
                                 </div>
@@ -1447,6 +1475,7 @@ export const MainInterface: React.FC<MainInterfaceProps> = ({ connection, onSwit
                                         onCopy={handleCopy}
                                         onExport={handleExport}
                                         theme={theme}
+                                        tables={tables}
                                     />
                                 </div>
 

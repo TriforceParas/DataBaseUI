@@ -12,6 +12,7 @@ interface QueryEditorProps {
     onCopy?: (format: 'CSV' | 'JSON') => void;
     onExport?: (format: 'CSV' | 'JSON') => void;
     theme?: 'blue' | 'gray' | 'amoled' | 'light';
+    tables?: string[]; // For autocomplete
 }
 
 const extractQueryAtLine = (model: any, lineNumber: number): string | null => {
@@ -30,12 +31,13 @@ const extractQueryAtLine = (model: any, lineNumber: number): string | null => {
     return text || null;
 };
 
-export const QueryEditor: React.FC<QueryEditorProps> = ({ value, onChange, onRunQuery, selectedRowCount = 0, onCopy, onExport, theme = 'blue' }) => {
+export const QueryEditor: React.FC<QueryEditorProps> = ({ value, onChange, onRunQuery, selectedRowCount = 0, onCopy, onExport, theme = 'blue', tables = [] }) => {
     const editorTheme = theme === 'light' ? 'light' : 'vs-dark';
     const editorRef = useRef<any>(null);
     const monacoRef = useRef<any>(null);
     const providerRef = useRef<any>(null);
     const commandRef = useRef<any>(null);
+    const completionProviderRef = useRef<any>(null);
 
     // Unique command ID for this editor instance to avoid collisions and stale closures
     const commandId = useRef('cmd.runQuery.' + crypto.randomUUID()).current;
@@ -154,6 +156,58 @@ export const QueryEditor: React.FC<QueryEditorProps> = ({ value, onChange, onRun
                 }
             });
         }
+
+        // Register SQL Completion Provider
+        if (!completionProviderRef.current) {
+            const sqlKeywords = [
+                'SELECT', 'FROM', 'WHERE', 'INSERT', 'INTO', 'VALUES', 'UPDATE', 'SET',
+                'DELETE', 'CREATE', 'TABLE', 'DROP', 'ALTER', 'ADD', 'COLUMN', 'INDEX',
+                'JOIN', 'LEFT', 'RIGHT', 'INNER', 'OUTER', 'ON', 'AND', 'OR', 'NOT',
+                'NULL', 'IS', 'IN', 'LIKE', 'BETWEEN', 'ORDER', 'BY', 'ASC', 'DESC',
+                'GROUP', 'HAVING', 'LIMIT', 'OFFSET', 'DISTINCT', 'AS', 'COUNT', 'SUM',
+                'AVG', 'MAX', 'MIN', 'CASE', 'WHEN', 'THEN', 'ELSE', 'END', 'UNION',
+                'ALL', 'EXISTS', 'PRIMARY', 'KEY', 'FOREIGN', 'REFERENCES', 'CASCADE',
+                'TRUNCATE', 'EXPLAIN', 'SHOW', 'DESCRIBE', 'USE', 'DATABASE', 'SCHEMA'
+            ];
+
+            completionProviderRef.current = monaco.languages.registerCompletionItemProvider('sql', {
+                provideCompletionItems: (model: any, position: any) => {
+                    const word = model.getWordUntilPosition(position);
+                    const range = {
+                        startLineNumber: position.lineNumber,
+                        endLineNumber: position.lineNumber,
+                        startColumn: word.startColumn,
+                        endColumn: word.endColumn
+                    };
+
+                    const suggestions: any[] = [];
+
+                    // Add SQL keywords
+                    sqlKeywords.forEach(kw => {
+                        suggestions.push({
+                            label: kw,
+                            kind: monaco.languages.CompletionItemKind.Keyword,
+                            insertText: kw,
+                            range: range,
+                            detail: 'SQL Keyword'
+                        });
+                    });
+
+                    // Add table names
+                    tables.forEach(tableName => {
+                        suggestions.push({
+                            label: tableName,
+                            kind: monaco.languages.CompletionItemKind.Class,
+                            insertText: tableName,
+                            range: range,
+                            detail: 'Table'
+                        });
+                    });
+
+                    return { suggestions };
+                }
+            });
+        }
     };
 
     // Cleanup
@@ -164,6 +218,9 @@ export const QueryEditor: React.FC<QueryEditorProps> = ({ value, onChange, onRun
             }
             if (commandRef.current) {
                 commandRef.current.dispose();
+            }
+            if (completionProviderRef.current) {
+                completionProviderRef.current.dispose();
             }
         };
     }, []);

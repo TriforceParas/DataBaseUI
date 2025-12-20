@@ -1,6 +1,6 @@
 import React, { useRef, useEffect, useState } from 'react';
 import { QueryResult, PendingChange } from '../types';
-import { ChevronUp, ChevronDown, CornerDownLeft, X, Key } from 'lucide-react';
+import { ChevronUp, ChevronDown, CornerDownLeft, X, Key, Pencil, MousePointer, Trash2 } from 'lucide-react';
 import styles from '../styles/MainLayout.module.css';
 
 interface DataGridProps {
@@ -14,6 +14,8 @@ interface DataGridProps {
     highlightRowIndex?: number | null;
     onCellEdit?: (rowIndex: number, column: string, value: any) => void;
     primaryKeys?: Set<string>;
+    onDeleteRow?: (rowIndex: number) => void;
+    onRecoverRow?: (rowIndex: number) => void; // Undo pending delete
 }
 
 export const DataGrid: React.FC<DataGridProps> = ({
@@ -26,7 +28,9 @@ export const DataGrid: React.FC<DataGridProps> = ({
     pendingChanges = [],
     highlightRowIndex,
     onCellEdit,
-    primaryKeys = new Set()
+    primaryKeys = new Set(),
+    onDeleteRow,
+    onRecoverRow
 }) => {
     const rowRefs = useRef<Map<number, HTMLTableRowElement>>(new Map());
     const tableContainerRef = useRef<HTMLDivElement>(null);
@@ -41,6 +45,9 @@ export const DataGrid: React.FC<DataGridProps> = ({
     // Editing State
     const [editingCell, setEditingCell] = useState<{ r: number, c: number } | null>(null);
     const [editValue, setEditValue] = useState<string>('');
+
+    // Context menu state
+    const [cellContextMenu, setCellContextMenu] = useState<{ x: number, y: number, r: number, c: number } | null>(null);
 
     useEffect(() => {
         if (highlightRowIndex !== undefined && highlightRowIndex !== null) {
@@ -57,6 +64,15 @@ export const DataGrid: React.FC<DataGridProps> = ({
         window.addEventListener('mouseup', handleGlobalMouseUp);
         return () => window.removeEventListener('mouseup', handleGlobalMouseUp);
     }, []);
+
+    // Close cell context menu on any click
+    useEffect(() => {
+        const handleClick = () => setCellContextMenu(null);
+        if (cellContextMenu) {
+            window.addEventListener('click', handleClick);
+            return () => window.removeEventListener('click', handleClick);
+        }
+    }, [cellContextMenu]);
 
     if (loading) {
         return <div style={{ padding: '2rem', textAlign: 'center', color: 'var(--text-secondary)' }}>Loading...</div>;
@@ -404,6 +420,14 @@ export const DataGrid: React.FC<DataGridProps> = ({
                                             onMouseDown={(e) => handleCellMouseDown(e, rIdx, cIdx)}
                                             onMouseEnter={() => handleCellMouseEnter(rIdx, cIdx)}
                                             onDoubleClick={() => startEditing(rIdx, cIdx)}
+                                            onContextMenu={(e) => {
+                                                e.preventDefault();
+                                                // Select the right-clicked cell
+                                                const cellId = getCellId(rIdx, cIdx);
+                                                setSelectedCells(new Set([cellId]));
+                                                setLastSelected({ r: rIdx, c: cIdx });
+                                                setCellContextMenu({ x: e.clientX, y: e.clientY, r: rIdx, c: cIdx });
+                                            }}
                                             className={`${isCellSelected ? styles.cellSelected : ''} ${isActive ? styles.cellActive : ''}`}
                                             style={{
                                                 padding: isEditing ? '0' : '0.5rem 1rem',
@@ -479,6 +503,129 @@ export const DataGrid: React.FC<DataGridProps> = ({
                     )}
                 </tbody>
             </table>
+
+            {/* Cell Context Menu */}
+            {cellContextMenu && (() => {
+                const menuWidth = 150;
+                const menuHeight = 130;
+                const adjustedX = cellContextMenu.x + menuWidth > window.innerWidth
+                    ? window.innerWidth - menuWidth - 10
+                    : cellContextMenu.x;
+                const adjustedY = cellContextMenu.y + menuHeight > window.innerHeight
+                    ? window.innerHeight - menuHeight - 10
+                    : cellContextMenu.y;
+                return (
+                    <div
+                        style={{
+                            position: 'fixed',
+                            top: adjustedY,
+                            left: adjustedX,
+                            backgroundColor: 'var(--bg-secondary)',
+                            border: '1px solid var(--border-color)',
+                            borderRadius: '6px',
+                            boxShadow: '0 4px 12px rgba(0,0,0,0.3)',
+                            zIndex: 9999,
+                            minWidth: '150px',
+                            overflow: 'hidden'
+                        }}
+                        onClick={e => e.stopPropagation()}
+                    >
+                        <div
+                            onClick={() => { startEditing(cellContextMenu.r, cellContextMenu.c); setCellContextMenu(null); }}
+                            style={{
+                                padding: '0.6rem 0.8rem',
+                                cursor: 'pointer',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '0.5rem',
+                                fontSize: '0.9rem',
+                                color: 'var(--text-primary)'
+                            }}
+                            onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--bg-tertiary)'}
+                            onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+                        >
+                            <Pencil size={14} /> Edit Cell
+                        </div>
+                        <div
+                            onClick={() => {
+                                if (onSelectionChange) {
+                                    const newSet = new Set(selectedIndices);
+                                    if (selectedIndices.has(cellContextMenu.r)) {
+                                        newSet.delete(cellContextMenu.r);
+                                    } else {
+                                        newSet.add(cellContextMenu.r);
+                                    }
+                                    onSelectionChange(newSet);
+                                }
+                                setCellContextMenu(null);
+                            }}
+                            style={{
+                                padding: '0.6rem 0.8rem',
+                                cursor: 'pointer',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '0.5rem',
+                                fontSize: '0.9rem',
+                                color: 'var(--text-primary)'
+                            }}
+                            onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--bg-tertiary)'}
+                            onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+                        >
+                            <MousePointer size={14} /> {selectedIndices.has(cellContextMenu.r) ? 'Unselect Row' : 'Select Row'}
+                        </div>
+                        {(() => {
+                            const isPendingDelete = pendingChanges.some(c => c.type === 'DELETE' && c.rowIndex === cellContextMenu.r);
+                            return isPendingDelete ? (
+                                <div
+                                    onClick={() => {
+                                        if (onRecoverRow) {
+                                            onRecoverRow(cellContextMenu.r);
+                                        }
+                                        setCellContextMenu(null);
+                                    }}
+                                    style={{
+                                        padding: '0.6rem 0.8rem',
+                                        cursor: 'pointer',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        gap: '0.5rem',
+                                        fontSize: '0.9rem',
+                                        color: '#22c55e',
+                                        borderTop: '1px solid var(--border-color)'
+                                    }}
+                                    onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--bg-tertiary)'}
+                                    onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+                                >
+                                    <Trash2 size={14} /> Recover Row
+                                </div>
+                            ) : (
+                                <div
+                                    onClick={() => {
+                                        if (onDeleteRow) {
+                                            onDeleteRow(cellContextMenu.r);
+                                        }
+                                        setCellContextMenu(null);
+                                    }}
+                                    style={{
+                                        padding: '0.6rem 0.8rem',
+                                        cursor: 'pointer',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        gap: '0.5rem',
+                                        fontSize: '0.9rem',
+                                        color: '#ef4444',
+                                        borderTop: '1px solid var(--border-color)'
+                                    }}
+                                    onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--bg-tertiary)'}
+                                    onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+                                >
+                                    <Trash2 size={14} /> Delete Row
+                                </div>
+                            );
+                        })()}
+                    </div>
+                );
+            })()}
         </div>
     );
 };

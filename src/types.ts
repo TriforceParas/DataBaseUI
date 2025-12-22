@@ -30,11 +30,11 @@ export interface ColumnSchema {
 }
 
 export interface PendingChange {
-    type: 'UPDATE' | 'DELETE' | 'INSERT';
+    type: 'UPDATE' | 'DELETE' | 'INSERT' | 'ADD_COLUMN' | 'DROP_COLUMN';
     tableName: string;
-    rowIndex: number; // Index in the current results array
-    rowData: any; // Full row data (for deletes or reference)
-    column?: string; // For updates
+    rowIndex: number; // Index in the current results array (or column index for schema changes)
+    rowData: any; // Full row data (for deletes or reference) or column definition for schema changes
+    column?: string; // For updates or column name for schema changes
     oldValue?: any;
     newValue?: any;
     generatedSql?: string; // Preview
@@ -49,4 +49,18 @@ export interface LogEntry {
     error?: string;
     rows?: number;
     user?: string;
+}
+
+export interface SavedQuery {
+    id: number;
+    name: string;
+    query: string;
+    connection_id: number;
+}
+
+export interface SavedFunction {
+    id: number;
+    name: string;
+    function_body: string;
+    connection_id: number;
 }

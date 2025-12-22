@@ -67,5 +67,35 @@ pub async fn init_db<R: Runtime>(app: &AppHandle<R>) -> Result<Pool<Sqlite>, Str
     .await
     .map_err(|e| format!("Failed to create table_tags table: {}", e))?;
 
+    // Saved Queries table
+    sqlx::query(
+        "CREATE TABLE IF NOT EXISTS saved_queries (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT NOT NULL,
+            query TEXT NOT NULL,
+            connection_id INTEGER NOT NULL,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY(connection_id) REFERENCES connections(id) ON DELETE CASCADE
+        );",
+    )
+    .execute(&pool)
+    .await
+    .map_err(|e| format!("Failed to create saved_queries table: {}", e))?;
+
+    // Saved Functions table
+    sqlx::query(
+        "CREATE TABLE IF NOT EXISTS saved_functions (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT NOT NULL,
+            function_body TEXT NOT NULL,
+            connection_id INTEGER NOT NULL,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY(connection_id) REFERENCES connections(id) ON DELETE CASCADE
+        );",
+    )
+    .execute(&pool)
+    .await
+    .map_err(|e| format!("Failed to create saved_functions table: {}", e))?;
+
     Ok(pool)
 }

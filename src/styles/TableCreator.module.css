@@ -25,8 +25,8 @@
     background-color: #3b82f6;
     /* Blue like in image */
     color: white;
-    padding: 0.4rem 1rem;
-    border-radius: 6px;
+    padding: 0.6rem 1.25rem;
+    border-radius: 8px;
     border: none;
     font-size: 0.9rem;
     font-weight: 500;
@@ -34,6 +34,8 @@
     display: flex;
     align-items: center;
     gap: 0.5rem;
+    white-space: nowrap;
+    flex-shrink: 0;
 }
 
 .saveButton:hover {
@@ -41,8 +43,8 @@
 }
 
 .section {
-    padding: 1.5rem;
-    max-width: 1200px;
+    padding: 1.5rem 0.75rem;
+    max-width: 1600px;
     margin: 0 auto;
     width: 100%;
 }
@@ -76,7 +78,7 @@
 .columnsHeader {
     display: grid;
     /* Grid matching the rows: # | Name | Type | Params | Default | Constraints | Actions */
-    grid-template-columns: 40px 2fr 1.2fr 1fr 1.2fr 240px 50px;
+    grid-template-columns: 40px 2fr 1.2fr 1fr 1.2fr 350px 50px;
     gap: 0.75rem;
     padding: 0.5rem 1rem;
     color: var(--text-secondary);
@@ -89,7 +91,7 @@
 
 .columnRow {
     display: grid;
-    grid-template-columns: 40px 2fr 1.2fr 1fr 1.2fr 240px 50px;
+    grid-template-columns: 40px 2fr 1.2fr 1fr 1.2fr 350px 50px;
     gap: 0.75rem;
     padding: 0.5rem 1rem;
     align-items: center;
@@ -119,6 +121,7 @@
 
 .rowSelect {
     padding: 0.4rem 0.8rem;
+    padding-right: 1.5rem;
     background-color: var(--input-bg);
     border: 1px solid var(--border-color);
     border-radius: 6px;
@@ -126,8 +129,6 @@
     font-size: 0.9rem;
     width: 100%;
     cursor: pointer;
-    appearance: none;
-    /* Custom arrow if we wanted, for now default */
 }
 
 .constraintsGroup {
@@ -165,14 +166,19 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    padding: 4px;
+    width: 28px;
+    height: 28px;
+    min-width: 28px;
+    min-height: 28px;
+    padding: 0;
     border-radius: 4px;
+    flex-shrink: 0;
 }
 
 .iconButton:hover {
     color: #ef4444;
     /* Red for delete/close */
-    background-color: rgba(239, 68, 68, 0.1);
+    background-color: rgba(239, 68, 68, 0.15);
 }
 
 .addColumnBtn {

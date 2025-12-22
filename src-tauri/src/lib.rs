@@ -27,7 +27,15 @@ pub fn run() {
             commands::get_table_schema,
             commands::truncate_table,
             commands::drop_table,
-            commands::duplicate_table
+            commands::duplicate_table,
+            // Saved Queries
+            commands::save_query,
+            commands::list_queries,
+            commands::delete_query,
+            // Saved Functions
+            commands::save_function,
+            commands::list_functions,
+            commands::delete_function
         ])
         .setup(|app| {
             if cfg!(debug_assertions) {

@@ -669,3 +669,108 @@ pub async fn duplicate_table(
 
     Ok(())
 }
+
+// ----- Saved Queries Commands -----
+
+#[derive(Serialize, Deserialize, Clone, Debug, FromRow)]
+pub struct SavedQuery {
+    pub id: i64,
+    pub name: String,
+    pub query: String,
+    pub connection_id: i64,
+}
+
+#[tauri::command]
+pub async fn save_query(
+    state: State<'_, AppState>,
+    name: String,
+    query: String,
+    connection_id: i64,
+) -> Result<i64, String> {
+    let result =
+        sqlx::query("INSERT INTO saved_queries (name, query, connection_id) VALUES (?, ?, ?)")
+            .bind(&name)
+            .bind(&query)
+            .bind(connection_id)
+            .execute(&state.db)
+            .await
+            .map_err(|e| format!("Failed to save query: {}", e))?;
+    Ok(result.last_insert_rowid())
+}
+
+#[tauri::command]
+pub async fn list_queries(
+    state: State<'_, AppState>,
+    connection_id: i64,
+) -> Result<Vec<SavedQuery>, String> {
+    sqlx::query_as::<_, SavedQuery>(
+        "SELECT id, name, query, connection_id FROM saved_queries WHERE connection_id = ? ORDER BY created_at DESC",
+    )
+    .bind(connection_id)
+    .fetch_all(&state.db)
+    .await
+    .map_err(|e| format!("Failed to list queries: {}", e))
+}
+
+#[tauri::command]
+pub async fn delete_query(state: State<'_, AppState>, id: i64) -> Result<(), String> {
+    sqlx::query("DELETE FROM saved_queries WHERE id = ?")
+        .bind(id)
+        .execute(&state.db)
+        .await
+        .map_err(|e| format!("Failed to delete query: {}", e))?;
+    Ok(())
+}
+
+// ----- Saved Functions Commands -----
+
+#[derive(Serialize, Deserialize, Clone, Debug, FromRow)]
+pub struct SavedFunction {
+    pub id: i64,
+    pub name: String,
+    pub function_body: String,
+    pub connection_id: i64,
+}
+
+#[tauri::command]
+pub async fn save_function(
+    state: State<'_, AppState>,
+    name: String,
+    function_body: String,
+    connection_id: i64,
+) -> Result<i64, String> {
+    let result = sqlx::query(
+        "INSERT INTO saved_functions (name, function_body, connection_id) VALUES (?, ?, ?)",
+    )
+    .bind(&name)
+    .bind(&function_body)
+    .bind(connection_id)
+    .execute(&state.db)
+    .await
+    .map_err(|e| format!("Failed to save function: {}", e))?;
+    Ok(result.last_insert_rowid())
+}
+
+#[tauri::command]
+pub async fn list_functions(
+    state: State<'_, AppState>,
+    connection_id: i64,
+) -> Result<Vec<SavedFunction>, String> {
+    sqlx::query_as::<_, SavedFunction>(
+        "SELECT id, name, function_body, connection_id FROM saved_functions WHERE connection_id = ? ORDER BY created_at DESC",
+    )
+    .bind(connection_id)
+    .fetch_all(&state.db)
+    .await
+    .map_err(|e| format!("Failed to list functions: {}", e))
+}
+
+#[tauri::command]
+pub async fn delete_function(state: State<'_, AppState>, id: i64) -> Result<(), String> {
+    sqlx::query("DELETE FROM saved_functions WHERE id = ?")
+        .bind(id)
+        .execute(&state.db)
+        .await
+        .map_err(|e| format!("Failed to delete function: {}", e))?;
+    Ok(())
+}

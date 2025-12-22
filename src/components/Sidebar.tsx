@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import styles from '../styles/MainLayout.module.css';
-import { Connection, Tag, TableTag } from '../types';
-import { ChevronDown, ChevronRight, Table, Check, Plus, Trash2, Folder, Terminal, Sigma, Pencil, Copy, FileText, AlertTriangle } from 'lucide-react';
+import { Connection, Tag, TableTag, SavedQuery, SavedFunction } from '../types';
+import { ChevronDown, ChevronRight, Table, Check, Plus, Trash2, Folder, Pencil, Copy, FileText, AlertTriangle, Code2, FunctionSquare } from 'lucide-react';
 import { invoke } from '@tauri-apps/api/core';
 import { TagManager } from './TagManager';
 import { ConfirmModal } from './ConfirmModal';
@@ -22,7 +22,14 @@ interface SidebarProps {
     onDuplicateTable?: (tableName: string) => void;
     onTruncateTable?: (tableName: string) => void;
     onDropTable?: (tableName: string) => void;
-    style?: React.CSSProperties; // Add style for color support
+    style?: React.CSSProperties;
+    // Saved queries and functions
+    savedQueries?: SavedQuery[];
+    savedFunctions?: SavedFunction[];
+    onQueryClick?: (query: SavedQuery) => void;
+    onFunctionClick?: (func: SavedFunction) => void;
+    onDeleteQuery?: (id: number) => void;
+    onDeleteFunction?: (id: number) => void;
 }
 
 // Draggable Table Item with Context Menu
@@ -145,6 +152,93 @@ const DraggableTableItem = ({
                             {item.icon} {item.label}
                         </div>
                     ))}
+                </div>
+            )}
+        </>
+    );
+};
+
+// Saved Item with Context Menu (for Queries/Functions)
+const SavedItemWithContextMenu = ({
+    name,
+    icon,
+    onClick,
+    onDelete
+}: {
+    name: string;
+    icon: React.ReactNode;
+    onClick: () => void;
+    onDelete: () => void;
+}) => {
+    const [contextMenu, setContextMenu] = useState<{ x: number, y: number } | null>(null);
+    const [isHovered, setIsHovered] = useState(false);
+
+    const handleContextMenu = (e: React.MouseEvent) => {
+        e.preventDefault();
+        e.stopPropagation();
+        setContextMenu({ x: e.clientX, y: e.clientY });
+    };
+
+    useEffect(() => {
+        const handleClick = () => setContextMenu(null);
+        window.addEventListener('click', handleClick);
+        return () => window.removeEventListener('click', handleClick);
+    }, [contextMenu]);
+
+    return (
+        <>
+            <div
+                onClick={onClick}
+                onContextMenu={handleContextMenu}
+                onMouseEnter={() => setIsHovered(true)}
+                onMouseLeave={() => setIsHovered(false)}
+                style={{
+                    padding: '0.35rem 0.5rem',
+                    fontSize: '0.85rem',
+                    color: 'var(--text-primary)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.5rem',
+                    cursor: 'pointer',
+                    borderRadius: '4px',
+                    backgroundColor: isHovered ? 'var(--bg-tertiary)' : 'transparent'
+                }}
+            >
+                {icon}
+                <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{name}</span>
+            </div>
+            {contextMenu && (
+                <div
+                    style={{
+                        position: 'fixed',
+                        top: contextMenu.y,
+                        left: contextMenu.x,
+                        backgroundColor: 'var(--bg-secondary)',
+                        border: '1px solid var(--border-color)',
+                        borderRadius: '6px',
+                        padding: '0.25rem',
+                        zIndex: 1000,
+                        boxShadow: 'var(--shadow-lg)'
+                    }}
+                    onClick={e => e.stopPropagation()}
+                >
+                    <div
+                        onClick={() => { onDelete(); setContextMenu(null); }}
+                        style={{
+                            padding: '0.5rem 0.75rem',
+                            cursor: 'pointer',
+                            borderRadius: '4px',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '0.5rem',
+                            fontSize: '0.9rem',
+                            color: '#ef4444'
+                        }}
+                        onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--bg-tertiary)'}
+                        onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+                    >
+                        <Trash2 size={14} /> Delete
+                    </div>
                 </div>
             )}
         </>
@@ -361,7 +455,8 @@ const TagGroup = ({
 export const Sidebar: React.FC<SidebarProps> = ({
     sidebarOpen, connection, tables, savedConnections,
     onSwitchConnection, onTableClick, onAddConnection, refreshTrigger,
-    onGetTableSchema, onEditTableSchema, onDuplicateTable, onTruncateTable, onDropTable
+    onGetTableSchema, onEditTableSchema, onDuplicateTable, onTruncateTable, onDropTable,
+    savedQueries = [], savedFunctions = [], onQueryClick, onFunctionClick, onDeleteQuery, onDeleteFunction
 }) => {
     const [viewMode, setViewMode] = useState<'az' | 'tags'>('az');
     const [showConnDropdown, setShowConnDropdown] = useState(false);
@@ -532,7 +627,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
                         zIndex: 100,
                         marginTop: '4px',
                         maxHeight: '300px',
-                        overflowY: 'auto'
+                        overflowY: 'auto',
+                        userSelect: 'none'
                     }}>
                         <div style={{
                             padding: '0.5rem',
@@ -625,22 +721,46 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
                         <CollapsibleSection
                             title="Queries"
-                            count={0}
-                            icon={<Terminal size={14} color="#8b5cf6" />}
+                            count={savedQueries.length}
+                            icon={<Code2 size={14} color="#8b5cf6" />}
                             isOpen={expandedSections.has('az-queries')}
                             onToggle={() => toggleSection('az-queries')}
                         >
-                            <div style={{ padding: '0.5rem', color: 'var(--text-muted)', fontSize: '0.8rem', fontStyle: 'italic' }}>No saved queries</div>
+                            {savedQueries.length > 0 ? (
+                                savedQueries.map(query => (
+                                    <SavedItemWithContextMenu
+                                        key={query.id}
+                                        name={query.name}
+                                        icon={<Code2 size={14} color="#8b5cf6" />}
+                                        onClick={() => onQueryClick?.(query)}
+                                        onDelete={() => onDeleteQuery?.(query.id)}
+                                    />
+                                ))
+                            ) : (
+                                <div style={{ padding: '0.5rem', color: 'var(--text-muted)', fontSize: '0.8rem', fontStyle: 'italic' }}>No saved queries</div>
+                            )}
                         </CollapsibleSection>
 
                         <CollapsibleSection
                             title="Functions"
-                            count={0}
-                            icon={<Sigma size={14} color="#f59e0b" />}
+                            count={savedFunctions.length}
+                            icon={<FunctionSquare size={14} color="#f59e0b" />}
                             isOpen={expandedSections.has('az-functions')}
                             onToggle={() => toggleSection('az-functions')}
                         >
-                            <div style={{ padding: '0.5rem', color: 'var(--text-muted)', fontSize: '0.8rem', fontStyle: 'italic' }}>No functions</div>
+                            {savedFunctions.length > 0 ? (
+                                savedFunctions.map(func => (
+                                    <SavedItemWithContextMenu
+                                        key={func.id}
+                                        name={func.name}
+                                        icon={<FunctionSquare size={14} color="#f59e0b" />}
+                                        onClick={() => onFunctionClick?.(func)}
+                                        onDelete={() => onDeleteFunction?.(func.id)}
+                                    />
+                                ))
+                            ) : (
+                                <div style={{ padding: '0.5rem', color: 'var(--text-muted)', fontSize: '0.8rem', fontStyle: 'italic' }}>No functions</div>
+                            )}
                         </CollapsibleSection>
                     </>
                 ) : (

@@ -96,20 +96,47 @@ export const ChangelogSidebar: React.FC<ChangelogSidebarProps> = ({
                                 {tabChanges.map((change, idx) => {
                                     const isUpdate = change.type === 'UPDATE';
                                     const isInsert = change.type === 'INSERT';
+                                    const isAddColumn = change.type === 'ADD_COLUMN';
+                                    const isDropColumn = change.type === 'DROP_COLUMN';
+                                    const isSchemaChange = isAddColumn || isDropColumn;
+
                                     const updateColor = '#f59e0b'; // Orange
                                     const insertColor = '#22c55e'; // Green
                                     const deleteColor = '#ff4d4d'; // Red
+                                    const schemaColor = '#8b5cf6'; // Purple for schema changes
+
+                                    const getColor = () => {
+                                        if (isUpdate) return updateColor;
+                                        if (isInsert || isAddColumn) return insertColor;
+                                        if (isDropColumn) return deleteColor;
+                                        return deleteColor;
+                                    };
+
+                                    const getBgColor = () => {
+                                        if (isUpdate) return 'rgba(245, 158, 11, 0.2)';
+                                        if (isInsert || isAddColumn) return 'rgba(34, 197, 94, 0.2)';
+                                        if (isDropColumn) return 'rgba(255, 77, 77, 0.2)';
+                                        return 'rgba(255, 77, 77, 0.2)';
+                                    };
+
+                                    const getBadge = () => {
+                                        if (isUpdate) return 'U';
+                                        if (isInsert) return 'I';
+                                        if (isAddColumn) return '+C';
+                                        if (isDropColumn) return '-C';
+                                        return 'D';
+                                    };
 
                                     return (
                                         <div key={idx}
-                                            onClick={() => onNavigate(tabId, change.rowIndex)}
+                                            onClick={() => !isSchemaChange && onNavigate(tabId, change.rowIndex)}
                                             style={{
                                                 backgroundColor: 'var(--bg-secondary)',
                                                 borderRadius: '6px',
                                                 padding: '0.75rem',
                                                 marginBottom: '0.75rem',
                                                 border: '1px solid var(--border-color)',
-                                                cursor: 'pointer',
+                                                cursor: isSchemaChange ? 'default' : 'pointer',
                                                 transition: 'background-color 0.2s'
                                             }}
                                             onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--bg-tertiary)'}
@@ -118,26 +145,34 @@ export const ChangelogSidebar: React.FC<ChangelogSidebarProps> = ({
                                             <div style={{ display: 'flex', alignItems: 'center', marginBottom: '0.5rem', color: 'var(--text-secondary)', fontSize: '0.8rem', justifyContent: 'space-between' }}>
                                                 <div style={{ display: 'flex', alignItems: 'center' }}>
                                                     <span style={{
-                                                        backgroundColor: isUpdate ? 'rgba(245, 158, 11, 0.2)' : isInsert ? 'rgba(34, 197, 94, 0.2)' : 'rgba(255, 77, 77, 0.2)',
-                                                        color: isUpdate ? updateColor : isInsert ? insertColor : deleteColor,
+                                                        backgroundColor: getBgColor(),
+                                                        color: getColor(),
                                                         borderRadius: '3px',
-                                                        width: 18, height: 18,
+                                                        width: isSchemaChange ? 22 : 18, height: 18,
                                                         display: 'flex', alignItems: 'center', justifyContent: 'center',
                                                         fontWeight: 700, marginRight: '0.5rem',
                                                         fontSize: '0.65rem'
                                                     }}>
-                                                        {isUpdate ? 'U' : isInsert ? 'I' : 'D'}
+                                                        {getBadge()}
                                                     </span>
                                                     <span style={{ fontFamily: 'monospace', fontWeight: 500 }}>
                                                         {tableName}
                                                     </span>
-                                                    <span style={{ marginLeft: '0.5rem', opacity: 0.7 }}>
-                                                        Row {change.rowIndex + 1}
-                                                    </span>
-                                                    {change.column && (
-                                                        <span style={{ marginLeft: '0.5rem', opacity: 0.7, fontStyle: 'italic' }}>
-                                                            ({change.column})
+                                                    {isSchemaChange ? (
+                                                        <span style={{ marginLeft: '0.5rem', opacity: 0.7 }}>
+                                                            Column: {change.column}
                                                         </span>
+                                                    ) : (
+                                                        <>
+                                                            <span style={{ marginLeft: '0.5rem', opacity: 0.7 }}>
+                                                                Row {change.rowIndex + 1}
+                                                            </span>
+                                                            {change.column && (
+                                                                <span style={{ marginLeft: '0.5rem', opacity: 0.7, fontStyle: 'italic' }}>
+                                                                    ({change.column})
+                                                                </span>
+                                                            )}
+                                                        </>
                                                     )}
                                                 </div>
                                                 <button

@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import Editor, { OnMount } from '@monaco-editor/react';
 import styles from '../styles/MainLayout.module.css';
-import { Play, ChevronDown, Copy, Download } from 'lucide-react';
+import { Play, ChevronDown, Copy, Download, Save, FunctionSquare } from 'lucide-react';
 
 interface QueryEditorProps {
     value: string;
@@ -13,6 +13,10 @@ interface QueryEditorProps {
     onExport?: (format: 'CSV' | 'JSON') => void;
     theme?: 'blue' | 'gray' | 'amoled' | 'light';
     tables?: string[]; // For autocomplete
+    // Saved Query props
+    onSaveQuery?: () => void;
+    onSaveFunction?: () => void;
+    onExportSql?: () => void;
 }
 
 const extractQueryAtLine = (model: any, lineNumber: number): string | null => {
@@ -31,7 +35,11 @@ const extractQueryAtLine = (model: any, lineNumber: number): string | null => {
     return text || null;
 };
 
-export const QueryEditor: React.FC<QueryEditorProps> = ({ value, onChange, onRunQuery, selectedRowCount = 0, onCopy, onExport, theme = 'blue', tables = [] }) => {
+export const QueryEditor: React.FC<QueryEditorProps> = ({
+    value, onChange, onRunQuery, selectedRowCount = 0, onCopy, onExport,
+    theme = 'blue', tables = [],
+    onSaveQuery, onSaveFunction, onExportSql
+}) => {
     const editorTheme = theme === 'light' ? 'light' : 'vs-dark';
     const editorRef = useRef<any>(null);
     const monacoRef = useRef<any>(null);
@@ -75,30 +83,6 @@ export const QueryEditor: React.FC<QueryEditorProps> = ({ value, onChange, onRun
         });
 
         // Register CodeLens Provider
-        // Note: We register this globally for 'sql', but we filter lenses or just provide them.
-        // Since it's global registration, multiple editors might trigger this?
-        // Actually `registerCodeLensProvider` is global for language.
-        // It provides lenses for ALL models of that language.
-        // We need to make sure we only provide lenses for THIS editor's model?
-        // Or if we provide for all, we need to make sure the command ID is correct for THAT model.
-        // Monaco calls provideCodeLenses(model).
-        // We can check if `model === editor.getModel()`?
-        // OR better: The provider itself should be global? NO.
-        // If we register multiple providers for 'sql', they pile up.
-        // ISSUE: `registerCodeLensProvider` IS GLOBAL.
-        // If we have 3 tabs, we have 3 providers registered.
-        // Each provider will get called for ANY sql model.
-        // Provider A (Tab A) called for Model B (Tab B).
-        // Provider A checks Model B. Generates lenses with Command A (Tab A).
-        // User clicks lens in Tab B. Command A executes.
-        // Command A uses `editor` (Tab A).
-        // `editor.getModel()` is Model A. `onRunQuery` is Tab A's.
-        // User clicked in Tab B, but Tab A runs?
-        // AND query extracted from Model A?
-
-        // CORRECTION:
-        // We must ensure the provider ONLY returns lenses if the model matches THIS editor instance.
-
         if (!providerRef.current) {
             providerRef.current = monaco.languages.registerCodeLensProvider('sql', {
                 provideCodeLenses: function (model: any) {
@@ -243,7 +227,7 @@ export const QueryEditor: React.FC<QueryEditorProps> = ({ value, onChange, onRun
                 justifyContent: 'space-between',
                 alignItems: 'center'
             }}>
-                <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
+                <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
                     <button
                         className={styles.primaryBtn}
                         onClick={() => onRunQuery(value)}
@@ -252,8 +236,40 @@ export const QueryEditor: React.FC<QueryEditorProps> = ({ value, onChange, onRun
                         <Play size={14} fill="currentColor" /> Run All
                     </button>
 
-                    {selectedRowCount > 0 && (
+                    <div className={styles.verticalDivider} style={{ height: '20px', margin: '0 0.5rem' }} />
+
+                    {onSaveQuery && (
+                        <button
+                            className={styles.toolbarBtn}
+                            onClick={onSaveQuery}
+                            title="Save Query"
+                        >
+                            <Save size={14} /> Save Query
+                        </button>
+                    )}
+                    {onSaveFunction && (
+                        <button
+                            className={styles.toolbarBtn}
+                            onClick={onSaveFunction}
+                            title="Save Function"
+                        >
+                            <FunctionSquare size={14} /> Save Function
+                        </button>
+                    )}
+                    {onExportSql && (
+                        <button
+                            className={styles.toolbarBtn}
+                            onClick={onExportSql}
+                            title="Export as .sql"
+                        >
+                            <Download size={14} /> Export
+                        </button>
+                    )}
+
+                    {(selectedRowCount > 0) && (
                         <>
+                            <div className={styles.verticalDivider} style={{ height: '20px', margin: '0 0.5rem' }} />
+
                             <div style={{ position: 'relative', display: 'inline-block' }} onClick={e => e.stopPropagation()}>
                                 <button
                                     className={styles.outlineBtn}

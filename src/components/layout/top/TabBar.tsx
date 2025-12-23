@@ -67,8 +67,7 @@ function SortableTab({ tab, isActive, onClick, onClose, onDoubleClick, color }: 
         display: 'flex',
         alignItems: 'center',
         gap: '0.5rem',
-        minWidth: '120px',
-        // maxWidth removed per recent UI polish
+        flexShrink: 0,
         justifyContent: 'space-between',
         color: isActive ? (color || 'var(--text-primary)') : (isHovered ? (color || 'var(--text-primary)') : 'var(--text-secondary)'),
         userSelect: 'none' as const,

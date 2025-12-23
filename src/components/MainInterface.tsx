@@ -3,36 +3,24 @@ import { invoke } from '@tauri-apps/api/core';
 import { generateRowChangeSql } from '../helpers/sqlHelpers';
 
 import styles from '../styles/MainLayout.module.css';
-import { Connection, QueryResult, PendingChange, Tag, TableTag, LogEntry, ColumnSchema, SavedQuery, SavedFunction } from '../types';
-import { Plus, Table, Filter, Trash2, ChevronUp, ChevronDown, Copy, Download, Activity, ChevronLeft, ChevronRight, RefreshCw, Save } from 'lucide-react';
+
 import { ConnectionForm } from './ConnectionForm';
-import { Sidebar, Navbar, TabBar, ChangelogSidebar, ResultsPane, InsertRowPanel } from './layout';
-import { QueryEditor } from './editors/QueryEditor';
 import { DataGrid } from './DataGrid';
-import { TableCreator, TableCreatorState } from './editors/TableCreator';
-import { PreferencesModal } from './modals/PreferencesModal';
-import { ConfirmModal } from './modals/ConfirmModal';
-import { DuplicateTableModal } from './modals/DuplicateTableModal';
-import { SchemaVisualizer } from './editors/SchemaVisualizer';
-import { SaveQueryModal } from './modals/SaveQueryModal';
-import { useSystemLogs } from '../hooks/useSystemLogs';
-import { useSavedItems } from '../hooks/useSavedItems';
-import { useTableOperations } from '../hooks/useTableOperations';
-import { useTableData } from '../hooks/useTableData';
-import { useResultsPane } from '../hooks/useResultsPane';
-import { useTabs } from '../hooks/useTabs';
-import { TabItem } from '../types';
-import { DragEndEvent } from '@dnd-kit/core';
-import { arrayMove } from '@dnd-kit/sortable';
+import { Plus, Filter, Trash2, ChevronDown, Copy, Download, Activity, ChevronLeft, ChevronRight, RefreshCw } from 'lucide-react';
+
+import { Connection, QueryResult, PendingChange, Tag, TableTag, ColumnSchema, SavedFunction } from '../types';
+import { Sidebar, Navbar, TabBar, ChangelogSidebar, ResultsPane, InsertRowPanel } from './layout';
+import { QueryEditor, SchemaVisualizer, TableCreator, TableCreatorState } from './editors';
+import { PreferencesModal, ConfirmModal, DuplicateTableModal, SaveQueryModal } from './modals';
+import { useSystemLogs, useSavedItems, useTableOperations, useTableData, useResultsPane, useTabs } from '../hooks';
+import { ToastContainer, useToast } from './Toast';
+import { captureSchemaScreenshot, saveExportFile } from '../helpers/screenshotHelper';
+import { FullscreenLoader } from './FullscreenLoader';
 
 interface MainInterfaceProps {
     connection: Connection;
     onSwitchConnection: (conn: Connection) => void;
 }
-
-// Local interfaces moved to types.ts
-
-
 
 export const MainInterface: React.FC<MainInterfaceProps> = ({ connection, onSwitchConnection }) => {
     const [sidebarOpen, setSidebarOpen] = useState(true);
@@ -92,8 +80,11 @@ export const MainInterface: React.FC<MainInterfaceProps> = ({ connection, onSwit
         };
     }, [showDbMenu]);
 
+    const [isCapturing, setIsCapturing] = useState(false); // Kept for blur effect
     const [tableSchemas, setTableSchemas] = useState<Record<string, ColumnSchema[]>>({});
     const [showEditWindow, setShowEditWindow] = useState(false);
+    const schemaContainerRef = React.useRef<HTMLDivElement>(null);
+    const { toasts, addToast, dismissToast } = useToast();
 
     const handleZoom = (delta: number) => {
         setZoom(prev => Math.max(0.5, Math.min(2.0, prev + delta)));
@@ -1080,7 +1071,7 @@ export const MainInterface: React.FC<MainInterfaceProps> = ({ connection, onSwit
         }
     };
 
-    const handleExport = (format: 'CSV' | 'JSON') => {
+    const handleExport = async (format: 'CSV' | 'JSON') => {
         let data: QueryResult | null = null;
         let indices: number[] = [];
 
@@ -1098,15 +1089,15 @@ export const MainInterface: React.FC<MainInterfaceProps> = ({ connection, onSwit
         if (!data || indices.length === 0) return;
         const text = generateDataText(format, data, indices);
 
-        const blob = new Blob([text], { type: format === 'JSON' ? 'application/json' : 'text/csv' });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = `export.${format.toLowerCase()}`;
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        URL.revokeObjectURL(url);
+        const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+        const fileName = `${activeTab?.title || 'export'}_${timestamp}.${format.toLowerCase()}`;
+
+        await saveExportFile(
+            fileName,
+            text,
+            (filePath) => addToast('Export Saved', 'Click to open folder', filePath, 'success'),
+            (err) => addToast('Export Failed', err, undefined, 'error')
+        );
     };
 
     const handleOpenLogs = () => {
@@ -1162,7 +1153,14 @@ export const MainInterface: React.FC<MainInterfaceProps> = ({ connection, onSwit
     const totalChanges = Object.values(pendingChanges).reduce((acc, curr) => acc + curr.length, 0);
 
     return (
-        <div className={styles.container} style={{ zoom: zoom, width: `calc(100vw / ${zoom})`, height: `calc(100vh / ${zoom})` } as any}>
+        <div className={styles.container} style={{
+            zoom: zoom,
+            width: `calc(100vw / ${zoom})`,
+            height: `calc(100vh / ${zoom})`,
+            filter: isCapturing ? 'blur(5px)' : 'none', // Apply blur when capturing
+            pointerEvents: isCapturing ? 'none' : 'auto', // Disable interaction
+            transition: 'filter 0.3s ease'
+        } as any}>
             <PreferencesModal
                 isOpen={showPreferences}
                 onClose={() => setShowPreferences(false)}
@@ -1171,6 +1169,8 @@ export const MainInterface: React.FC<MainInterfaceProps> = ({ connection, onSwit
                 zoom={zoom}
                 setZoom={setZoom}
             />
+            {/* <FullscreenLoader isVisible={isCapturing} message="Generating High-Quality Screenshot..." /> */}
+            <ToastContainer toasts={toasts} onDismiss={dismissToast} />
 
 
             <Navbar
@@ -1505,12 +1505,37 @@ export const MainInterface: React.FC<MainInterfaceProps> = ({ connection, onSwit
                                 }}
                             />
                         ) : (activeTab as any).type === 'schema-diagram' ? (
-                            <div style={{ height: '100%', width: '100%' }}>
+                            <div ref={schemaContainerRef} style={{ height: '100%', width: '100%' }}>
                                 <SchemaVisualizer
                                     tables={tables}
                                     tableSchemas={tableSchemas}
                                     onTableClick={(tableName) => handleTableClick(tableName)}
                                     theme={theme}
+                                    onDownload={() => {
+                                        if (schemaContainerRef.current) {
+                                            setIsCapturing(true); // Enable Blur
+
+                                            // Open native loading window
+                                            invoke('open_loading_window').catch(console.error);
+
+                                            // Small timeout to allow loader to render before thread blocking
+                                            setTimeout(() => {
+                                                captureSchemaScreenshot(
+                                                    schemaContainerRef.current!,
+                                                    (filePath) => {
+                                                        invoke('close_loading_window').catch(console.error);
+                                                        setIsCapturing(false); // Disable Blur
+                                                        addToast('Screenshot Saved', 'Click to open', filePath, 'success');
+                                                    },
+                                                    (error) => {
+                                                        invoke('close_loading_window').catch(console.error);
+                                                        setIsCapturing(false); // Disable Blur
+                                                        addToast('Screenshot Failed', error, undefined, 'error');
+                                                    }
+                                                );
+                                            }, 500);
+                                        }
+                                    }}
                                 />
                             </div>
                         ) : (activeTab as any).type === 'function-output' ? (

@@ -316,7 +316,7 @@ const CollapsibleSection = ({
                 {count !== undefined && <span style={{ marginLeft: 'auto', opacity: 0.5, fontSize: '0.75rem' }}>{count}</span>}
             </div>
             {isOpen && (
-                <div style={{ marginLeft: '1rem', borderLeft: '1px solid var(--border-color)', paddingLeft: '0.5rem' }}>
+                <div style={{ marginLeft: '1rem', paddingLeft: '0.5rem' }}>
                     {children}
                 </div>
             )}

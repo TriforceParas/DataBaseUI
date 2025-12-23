@@ -7,6 +7,8 @@ use tauri::Manager;
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
+        .plugin(tauri_plugin_fs::init())
+        .plugin(tauri_plugin_shell::init())
         .invoke_handler(tauri::generate_handler![
             commands::save_connection,
             commands::list_connections,
@@ -37,7 +39,10 @@ pub fn run() {
             commands::save_function,
             commands::list_functions,
             commands::delete_function,
-            commands::update_function
+            commands::update_function,
+            // Loading Window
+            commands::open_loading_window,
+            commands::close_loading_window
         ])
         .setup(|app| {
             if cfg!(debug_assertions) {

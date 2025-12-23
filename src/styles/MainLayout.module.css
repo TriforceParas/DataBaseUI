@@ -161,8 +161,7 @@
     flex: 1;
     display: flex;
     overflow-x: auto;
-    gap: 4px;
-}
+    }
 
 .tabsContainer::-webkit-scrollbar {
     height: 2px;

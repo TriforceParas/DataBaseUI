@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { WelcomeScreen } from "./components/WelcomeScreen";
 import { MainInterface } from "./components/MainInterface";
+import { FullscreenLoader } from "./components/FullscreenLoader";
 import { Connection } from "./types";
 
 function App() {
@@ -40,6 +41,13 @@ function App() {
       console.error("Failed to open connection window", e);
     }
   };
+
+  const params = new URLSearchParams(window.location.search);
+  const isLoadingMode = params.get('mode') === 'loading';
+
+  if (isLoadingMode) {
+    return <FullscreenLoader isVisible={true} message="Generating High-Quality Screenshot..." />;
+  }
 
   if (loading) return null; // Or a loader
 

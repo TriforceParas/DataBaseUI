@@ -3,6 +3,7 @@ import {
     ReactFlow,
     Background,
     Controls,
+    ControlButton,
     useNodesState,
     useEdgesState,
     Node,
@@ -13,7 +14,7 @@ import {
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 import dagre from 'dagre';
-import { Key, Link, Table, ChevronDown, ChevronUp } from 'lucide-react';
+import { Key, Link, Table, ChevronDown, ChevronUp, Download } from 'lucide-react';
 
 // Dagre layout helper
 const getLayoutedElements = (nodes: Node[], edges: Edge[], direction = 'LR') => {
@@ -67,10 +68,11 @@ interface SchemaVisualizerProps {
     tables: string[];
     tableSchemas: Record<string, ColumnSchema[]>;
     onTableClick?: (tableName: string) => void;
+    onDownload?: () => void;
     theme?: 'blue' | 'gray' | 'amoled' | 'light';
 }
 
-// Helper to categorize columns
+// Helper to categorize columns - collapsed by default (shows only PKs and FKs)
 const categorizeColumns = (columns: ColumnSchema[], expanded: boolean) => {
     const pks: ColumnSchema[] = [];
     const fks: ColumnSchema[] = [];
@@ -85,12 +87,9 @@ const categorizeColumns = (columns: ColumnSchema[], expanded: boolean) => {
         else others.push(col);
     });
 
-    const hiddenCount = others.length;
-    const visibleOthers = expanded ? others : [];
-
     return {
-        visibleColumns: [...pks, ...fks, ...visibleOthers],
-        hasHiddenCount: !expanded ? hiddenCount : 0
+        visibleColumns: expanded ? [...pks, ...fks, ...others] : [...pks, ...fks],
+        hiddenCount: expanded ? 0 : others.length
     };
 };
 
@@ -232,7 +231,7 @@ const TableNode = ({ data }: { data: { label: string; columns: ColumnSchema[]; o
     const { label, columns, onTableClick } = data;
     const [expanded, setExpanded] = useState(false);
 
-    const { visibleColumns, hasHiddenCount } = useMemo(() => categorizeColumns(columns, expanded), [columns, expanded]);
+    const { visibleColumns, hiddenCount } = useMemo(() => categorizeColumns(columns, expanded), [columns, expanded]);
 
     return (
         <div
@@ -250,14 +249,14 @@ const TableNode = ({ data }: { data: { label: string; columns: ColumnSchema[]; o
             <TableHandles columns={visibleColumns} />
             <TableHeader label={label} onClick={onTableClick} />
 
-            <div style={{ maxHeight: '300px', overflowY: 'auto', overflowX: 'hidden' }}>
+            <div style={{ overflowY: 'visible', overflowX: 'hidden' }}>
                 {visibleColumns.map((col, idx) => (
-                    <ColumnRow key={col.name} col={col} isLast={idx === visibleColumns.length - 1} />
+                    <ColumnRow key={col.name} col={col} isLast={idx === visibleColumns.length - 1 && hiddenCount === 0} />
                 ))}
 
-                {(hasHiddenCount > 0 || expanded) && (
+                {(hiddenCount > 0 || expanded) && (
                     <ToggleRow
-                        hasHiddenCount={hasHiddenCount}
+                        hasHiddenCount={hiddenCount}
                         expanded={expanded}
                         onToggle={() => setExpanded(!expanded)}
                     />
@@ -340,6 +339,7 @@ export const SchemaVisualizer: React.FC<SchemaVisualizerProps> = ({
     tables,
     tableSchemas,
     onTableClick,
+    onDownload,
     theme = 'blue'
 }) => {
     const isDark = theme !== 'light';
@@ -395,23 +395,31 @@ export const SchemaVisualizer: React.FC<SchemaVisualizerProps> = ({
                 elementsSelectable={true}
             >
                 <Background color={isDark ? '#333' : '#ddd'} gap={20} />
-                <Controls style={controlsStyle} />
+                <Controls style={controlsStyle}>
+                    {onDownload && (
+                        <ControlButton onClick={onDownload} title="Save Image">
+                            <Download />
+                        </ControlButton>
+                    )}
+                </Controls>
             </ReactFlow>
 
             {/* Legend - positioned top right */}
-            <div style={{
-                position: 'absolute',
-                top: 16,
-                right: 16,
-                background: 'var(--bg-secondary)',
-                border: '1px solid var(--border-color)',
-                borderRadius: '6px',
-                padding: '0.5rem 0.75rem',
-                fontSize: '0.7rem',
-                display: 'flex',
-                gap: '1rem',
-                zIndex: 10
-            }}>
+            <div
+                data-legend="true"
+                style={{
+                    position: 'absolute',
+                    top: 16,
+                    right: 16,
+                    background: 'var(--bg-secondary)',
+                    border: '1px solid var(--border-color)',
+                    borderRadius: '6px',
+                    padding: '0.5rem 0.75rem',
+                    fontSize: '0.7rem',
+                    display: 'flex',
+                    gap: '1rem',
+                    zIndex: 10
+                }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
                     <Key size={11} style={{ color: '#eab308' }} />
                     <span style={{ color: 'var(--text-secondary)' }}>Primary Key</span>

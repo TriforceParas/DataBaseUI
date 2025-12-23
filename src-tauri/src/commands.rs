@@ -1,5 +1,4 @@
 use crate::db::AppState;
-use chrono::NaiveDate;
 use serde::{Deserialize, Serialize};
 use sqlx::mysql::MySqlConnection;
 use sqlx::postgres::PgConnection;
@@ -951,6 +950,50 @@ pub async fn update_function(
         &function_body,
     )
     .await
+}
+
+#[tauri::command]
+pub async fn open_loading_window<R: tauri::Runtime>(
+    app: tauri::AppHandle<R>,
+    //window: tauri::WebviewWindow<R>, // Changed from Window to WebviewWindow
+) -> Result<(), String> {
+    let label = "loading-window";
+    let url = "index.html?mode=loading";
+
+    if let Some(win) = app.get_webview_window(label) {
+        let _ = win.set_focus();
+        return Ok(());
+    }
+
+    let win = WebviewWindowBuilder::new(&app, label, WebviewUrl::App(url.into()))
+        .title("Processing")
+        .inner_size(300.0, 180.0)
+        .decorations(false)
+        .transparent(true)
+        .always_on_top(true)
+        .skip_taskbar(true)
+        .center()
+        .resizable(false);
+
+    // Set parent to keep it attached/centered relative to the caller
+    // #[cfg(target_os = "windows")]
+    // let win = win.parent(&window).expect("Failed to set parent");
+
+    // For non-windows we might need manual centering logic, but parent() usually helps
+
+    win.build().map_err(|e| e.to_string())?;
+
+    Ok(())
+}
+
+#[tauri::command]
+pub async fn close_loading_window<R: tauri::Runtime>(
+    app: tauri::AppHandle<R>,
+) -> Result<(), String> {
+    if let Some(win) = app.get_webview_window("loading-window") {
+        win.close().map_err(|e| e.to_string())?;
+    }
+    Ok(())
 }
 
 #[cfg(test)]

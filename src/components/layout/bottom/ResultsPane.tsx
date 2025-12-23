@@ -241,7 +241,7 @@ export const ResultsPane: React.FC<ResultsPaneProps> = ({
                                         <span>{currentResult?.data?.rows?.length || 0} rows visible</span>
                                     </div>
                                     <div className={styles.statusItem}>
-                                        <span>Total: {pagination.total}</span>
+                                        <span>Total: {Number.isFinite(pagination.total) ? pagination.total : 0}</span>
                                     </div>
                                     {currentResult?.data?.duration_ms !== undefined && (
                                         <div className={styles.statusItem}>

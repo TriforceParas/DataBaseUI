@@ -39,8 +39,8 @@ interface ResultsPaneProps {
     pendingChanges?: Record<string, PendingChange[]>;
 
     // Export handlers
-    onExport: (format: 'csv' | 'json') => void;
-    onCopy: (format: 'csv' | 'json') => void;
+    onExport: (format: 'CSV' | 'JSON') => void;
+    onCopy: (format: 'CSV' | 'JSON') => void;
 }
 
 export const ResultsPane: React.FC<ResultsPaneProps> = ({
@@ -195,8 +195,8 @@ export const ResultsPane: React.FC<ResultsPaneProps> = ({
                                         </button>
                                         {activeDropdown === 'copy' && (
                                             <div className={styles.dropdownMenu} style={{ bottom: '100%', top: 'auto', marginBottom: '4px', right: 0 }}>
-                                                <div className={styles.dropdownItem} onClick={() => { onCopy('csv'); setActiveDropdown(null); }}>Copy as CSV</div>
-                                                <div className={styles.dropdownItem} onClick={() => { onCopy('json'); setActiveDropdown(null); }}>Copy as JSON</div>
+                                                <div className={styles.dropdownItem} onClick={() => { onCopy('CSV'); setActiveDropdown(null); }}>Copy as CSV</div>
+                                                <div className={styles.dropdownItem} onClick={() => { onCopy('JSON'); setActiveDropdown(null); }}>Copy as JSON</div>
                                             </div>
                                         )}
                                     </div>
@@ -207,8 +207,8 @@ export const ResultsPane: React.FC<ResultsPaneProps> = ({
                                         </button>
                                         {activeDropdown === 'export' && (
                                             <div className={styles.dropdownMenu} style={{ bottom: '100%', top: 'auto', marginBottom: '4px', right: 0 }}>
-                                                <div className={styles.dropdownItem} onClick={() => { onExport('csv'); setActiveDropdown(null); }}>Export CSV</div>
-                                                <div className={styles.dropdownItem} onClick={() => { onExport('json'); setActiveDropdown(null); }}>Export JSON</div>
+                                                <div className={styles.dropdownItem} onClick={() => { onExport('CSV'); setActiveDropdown(null); }}>Export CSV</div>
+                                                <div className={styles.dropdownItem} onClick={() => { onExport('JSON'); setActiveDropdown(null); }}>Export JSON</div>
                                             </div>
                                         )}
                                     </div>

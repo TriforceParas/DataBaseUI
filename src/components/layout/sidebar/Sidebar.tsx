@@ -15,7 +15,7 @@ interface SidebarProps {
     onSwitchConnection: (conn: Connection) => void;
     onTableClick: (tableName: string) => void;
     onAddConnection: () => void;
-    refreshTrigger: number;
+    refreshTrigger?: number;
     // Table context menu actions
     onGetTableSchema?: (tableName: string) => void;
     onEditTableSchema?: (tableName: string) => void;

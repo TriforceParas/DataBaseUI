@@ -87,3 +87,14 @@ export interface TabItem {
     savedQueryId?: number;
     savedFunctionId?: number;
 }
+
+// Aliases for better naming/compatibility
+export type Tab = TabItem;
+export type TableDataState = TabResult;
+export type SystemLog = LogEntry;
+
+export interface PaginationState {
+    page: number;
+    pageSize: number;
+    total: number;
+}

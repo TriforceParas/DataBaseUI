@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { Save, Database, FileJson, Plus, Trash2 } from 'lucide-react';
-import styles from '../../../styles/ConnectionForm.module.css';
+import styles from '../../styles/ConnectionForm.module.css';
 
-interface InsertRowPanelProps {
+interface InsertRowModalProps {
     isOpen: boolean;
     onClose: () => void;
     columns: string[];
@@ -14,7 +14,7 @@ interface InsertRowPanelProps {
     onRemoveRow?: (rowIndex: number) => void;
 }
 
-export const InsertRowPanel: React.FC<InsertRowPanelProps> = ({ isOpen, onClose, columns, onInsert, initialData, onAddRow, onUpdateRow, onRemoveRow }) => {
+export const InsertRowModal: React.FC<InsertRowModalProps> = ({ isOpen, onClose, columns, onInsert, initialData, onAddRow, onUpdateRow, onRemoveRow }) => {
     const [mode, setMode] = useState<'form' | 'json'>('form');
     // Array of rows. Each row is a Record<column, value>
     const [rows, setRows] = useState<Record<string, string>[]>([{}]);
@@ -125,8 +125,6 @@ export const InsertRowPanel: React.FC<InsertRowPanelProps> = ({ isOpen, onClose,
         }
     };
 
-    // if (!isOpen) return null; // Removed for animation
-
     return (
         <div style={{
             position: 'fixed',
@@ -141,11 +139,6 @@ export const InsertRowPanel: React.FC<InsertRowPanelProps> = ({ isOpen, onClose,
             transform: visible ? 'translateX(0)' : 'translateX(100%)',
             transition: 'transform 0.3s ease-in-out',
         }}>
-            {/* Header */}
-            {/* Header Removed */}
-            <div style={{ height: '44px', display: 'none' }} />
-
-            {/* Toggle */}
             <div style={{ display: 'flex', padding: '1rem', gap: '1rem' }}>
                 <button
                     onClick={() => setMode('form')}
@@ -185,7 +178,6 @@ export const InsertRowPanel: React.FC<InsertRowPanelProps> = ({ isOpen, onClose,
                 </button>
             </div>
 
-            {/* Content */}
             <div style={{ flex: 1, overflowY: 'auto', padding: '1rem' }}>
                 {initialData && initialData.length === 0 ? (
                     <div style={{ height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: 'var(--text-secondary)' }}>
@@ -289,7 +281,6 @@ export const InsertRowPanel: React.FC<InsertRowPanelProps> = ({ isOpen, onClose,
                 )}
             </div>
 
-            {/* Footer */}
             <div style={{ padding: '1rem', borderTop: '1px solid var(--border-color)' }}>
                 {error && <div style={{ color: '#ff4d4d', fontSize: '0.9rem', marginBottom: '1rem' }}>{error}</div>}
                 <div style={{ display: 'flex', gap: '1rem' }}>

@@ -28,6 +28,7 @@ export const captureSchemaScreenshot = async (
             pixelRatio: 2,
             filter: filter,
             backgroundColor: getComputedStyle(document.documentElement).getPropertyValue('--bg-primary') || '#1a1a2e',
+            skipFonts: true, // Prevent CORS errors from remote webfonts
         });
 
         // Convert Data URL to Uint8Array

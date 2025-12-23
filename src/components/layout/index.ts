@@ -4,5 +4,5 @@ export * from './top/Navbar';
 export * from './top/TabBar';
 export * from './top/WindowControls';
 export * from './bottom/ResultsPane';
-export * from './panels/InsertRowPanel';
+
 export * from './panels/ChangelogSidebar';

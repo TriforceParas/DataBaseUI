@@ -1,6 +1,6 @@
 
 import { useState, useCallback } from 'react';
-import { TabItem, SavedQuery, SavedFunction } from '../types';
+import { TabItem, SavedQuery } from '../types';
 import { DragEndEvent } from '@dnd-kit/core';
 import { arrayMove } from '@dnd-kit/sortable';
 

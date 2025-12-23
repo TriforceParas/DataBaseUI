@@ -61,7 +61,7 @@ export const useTableData = ({ connection, addLog }: UseTableDataProps) => {
                 connectionString: connection.connection_string,
                 query: countQuery
             });
-            const total = countRes.length > 0 && countRes[0].rows.length > 0 ? Number(countRes[0].rows[0].count) : 0;
+            const total = countRes.length > 0 && countRes[0].rows.length > 0 ? Number(countRes[0].rows[0][0]) : 0;
 
             updateTabResult(tabId, { data: lastRes, allData: res, loading: false, error: null });
             setPaginationMap(prev => ({ ...prev, [tabId]: { page, pageSize, total } }));

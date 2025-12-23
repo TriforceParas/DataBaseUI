@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { X, Save, Database, FileJson, Plus, Trash2 } from 'lucide-react';
-import styles from '../styles/ConnectionForm.module.css';
+import { Save, Database, FileJson, Plus, Trash2 } from 'lucide-react';
+import styles from '../../../styles/ConnectionForm.module.css';
 
 interface InsertRowPanelProps {
     isOpen: boolean;
@@ -14,12 +14,29 @@ interface InsertRowPanelProps {
     onRemoveRow?: (rowIndex: number) => void;
 }
 
-export const InsertRowPanel: React.FC<InsertRowPanelProps> = ({ isOpen, onClose, columns, onInsert, tableName, initialData, onAddRow, onUpdateRow, onRemoveRow }) => {
+export const InsertRowPanel: React.FC<InsertRowPanelProps> = ({ isOpen, onClose, columns, onInsert, initialData, onAddRow, onUpdateRow, onRemoveRow }) => {
     const [mode, setMode] = useState<'form' | 'json'>('form');
     // Array of rows. Each row is a Record<column, value>
     const [rows, setRows] = useState<Record<string, string>[]>([{}]);
     const [jsonContent, setJsonContent] = useState('[\n  {\n    \n  }\n]');
     const [error, setError] = useState<string | null>(null);
+    const [visible, setVisible] = useState(false);
+
+    useEffect(() => {
+        const timer = setTimeout(() => setVisible(true), 10);
+        return () => clearTimeout(timer);
+    }, []);
+
+    const handleClose = () => {
+        setVisible(false);
+        setTimeout(onClose, 300);
+    };
+
+    useEffect(() => {
+        if (!isOpen) {
+            handleClose();
+        }
+    }, [isOpen]);
 
     useEffect(() => {
         if (initialData && initialData.length > 0) {
@@ -48,8 +65,8 @@ export const InsertRowPanel: React.FC<InsertRowPanelProps> = ({ isOpen, onClose,
 
     useEffect(() => {
         const handleKeyDown = (e: KeyboardEvent) => {
-            if (e.key === 'Escape' && isOpen) {
-                onClose();
+            if (e.key === 'Escape') {
+                handleClose();
             }
         };
         window.addEventListener('keydown', handleKeyDown);
@@ -112,18 +129,17 @@ export const InsertRowPanel: React.FC<InsertRowPanelProps> = ({ isOpen, onClose,
 
     return (
         <div style={{
-            position: 'absolute',
+            position: 'fixed',
             top: '44px', right: 0, bottom: 0,
             width: '450px',
             backgroundColor: 'var(--bg-primary)',
             borderLeft: '1px solid var(--border-color)',
             boxShadow: '-4px 0 15px rgba(0,0,0,0.3)',
-            zIndex: 100,
+            zIndex: 2000,
             display: 'flex',
             flexDirection: 'column',
-            transform: isOpen ? 'translateX(0)' : 'translateX(100%)',
+            transform: visible ? 'translateX(0)' : 'translateX(100%)',
             transition: 'transform 0.3s ease-in-out',
-            pointerEvents: isOpen ? 'auto' : 'none'
         }}>
             {/* Header */}
             {/* Header Removed */}
@@ -278,7 +294,7 @@ export const InsertRowPanel: React.FC<InsertRowPanelProps> = ({ isOpen, onClose,
                 {error && <div style={{ color: '#ff4d4d', fontSize: '0.9rem', marginBottom: '1rem' }}>{error}</div>}
                 <div style={{ display: 'flex', gap: '1rem' }}>
                     <button
-                        onClick={onClose}
+                        onClick={handleClose}
                         style={{ flex: 1, padding: '0.75rem', border: '1px solid var(--border-color)', background: 'transparent', color: 'var(--text-primary)', borderRadius: '4px', cursor: 'pointer' }}
                     >
                         Cancel

@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import { X, Check, Pencil } from 'lucide-react';
-import styles from '../styles/ConnectionForm.module.css';
-import { Tag } from '../types';
+import styles from '../../../styles/ConnectionForm.module.css';
+import { Tag } from '../../../types';
 
 interface TagManagerProps {
     onSuccess: () => void;

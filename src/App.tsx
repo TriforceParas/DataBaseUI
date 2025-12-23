@@ -9,6 +9,10 @@ function App() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    // Apply theme immediately on load
+    const savedTheme = localStorage.getItem('app-theme') || 'blue';
+    document.documentElement.dataset.theme = savedTheme;
+
     const init = async () => {
       const params = new URLSearchParams(window.location.search);
       const connId = params.get('connection_id');

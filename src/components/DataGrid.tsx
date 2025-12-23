@@ -188,9 +188,20 @@ export const DataGrid: React.FC<DataGridProps> = ({
     };
 
     // --- Keyboard Navigation ---
+    // --- Keyboard Navigation ---
+    const getNextPosition = (key: string, current: { r: number, c: number }) => {
+        let { r, c } = current;
+        switch (key) {
+            case 'ArrowUp': r = Math.max(0, r - 1); break;
+            case 'ArrowDown': r = Math.min(rowCount - 1, r + 1); break;
+            case 'ArrowLeft': c = Math.max(0, c - 1); break;
+            case 'ArrowRight': c = Math.min(colCount - 1, c + 1); break;
+        }
+        return { r, c };
+    };
+
     const handleGridKeyDown = (e: React.KeyboardEvent) => {
-        if (editingCell) return; // Handled by input
-        if (selectedCells.size === 0) return;
+        if (editingCell || selectedCells.size === 0) return; // Handled by input or no selection
 
         if (e.key === 'Escape') {
             setSelectedCells(new Set());
@@ -200,59 +211,24 @@ export const DataGrid: React.FC<DataGridProps> = ({
             return;
         }
 
-        // If no last selected (shouldn't happen if selectedCells > 0), use 0,0 or first from set
         if (!lastSelected) return;
 
-        let { r, c } = lastSelected;
-
-        const isCtrl = e.ctrlKey;
-        // Shift key unused for now
-        // const isShift = e.shiftKey; 
-
-        let moved = false;
-
-        switch (e.key) {
-            case 'ArrowUp':
-                r = Math.max(0, r - 1);
-                moved = true;
-                break;
-            case 'ArrowDown':
-                r = Math.min(rowCount - 1, r + 1);
-                moved = true;
-                break;
-            case 'ArrowLeft':
-                c = Math.max(0, c - 1);
-                moved = true;
-                break;
-            case 'ArrowRight':
-                c = Math.min(colCount - 1, c + 1);
-                moved = true;
-                break;
-            case 'Enter':
-                e.preventDefault();
-                // If selected cells > 0, start edit on active cell
-                if (selectedCells.size > 0 && lastSelected) {
-                    startEditing(lastSelected.r, lastSelected.c);
-                }
-                return;
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            if (selectedCells.size > 0) startEditing(lastSelected.r, lastSelected.c);
+            return;
         }
+
+        const { r, c } = getNextPosition(e.key, lastSelected);
+        const moved = r !== lastSelected.r || c !== lastSelected.c;
 
         if (moved) {
             e.preventDefault();
-
-            // Scroll new cell into view
-            const rowEl = rowRefs.current.get(r);
-            if (rowEl) {
-                // Crude cell scrolling logic
-                // rowEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-                // Note: horizontal scrolling is trickier without a ref to the cell or column logic
-            }
-
             setLastSelected({ r, c });
 
-            if (isCtrl) {
+            if (e.ctrlKey) {
                 // "Expand" selection from dragStart (anchor) to new pos
-                const anchor = dragStart || lastSelected; // Fallback to last active if no dragStart
+                const anchor = dragStart || lastSelected;
                 if (!dragStart) setDragStart(anchor);
                 updateRangeSelection(anchor, { r, c });
             } else {
@@ -393,26 +369,15 @@ export const DataGrid: React.FC<DataGridProps> = ({
                                 {row.map((cell: any, cIdx: number) => {
                                     const colName = data.columns[cIdx];
                                     const pendingUpdate = pendingChanges.find(c => c.type === 'UPDATE' && c.rowIndex === rIdx && c.column === colName);
-
                                     const displayValue = pendingUpdate ? pendingUpdate.newValue : cell;
 
-                                    let content = displayValue;
-                                    if (displayValue === null || displayValue === undefined) {
-                                        content = 'NULL';
-                                    } else if (typeof displayValue === 'object') {
-                                        try {
-                                            content = JSON.stringify(displayValue);
-                                        } catch (e) {
-                                            content = '[Object]';
-                                        }
-                                    }
-                                    const cellText = String(content);
+                                    const content = displayValue === null || displayValue === undefined ? 'NULL' :
+                                        typeof displayValue === 'object' ? JSON.stringify(displayValue) : String(displayValue);
 
                                     const isCellSelected = selectedCells.has(getCellId(rIdx, cIdx));
                                     const isEditing = editingCell?.r === rIdx && editingCell?.c === cIdx;
                                     const isLastSelected = lastSelected?.r === rIdx && lastSelected?.c === cIdx;
-                                    // Make active (thick border) if it is the editing cell OR the last selected cell (anchor)
-                                    const isActive = isEditing || (isCellSelected && isLastSelected && selectedCells.size === 1) || (isCellSelected && isLastSelected);
+                                    const isActive = isEditing || (isCellSelected && isLastSelected); // Simplified active check
 
                                     return (
                                         <td
@@ -422,7 +387,6 @@ export const DataGrid: React.FC<DataGridProps> = ({
                                             onDoubleClick={() => startEditing(rIdx, cIdx)}
                                             onContextMenu={(e) => {
                                                 e.preventDefault();
-                                                // Select the right-clicked cell
                                                 const cellId = getCellId(rIdx, cIdx);
                                                 setSelectedCells(new Set([cellId]));
                                                 setLastSelected({ r: rIdx, c: cIdx });
@@ -443,7 +407,7 @@ export const DataGrid: React.FC<DataGridProps> = ({
                                                 position: 'relative',
                                                 cursor: 'cell'
                                             }}
-                                            title={cellText}
+                                            title={content}
                                         >
                                             {isEditing ? (
                                                 <>
@@ -477,7 +441,7 @@ export const DataGrid: React.FC<DataGridProps> = ({
                                                     />
                                                 </>
                                             ) : (
-                                                cellText
+                                                content
                                             )}
                                         </td>
                                     );

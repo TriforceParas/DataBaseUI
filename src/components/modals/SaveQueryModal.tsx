@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { X, Save } from 'lucide-react';
-import styles from '../styles/ConnectionForm.module.css';
+import styles from '../../styles/ConnectionForm.module.css';
 
 interface SaveQueryModalProps {
     isOpen: boolean;

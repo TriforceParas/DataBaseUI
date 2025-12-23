@@ -4,7 +4,10 @@ use serde::{Deserialize, Serialize};
 use sqlx::mysql::MySqlConnection;
 use sqlx::postgres::PgConnection;
 use sqlx::sqlite::SqliteConnection;
-use sqlx::{AnyConnection, Column, Connection as SqlxConnection, FromRow, Row, TypeInfo};
+use sqlx::{
+    any::AnyRow, AnyConnection, Column, Connection as SqlxConnection, FromRow, Pool, Row, Sqlite,
+    TypeInfo,
+};
 
 use tauri::{Manager, State, WebviewUrl, WebviewWindowBuilder};
 
@@ -33,6 +36,26 @@ pub struct TableTag {
 pub struct QueryResult {
     pub columns: Vec<String>,
     pub rows: Vec<Vec<String>>,
+}
+
+// Helper function to detect database type
+fn detect_db_type(url: &str) -> Result<&str, String> {
+    if url.starts_with("postgres:") || url.starts_with("postgresql:") {
+        Ok("postgres")
+    } else if url.starts_with("mysql:") {
+        Ok("mysql")
+    } else if url.starts_with("sqlite:") {
+        Ok("sqlite")
+    } else {
+        Err("Unsupported database type".to_string())
+    }
+}
+
+// Helper function to establish connection
+async fn connect_to_db(url: &str) -> Result<AnyConnection, String> {
+    <AnyConnection as SqlxConnection>::connect(url)
+        .await
+        .map_err(|e| format!("Failed to connect: {}", e))
 }
 
 #[tauri::command]
@@ -216,19 +239,8 @@ pub async fn get_table_tags(
 
 #[tauri::command]
 pub async fn get_tables(connection_string: String) -> Result<Vec<String>, String> {
-    let db_type = if connection_string.starts_with("postgres://") {
-        "postgres"
-    } else if connection_string.starts_with("mysql://") {
-        "mysql"
-    } else if connection_string.starts_with("sqlite://") {
-        "sqlite"
-    } else {
-        return Err("Unsupported or unknown database type".to_string());
-    };
-
-    let mut conn = <AnyConnection as SqlxConnection>::connect(&connection_string)
-        .await
-        .map_err(|e| format!("Failed to connect: {}", e))?;
+    let db_type = detect_db_type(&connection_string)?;
+    let mut conn = connect_to_db(&connection_string).await?;
 
     let query = match db_type {
         "postgres" => {
@@ -254,72 +266,170 @@ pub async fn get_tables(connection_string: String) -> Result<Vec<String>, String
     Ok(tables)
 }
 
+fn split_sql_statements(sql: &str, support_backslash_escape: bool) -> Vec<String> {
+    let mut stmts = Vec::new();
+    let mut current = String::new();
+    let mut chars = sql.chars().peekable();
+
+    let mut in_quote = false;
+    let mut quote_char = '\0';
+    let mut in_line_comment = false;
+    let mut in_block_comment = false;
+
+    while let Some(c) = chars.next() {
+        if in_line_comment {
+            current.push(c);
+            if c == '\n' {
+                in_line_comment = false;
+            }
+            continue;
+        }
+
+        if in_block_comment {
+            current.push(c);
+            if c == '*' {
+                if let Some(&next_c) = chars.peek() {
+                    if next_c == '/' {
+                        chars.next();
+                        current.push('/');
+                        in_block_comment = false;
+                    }
+                }
+            }
+            continue;
+        }
+
+        if in_quote {
+            current.push(c);
+            if support_backslash_escape && c == '\\' {
+                if let Some(&next_c) = chars.peek() {
+                    chars.next();
+                    current.push(next_c);
+                }
+                continue;
+            }
+            if c == quote_char {
+                if let Some(&next_c) = chars.peek() {
+                    if next_c == quote_char {
+                        chars.next();
+                        current.push(next_c);
+                        continue;
+                    }
+                }
+                in_quote = false;
+            }
+            continue;
+        }
+
+        match c {
+            '-' => {
+                current.push(c);
+                if let Some(&next_c) = chars.peek() {
+                    if next_c == '-' {
+                        chars.next();
+                        current.push('-');
+                        in_line_comment = true;
+                    }
+                }
+            }
+            '/' => {
+                current.push(c);
+                if let Some(&next_c) = chars.peek() {
+                    if next_c == '*' {
+                        chars.next();
+                        current.push('*');
+                        in_block_comment = true;
+                    }
+                }
+            }
+            '\'' | '"' | '`' => {
+                in_quote = true;
+                quote_char = c;
+                current.push(c);
+            }
+            ';' => {
+                if !current.trim().is_empty() {
+                    stmts.push(current.trim().to_string());
+                }
+                current = String::new();
+            }
+            _ => current.push(c),
+        }
+    }
+
+    if !current.trim().is_empty() {
+        stmts.push(current.trim().to_string());
+    }
+
+    stmts
+}
+
 #[tauri::command]
 pub async fn execute_query(
     connection_string: String,
     query: String,
-) -> Result<QueryResult, String> {
+) -> Result<Vec<QueryResult>, String> {
     // Macro for MySQL and Postgres (supports rust_decimal)
     macro_rules! process_rows_with_decimal {
         ($rows:expr) => {{
             if $rows.is_empty() {
-                return Ok(QueryResult {
+                QueryResult {
                     columns: vec![],
                     rows: vec![],
-                });
-            }
-
-            let columns: Vec<String> = $rows[0]
-                .columns()
-                .iter()
-                .map(|c| c.name().to_string())
-                .collect();
-
-            let mut result_rows = Vec::new();
-
-            for row in $rows {
-                let mut result_row = Vec::new();
-                for i in 0..columns.len() {
-                    let val_str = if let Ok(v) = row.try_get::<String, _>(i) {
-                        v
-                    } else if let Ok(v) = row.try_get::<i64, _>(i) {
-                        v.to_string()
-                    } else if let Ok(v) = row.try_get::<i32, _>(i) {
-                        v.to_string()
-                    } else if let Ok(v) = row.try_get::<f64, _>(i) {
-                        v.to_string()
-                    } else if let Ok(v) = row.try_get::<bool, _>(i) {
-                        v.to_string()
-                    } else if let Ok(v) = row.try_get::<chrono::NaiveDate, _>(i) {
-                        v.to_string()
-                    } else if let Ok(v) = row.try_get::<chrono::NaiveDateTime, _>(i) {
-                        v.to_string()
-                    } else if let Ok(v) = row.try_get::<chrono::DateTime<chrono::Utc>, _>(i) {
-                        v.to_string()
-                    } else if let Ok(v) = row.try_get::<rust_decimal::Decimal, _>(i) {
-                        v.to_string()
-                    } else if let Ok(v) = row.try_get::<Vec<u8>, _>(i) {
-                        String::from_utf8(v.clone())
-                            .unwrap_or_else(|_| format!("<BINARY {} bytes>", v.len()))
-                    } else {
-                        match row.try_get::<Option<String>, _>(i) {
-                            Ok(None) => "NULL".to_string(),
-                            Err(_e) => {
-                                let type_name = row.column(i).type_info().name();
-                                format!("ERR[{}]", type_name)
-                            }
-                            Ok(Some(s)) => s,
-                        }
-                    };
-                    result_row.push(val_str);
                 }
-                result_rows.push(result_row);
-            }
+            } else {
+                let columns: Vec<String> = $rows[0]
+                    .columns()
+                    .iter()
+                    .map(|c| c.name().to_string())
+                    .collect();
 
-            Ok(QueryResult {
-                columns,
-                rows: result_rows,
-            })
+                let mut result_rows = Vec::new();
+
+                for row in $rows {
+                    let mut result_row = Vec::new();
+                    for i in 0..columns.len() {
+                        let val_str = if let Ok(v) = row.try_get::<String, _>(i) {
+                            v
+                        } else if let Ok(v) = row.try_get::<i64, _>(i) {
+                            v.to_string()
+                        } else if let Ok(v) = row.try_get::<i32, _>(i) {
+                            v.to_string()
+                        } else if let Ok(v) = row.try_get::<f64, _>(i) {
+                            v.to_string()
+                        } else if let Ok(v) = row.try_get::<bool, _>(i) {
+                            v.to_string()
+                        } else if let Ok(v) = row.try_get::<chrono::NaiveDate, _>(i) {
+                            v.to_string()
+                        } else if let Ok(v) = row.try_get::<chrono::NaiveDateTime, _>(i) {
+                            v.to_string()
+                        } else if let Ok(v) = row.try_get::<chrono::DateTime<chrono::Utc>, _>(i) {
+                            v.to_string()
+                        } else if let Ok(v) = row.try_get::<rust_decimal::Decimal, _>(i) {
+                            v.to_string()
+                        } else if let Ok(v) = row.try_get::<Vec<u8>, _>(i) {
+                            String::from_utf8(v.clone())
+                                .unwrap_or_else(|_| format!("<BINARY {} bytes>", v.len()))
+                        } else {
+                            match row.try_get::<Option<String>, _>(i) {
+                                Ok(None) => "NULL".to_string(),
+                                Err(_e) => {
+                                    let type_name = row.column(i).type_info().name();
+                                    format!("ERR[{}]", type_name)
+                                }
+                                Ok(Some(s)) => s,
+                            }
+                        };
+                        result_row.push(val_str);
+                    }
+                    result_rows.push(result_row);
+                }
+
+                QueryResult {
+                    columns,
+                    rows: result_rows,
+                }
+            }
         }};
     }
 
@@ -327,61 +437,61 @@ pub async fn execute_query(
     macro_rules! process_rows_sqlite {
         ($rows:expr) => {{
             if $rows.is_empty() {
-                return Ok(QueryResult {
+                QueryResult {
                     columns: vec![],
                     rows: vec![],
-                });
-            }
-
-            let columns: Vec<String> = $rows[0]
-                .columns()
-                .iter()
-                .map(|c| c.name().to_string())
-                .collect();
-
-            let mut result_rows = Vec::new();
-
-            for row in $rows {
-                let mut result_row = Vec::new();
-                for i in 0..columns.len() {
-                    let val_str = if let Ok(v) = row.try_get::<String, _>(i) {
-                        v
-                    } else if let Ok(v) = row.try_get::<i64, _>(i) {
-                        v.to_string()
-                    } else if let Ok(v) = row.try_get::<i32, _>(i) {
-                        v.to_string()
-                    } else if let Ok(v) = row.try_get::<f64, _>(i) {
-                        v.to_string()
-                    } else if let Ok(v) = row.try_get::<bool, _>(i) {
-                        v.to_string()
-                    } else if let Ok(v) = row.try_get::<chrono::NaiveDate, _>(i) {
-                        v.to_string()
-                    } else if let Ok(v) = row.try_get::<chrono::NaiveDateTime, _>(i) {
-                        v.to_string()
-                    } else if let Ok(v) = row.try_get::<chrono::DateTime<chrono::Utc>, _>(i) {
-                        v.to_string()
-                    } else if let Ok(v) = row.try_get::<Vec<u8>, _>(i) {
-                        String::from_utf8(v.clone())
-                            .unwrap_or_else(|_| format!("<BINARY {} bytes>", v.len()))
-                    } else {
-                        match row.try_get::<Option<String>, _>(i) {
-                            Ok(None) => "NULL".to_string(),
-                            Err(_e) => {
-                                let type_name = row.column(i).type_info().name();
-                                format!("ERR[{}]", type_name)
-                            }
-                            Ok(Some(s)) => s,
-                        }
-                    };
-                    result_row.push(val_str);
                 }
-                result_rows.push(result_row);
-            }
+            } else {
+                let columns: Vec<String> = $rows[0]
+                    .columns()
+                    .iter()
+                    .map(|c| c.name().to_string())
+                    .collect();
 
-            Ok(QueryResult {
-                columns,
-                rows: result_rows,
-            })
+                let mut result_rows = Vec::new();
+
+                for row in $rows {
+                    let mut result_row = Vec::new();
+                    for i in 0..columns.len() {
+                        let val_str = if let Ok(v) = row.try_get::<String, _>(i) {
+                            v
+                        } else if let Ok(v) = row.try_get::<i64, _>(i) {
+                            v.to_string()
+                        } else if let Ok(v) = row.try_get::<i32, _>(i) {
+                            v.to_string()
+                        } else if let Ok(v) = row.try_get::<f64, _>(i) {
+                            v.to_string()
+                        } else if let Ok(v) = row.try_get::<bool, _>(i) {
+                            v.to_string()
+                        } else if let Ok(v) = row.try_get::<chrono::NaiveDate, _>(i) {
+                            v.to_string()
+                        } else if let Ok(v) = row.try_get::<chrono::NaiveDateTime, _>(i) {
+                            v.to_string()
+                        } else if let Ok(v) = row.try_get::<chrono::DateTime<chrono::Utc>, _>(i) {
+                            v.to_string()
+                        } else if let Ok(v) = row.try_get::<Vec<u8>, _>(i) {
+                            String::from_utf8(v.clone())
+                                .unwrap_or_else(|_| format!("<BINARY {} bytes>", v.len()))
+                        } else {
+                            match row.try_get::<Option<String>, _>(i) {
+                                Ok(None) => "NULL".to_string(),
+                                Err(_e) => {
+                                    let type_name = row.column(i).type_info().name();
+                                    format!("ERR[{}]", type_name)
+                                }
+                                Ok(Some(s)) => s,
+                            }
+                        };
+                        result_row.push(val_str);
+                    }
+                    result_rows.push(result_row);
+                }
+
+                QueryResult {
+                    columns,
+                    rows: result_rows,
+                }
+            }
         }};
     }
 
@@ -389,29 +499,56 @@ pub async fn execute_query(
         let mut conn = MySqlConnection::connect(&connection_string)
             .await
             .map_err(|e| format!("Connection failed: {}", e))?;
-        let rows = sqlx::query(&query)
-            .fetch_all(&mut conn)
-            .await
-            .map_err(|e| format!("Query failed: {}", e))?;
-        process_rows_with_decimal!(rows)
+
+        let stmts = split_sql_statements(&query, true);
+        let mut results = Vec::new();
+
+        for stmt in stmts {
+            let rows = sqlx::query(&stmt)
+                .fetch_all(&mut conn)
+                .await
+                .map_err(|e| format!("Query failed: {}", e))?;
+
+            let res = process_rows_with_decimal!(rows);
+            results.push(res);
+        }
+        Ok(results)
     } else if connection_string.starts_with("postgres:") {
         let mut conn = PgConnection::connect(&connection_string)
             .await
             .map_err(|e| format!("Connection failed: {}", e))?;
-        let rows = sqlx::query(&query)
-            .fetch_all(&mut conn)
-            .await
-            .map_err(|e| format!("Query failed: {}", e))?;
-        process_rows_with_decimal!(rows)
+
+        let stmts = split_sql_statements(&query, false);
+        let mut results = Vec::new();
+
+        for stmt in stmts {
+            let rows = sqlx::query(&stmt)
+                .fetch_all(&mut conn)
+                .await
+                .map_err(|e| format!("Query failed: {}", e))?;
+
+            let res = process_rows_with_decimal!(rows);
+            results.push(res);
+        }
+        Ok(results)
     } else if connection_string.starts_with("sqlite:") {
         let mut conn = SqliteConnection::connect(&connection_string)
             .await
             .map_err(|e| format!("Connection failed: {}", e))?;
-        let rows = sqlx::query(&query)
-            .fetch_all(&mut conn)
-            .await
-            .map_err(|e| format!("Query failed: {}", e))?;
-        process_rows_sqlite!(rows)
+
+        let stmts = split_sql_statements(&query, false);
+        let mut results = Vec::new();
+
+        for stmt in stmts {
+            let rows = sqlx::query(&stmt)
+                .fetch_all(&mut conn)
+                .await
+                .map_err(|e| format!("Query failed: {}", e))?;
+
+            let res = process_rows_sqlite!(rows);
+            results.push(res);
+        }
+        Ok(results)
     } else {
         Err(
             "Unsupported database protocol. Only mysql:, postgres:, and sqlite: are supported."
@@ -425,19 +562,8 @@ pub async fn get_columns(
     connection_string: String,
     table_name: String,
 ) -> Result<Vec<String>, String> {
-    let db_type = if connection_string.starts_with("postgres://") {
-        "postgres"
-    } else if connection_string.starts_with("mysql://") {
-        "mysql"
-    } else if connection_string.starts_with("sqlite://") {
-        "sqlite"
-    } else {
-        return Err("Unsupported database type".to_string());
-    };
-
-    let mut conn = <AnyConnection as SqlxConnection>::connect(&connection_string)
-        .await
-        .map_err(|e| format!("Failed to connect: {}", e))?;
+    let db_type = detect_db_type(&connection_string)?;
+    let mut conn = connect_to_db(&connection_string).await?;
 
     let (query, col_idx) = match db_type {
         "postgres" => (format!("SELECT column_name FROM information_schema.columns WHERE table_name = '{}' AND table_schema = 'public'", table_name), 0),
@@ -492,24 +618,41 @@ pub struct ColumnSchema {
     pub column_key: String,
 }
 
+fn parse_sqlite_schema_row(row: &AnyRow) -> ColumnSchema {
+    ColumnSchema {
+        name: row.try_get::<String, _>(1).unwrap_or_default(),
+        data_type: row.try_get::<String, _>(2).unwrap_or_default(),
+        is_nullable: if row.try_get::<i32, _>(3).unwrap_or(0) == 0 {
+            "YES".to_string()
+        } else {
+            "NO".to_string()
+        },
+        column_default: row.try_get::<Option<String>, _>(4).ok().flatten(),
+        column_key: if row.try_get::<i32, _>(5).unwrap_or(0) == 1 {
+            "PRI".to_string()
+        } else {
+            "".to_string()
+        },
+    }
+}
+
+fn parse_standard_schema_row(row: &AnyRow) -> ColumnSchema {
+    ColumnSchema {
+        name: row.try_get(0).unwrap_or_default(),
+        data_type: row.try_get(1).unwrap_or_default(),
+        is_nullable: row.try_get(2).unwrap_or_default(),
+        column_default: row.try_get(3).ok(),
+        column_key: row.try_get(4).unwrap_or_default(),
+    }
+}
+
 #[tauri::command]
 pub async fn get_table_schema(
     connection_string: String,
     table_name: String,
 ) -> Result<Vec<ColumnSchema>, String> {
-    let db_type = if connection_string.starts_with("postgres://") {
-        "postgres"
-    } else if connection_string.starts_with("mysql://") {
-        "mysql"
-    } else if connection_string.starts_with("sqlite://") {
-        "sqlite"
-    } else {
-        return Err("Unsupported database type".to_string());
-    };
-
-    let mut conn = <AnyConnection as SqlxConnection>::connect(&connection_string)
-        .await
-        .map_err(|e| format!("Failed to connect: {}", e))?;
+    let db_type = detect_db_type(&connection_string)?;
+    let mut conn = connect_to_db(&connection_string).await?;
 
     let query = match db_type {
         "postgres" => format!(
@@ -531,55 +674,24 @@ pub async fn get_table_schema(
         .await
         .map_err(|e| format!("Failed to fetch schema: {}", e))?;
 
-    let mut schema = Vec::new();
-
-    for row in rows {
-        if db_type == "sqlite" {
-            // SQLite PRAGMA returns: cid, name, type, notnull, dflt_value, pk
-            schema.push(ColumnSchema {
-                name: row.try_get::<String, _>(1).unwrap_or_default(),
-                data_type: row.try_get::<String, _>(2).unwrap_or_default(),
-                is_nullable: if row.try_get::<i32, _>(3).unwrap_or(0) == 0 {
-                    "YES".to_string()
-                } else {
-                    "NO".to_string()
-                },
-                column_default: row.try_get::<Option<String>, _>(4).ok().flatten(),
-                column_key: if row.try_get::<i32, _>(5).unwrap_or(0) == 1 {
-                    "PRI".to_string()
-                } else {
-                    "".to_string()
-                },
-            });
-        } else {
-            schema.push(ColumnSchema {
-                name: row.try_get(0).unwrap_or_default(),
-                data_type: row.try_get(1).unwrap_or_default(),
-                is_nullable: row.try_get(2).unwrap_or_default(),
-                column_default: row.try_get(3).ok(),
-                column_key: row.try_get(4).unwrap_or_default(),
-            });
-        }
-    }
+    let schema = rows
+        .iter()
+        .map(|row| {
+            if db_type == "sqlite" {
+                parse_sqlite_schema_row(row)
+            } else {
+                parse_standard_schema_row(row)
+            }
+        })
+        .collect();
 
     Ok(schema)
 }
 
 #[tauri::command]
 pub async fn truncate_table(connection_string: String, table_name: String) -> Result<(), String> {
-    let db_type = if connection_string.starts_with("postgres://") {
-        "postgres"
-    } else if connection_string.starts_with("mysql://") {
-        "mysql"
-    } else if connection_string.starts_with("sqlite://") {
-        "sqlite"
-    } else {
-        return Err("Unsupported database type".to_string());
-    };
-
-    let mut conn = <AnyConnection as SqlxConnection>::connect(&connection_string)
-        .await
-        .map_err(|e| format!("Failed to connect: {}", e))?;
+    let db_type = detect_db_type(&connection_string)?;
+    let mut conn = connect_to_db(&connection_string).await?;
 
     // SQLite doesn't support TRUNCATE, use DELETE instead
     let query = if db_type == "sqlite" {
@@ -600,11 +712,10 @@ pub async fn truncate_table(connection_string: String, table_name: String) -> Re
 
 #[tauri::command]
 pub async fn drop_table(connection_string: String, table_name: String) -> Result<(), String> {
-    let mut conn = <AnyConnection as SqlxConnection>::connect(&connection_string)
-        .await
-        .map_err(|e| format!("Failed to connect: {}", e))?;
+    let db_type = detect_db_type(&connection_string)?;
+    let mut conn = connect_to_db(&connection_string).await?;
 
-    let query = if connection_string.starts_with("mysql://") {
+    let query = if db_type == "mysql" {
         format!("DROP TABLE `{}`", table_name)
     } else {
         format!("DROP TABLE \"{}\"", table_name)
@@ -625,19 +736,8 @@ pub async fn duplicate_table(
     new_table: String,
     include_data: bool,
 ) -> Result<(), String> {
-    let db_type = if connection_string.starts_with("postgres://") {
-        "postgres"
-    } else if connection_string.starts_with("mysql://") {
-        "mysql"
-    } else if connection_string.starts_with("sqlite://") {
-        "sqlite"
-    } else {
-        return Err("Unsupported database type".to_string());
-    };
-
-    let mut conn = <AnyConnection as SqlxConnection>::connect(&connection_string)
-        .await
-        .map_err(|e| format!("Failed to connect: {}", e))?;
+    let db_type = detect_db_type(&connection_string)?;
+    let mut conn = connect_to_db(&connection_string).await?;
 
     // Different syntax for different databases
     let query = match db_type {
@@ -672,6 +772,44 @@ pub async fn duplicate_table(
 
 // ----- Saved Queries Commands -----
 
+// ... (previous code)
+
+// Helper for saving items (query or function)
+async fn insert_saved_item(
+    db: &Pool<Sqlite>,
+    table: &str,
+    content_col: &str,
+    name: &str,
+    content: &str,
+    connection_id: i64,
+) -> Result<i64, String> {
+    let sql = format!(
+        "INSERT INTO {} (name, {}, connection_id) VALUES (?, ?, ?)",
+        table, content_col
+    );
+    let result = sqlx::query(&sql)
+        .bind(name)
+        .bind(content)
+        .bind(connection_id)
+        .execute(db)
+        .await
+        .map_err(|e| format!("Failed to save to {}: {}", table, e))?;
+    Ok(result.last_insert_rowid())
+}
+
+// Helper for deleting items
+async fn delete_saved_item(db: &Pool<Sqlite>, table: &str, id: i64) -> Result<(), String> {
+    let sql = format!("DELETE FROM {} WHERE id = ?", table);
+    sqlx::query(&sql)
+        .bind(id)
+        .execute(db)
+        .await
+        .map_err(|e| format!("Failed to delete from {}: {}", table, e))?;
+    Ok(())
+}
+
+// ----- Saved Queries Commands -----
+
 #[derive(Serialize, Deserialize, Clone, Debug, FromRow)]
 pub struct SavedQuery {
     pub id: i64,
@@ -687,15 +825,15 @@ pub async fn save_query(
     query: String,
     connection_id: i64,
 ) -> Result<i64, String> {
-    let result =
-        sqlx::query("INSERT INTO saved_queries (name, query, connection_id) VALUES (?, ?, ?)")
-            .bind(&name)
-            .bind(&query)
-            .bind(connection_id)
-            .execute(&state.db)
-            .await
-            .map_err(|e| format!("Failed to save query: {}", e))?;
-    Ok(result.last_insert_rowid())
+    insert_saved_item(
+        &state.db,
+        "saved_queries",
+        "query",
+        &name,
+        &query,
+        connection_id,
+    )
+    .await
 }
 
 #[tauri::command]
@@ -714,12 +852,7 @@ pub async fn list_queries(
 
 #[tauri::command]
 pub async fn delete_query(state: State<'_, AppState>, id: i64) -> Result<(), String> {
-    sqlx::query("DELETE FROM saved_queries WHERE id = ?")
-        .bind(id)
-        .execute(&state.db)
-        .await
-        .map_err(|e| format!("Failed to delete query: {}", e))?;
-    Ok(())
+    delete_saved_item(&state.db, "saved_queries", id).await
 }
 
 // ----- Saved Functions Commands -----
@@ -739,16 +872,15 @@ pub async fn save_function(
     function_body: String,
     connection_id: i64,
 ) -> Result<i64, String> {
-    let result = sqlx::query(
-        "INSERT INTO saved_functions (name, function_body, connection_id) VALUES (?, ?, ?)",
+    insert_saved_item(
+        &state.db,
+        "saved_functions",
+        "function_body",
+        &name,
+        &function_body,
+        connection_id,
     )
-    .bind(&name)
-    .bind(&function_body)
-    .bind(connection_id)
-    .execute(&state.db)
     .await
-    .map_err(|e| format!("Failed to save function: {}", e))?;
-    Ok(result.last_insert_rowid())
 }
 
 #[tauri::command]
@@ -767,10 +899,109 @@ pub async fn list_functions(
 
 #[tauri::command]
 pub async fn delete_function(state: State<'_, AppState>, id: i64) -> Result<(), String> {
-    sqlx::query("DELETE FROM saved_functions WHERE id = ?")
+    delete_saved_item(&state.db, "saved_functions", id).await
+}
+
+// Helper for updating saved items
+async fn update_saved_item(
+    db: &Pool<Sqlite>,
+    table: &str,
+    content_col: &str,
+    id: i64,
+    name: &str,
+    content: &str,
+) -> Result<(), String> {
+    let sql = format!(
+        "UPDATE {} SET name = ?, {} = ? WHERE id = ?",
+        table, content_col
+    );
+    sqlx::query(&sql)
+        .bind(name)
+        .bind(content)
         .bind(id)
-        .execute(&state.db)
+        .execute(db)
         .await
-        .map_err(|e| format!("Failed to delete function: {}", e))?;
+        .map_err(|e| format!("Failed to update {}: {}", table, e))?;
     Ok(())
+}
+
+#[tauri::command]
+pub async fn update_query(
+    state: State<'_, AppState>,
+    id: i64,
+    name: String,
+    query: String,
+) -> Result<(), String> {
+    update_saved_item(&state.db, "saved_queries", "query", id, &name, &query).await
+}
+
+#[tauri::command]
+pub async fn update_function(
+    state: State<'_, AppState>,
+    id: i64,
+    name: String,
+    function_body: String,
+) -> Result<(), String> {
+    update_saved_item(
+        &state.db,
+        "saved_functions",
+        "function_body",
+        id,
+        &name,
+        &function_body,
+    )
+    .await
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_detect_db_type() {
+        assert_eq!(
+            detect_db_type("postgres://user:pass@localhost/db").unwrap(),
+            "postgres"
+        );
+        assert_eq!(
+            detect_db_type("postgresql://user:pass@localhost/db").unwrap(),
+            "postgres"
+        );
+        assert_eq!(
+            detect_db_type("mysql://user:pass@localhost/db").unwrap(),
+            "mysql"
+        );
+        assert_eq!(detect_db_type("sqlite://path/to/db").unwrap(), "sqlite");
+        assert!(detect_db_type("invalid://url").is_err());
+    }
+
+    #[test]
+    fn test_split_sql_statements() {
+        use super::split_sql_statements;
+
+        // Basic
+        let s = split_sql_statements("SELECT 1; SELECT 2", false);
+        assert_eq!(s, vec!["SELECT 1", "SELECT 2"]);
+
+        // With trailing semi
+        let s = split_sql_statements("SELECT 1;", false);
+        assert_eq!(s, vec!["SELECT 1"]);
+
+        // Quoted semi
+        let s = split_sql_statements("SELECT 'a;b'; SELECT 3", false);
+        assert_eq!(s, vec!["SELECT 'a;b'", "SELECT 3"]);
+
+        // Multiple quotes
+        let s = split_sql_statements("SELECT 'a', \"b;c\";", false);
+        assert_eq!(s, vec!["SELECT 'a', \"b;c\""]);
+
+        // Comments
+        let s = split_sql_statements("SELECT 1; -- comment; \n SELECT 2", false);
+        assert_eq!(s.len(), 2);
+        assert!(s[1].contains("SELECT 2"));
+
+        // MySQL Escape
+        let s = split_sql_statements(r"SELECT 'a\'b'; SELECT 2", true);
+        assert_eq!(s[0], r"SELECT 'a\'b'");
+    }
 }

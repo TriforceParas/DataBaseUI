@@ -1,5 +1,5 @@
 import React from 'react';
-import styles from '../styles/MainLayout.module.css';
+import styles from '../../styles/MainLayout.module.css';
 import { ZoomIn, ZoomOut, X } from 'lucide-react';
 
 interface PreferencesModalProps {

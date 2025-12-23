@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import Editor, { OnMount } from '@monaco-editor/react';
-import styles from '../styles/MainLayout.module.css';
+import styles from '../../styles/MainLayout.module.css';
 import { Play, ChevronDown, Copy, Download, Save, FunctionSquare } from 'lucide-react';
 
 interface QueryEditorProps {
@@ -17,6 +17,9 @@ interface QueryEditorProps {
     onSaveQuery?: () => void;
     onSaveFunction?: () => void;
     onExportSql?: () => void;
+    // For saved items - update instead of save
+    onSaveChanges?: () => void;
+    isSaved?: boolean;
 }
 
 const extractQueryAtLine = (model: any, lineNumber: number): string | null => {
@@ -38,7 +41,7 @@ const extractQueryAtLine = (model: any, lineNumber: number): string | null => {
 export const QueryEditor: React.FC<QueryEditorProps> = ({
     value, onChange, onRunQuery, selectedRowCount = 0, onCopy, onExport,
     theme = 'blue', tables = [],
-    onSaveQuery, onSaveFunction, onExportSql
+    onSaveQuery, onSaveFunction, onExportSql, onSaveChanges, isSaved = false
 }) => {
     const editorTheme = theme === 'light' ? 'light' : 'vs-dark';
     const editorRef = useRef<any>(null);
@@ -236,36 +239,6 @@ export const QueryEditor: React.FC<QueryEditorProps> = ({
                         <Play size={14} fill="currentColor" /> Run All
                     </button>
 
-                    <div className={styles.verticalDivider} style={{ height: '20px', margin: '0 0.5rem' }} />
-
-                    {onSaveQuery && (
-                        <button
-                            className={styles.toolbarBtn}
-                            onClick={onSaveQuery}
-                            title="Save Query"
-                        >
-                            <Save size={14} /> Save Query
-                        </button>
-                    )}
-                    {onSaveFunction && (
-                        <button
-                            className={styles.toolbarBtn}
-                            onClick={onSaveFunction}
-                            title="Save Function"
-                        >
-                            <FunctionSquare size={14} /> Save Function
-                        </button>
-                    )}
-                    {onExportSql && (
-                        <button
-                            className={styles.toolbarBtn}
-                            onClick={onExportSql}
-                            title="Export as .sql"
-                        >
-                            <Download size={14} /> Export
-                        </button>
-                    )}
-
                     {(selectedRowCount > 0) && (
                         <>
                             <div className={styles.verticalDivider} style={{ height: '20px', margin: '0 0.5rem' }} />
@@ -348,6 +321,48 @@ export const QueryEditor: React.FC<QueryEditorProps> = ({
                                 )}
                             </div>
                         </>
+                    )}
+                </div>
+
+                <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                    {isSaved && onSaveChanges ? (
+                        <button
+                            className={styles.toolbarBtn}
+                            onClick={onSaveChanges}
+                            title="Save Changes"
+                        >
+                            <Save size={14} /> Save
+                        </button>
+                    ) : (
+                        <>
+                            {onSaveQuery && (
+                                <button
+                                    className={styles.toolbarBtn}
+                                    onClick={onSaveQuery}
+                                    title="Save Query"
+                                >
+                                    <Save size={14} /> Save Query
+                                </button>
+                            )}
+                            {onSaveFunction && (
+                                <button
+                                    className={styles.toolbarBtn}
+                                    onClick={onSaveFunction}
+                                    title="Save Function"
+                                >
+                                    <FunctionSquare size={14} /> Save Function
+                                </button>
+                            )}
+                        </>
+                    )}
+                    {onExportSql && (
+                        <button
+                            className={styles.toolbarBtn}
+                            onClick={onExportSql}
+                            title="Export as .sql"
+                        >
+                            <Download size={14} /> Export
+                        </button>
                     )}
                 </div>
             </div>

@@ -18,7 +18,8 @@ export interface TableTag {
 
 export interface QueryResult {
     columns: string[];
-    rows: string[][];
+    rows: any[][]; // Changed to any[][] to support various data types
+    duration_ms?: number;
 }
 
 export interface ColumnSchema {
@@ -63,4 +64,26 @@ export interface SavedFunction {
     name: string;
     function_body: string;
     connection_id: number;
+}
+
+// Moved from MainInterface
+export interface TabResult {
+    data: QueryResult | null;
+    allData?: QueryResult[];
+    loading: boolean;
+    error: string | null;
+}
+
+export interface SortState {
+    column: string;
+    direction: 'ASC' | 'DESC';
+}
+
+export interface TabItem {
+    id: string;
+    type: string;
+    title: string;
+    isPreview?: boolean;
+    savedQueryId?: number;
+    savedFunctionId?: number;
 }

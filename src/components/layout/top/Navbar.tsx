@@ -1,5 +1,5 @@
 import React from 'react';
-import styles from '../styles/MainLayout.module.css';
+import styles from '../../../styles/MainLayout.module.css';
 import { RefreshCw, Search, Plus, PanelLeftClose, PanelLeftOpen, Settings, Activity, ListPlus, Workflow } from 'lucide-react';
 import { WindowControls } from './WindowControls';
 

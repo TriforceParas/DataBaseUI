@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { invoke } from '@tauri-apps/api/core';
-import styles from '../styles/TableCreator.module.css';
+import styles from '../../styles/TableCreator.module.css';
 import { Plus, Trash2, Key, X, Save, Fingerprint, RotateCcw } from 'lucide-react';
 
 export interface ColumnDef {
@@ -27,7 +27,7 @@ export interface TableCreatorState {
     columns: ColumnDef[];
     foreignKeys: ForeignKeyDef[];
 }
-import { PendingChange } from '../types';
+import { PendingChange } from '../../types';
 
 interface TableCreatorProps {
     connectionString: string;

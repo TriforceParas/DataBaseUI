@@ -1,10 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import styles from '../styles/MainLayout.module.css';
-import { Connection, Tag, TableTag, SavedQuery, SavedFunction } from '../types';
+import styles from '../../../styles/MainLayout.module.css';
+import { Connection, Tag, TableTag, SavedQuery, SavedFunction } from '../../../types';
 import { ChevronDown, ChevronRight, Table, Check, Plus, Trash2, Folder, Pencil, Copy, FileText, AlertTriangle, Code2, FunctionSquare } from 'lucide-react';
 import { invoke } from '@tauri-apps/api/core';
 import { TagManager } from './TagManager';
-import { ConfirmModal } from './ConfirmModal';
+import { ConfirmModal } from '../../modals/ConfirmModal';
 import { DndContext, useDraggable, useDroppable, DragEndEvent, useSensor, useSensors, PointerSensor, KeyboardSensor } from '@dnd-kit/core';
 
 interface SidebarProps {
@@ -30,6 +30,7 @@ interface SidebarProps {
     onFunctionClick?: (func: SavedFunction) => void;
     onDeleteQuery?: (id: number) => void;
     onDeleteFunction?: (id: number) => void;
+    onEditFunction?: (func: SavedFunction) => void;
 }
 
 // Draggable Table Item with Context Menu
@@ -163,12 +164,14 @@ const SavedItemWithContextMenu = ({
     name,
     icon,
     onClick,
-    onDelete
+    onDelete,
+    onEdit
 }: {
     name: string;
     icon: React.ReactNode;
     onClick: () => void;
     onDelete: () => void;
+    onEdit?: () => void;
 }) => {
     const [contextMenu, setContextMenu] = useState<{ x: number, y: number } | null>(null);
     const [isHovered, setIsHovered] = useState(false);
@@ -222,6 +225,25 @@ const SavedItemWithContextMenu = ({
                     }}
                     onClick={e => e.stopPropagation()}
                 >
+                    {onEdit && (
+                        <div
+                            onClick={() => { onEdit(); setContextMenu(null); }}
+                            style={{
+                                padding: '0.5rem 0.75rem',
+                                cursor: 'pointer',
+                                borderRadius: '4px',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '0.5rem',
+                                fontSize: '0.9rem',
+                                color: 'var(--text-primary)'
+                            }}
+                            onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--bg-tertiary)'}
+                            onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+                        >
+                            <Pencil size={14} /> Edit
+                        </div>
+                    )}
                     <div
                         onClick={() => { onDelete(); setContextMenu(null); }}
                         style={{
@@ -456,7 +478,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
     sidebarOpen, connection, tables, savedConnections,
     onSwitchConnection, onTableClick, onAddConnection, refreshTrigger,
     onGetTableSchema, onEditTableSchema, onDuplicateTable, onTruncateTable, onDropTable,
-    savedQueries = [], savedFunctions = [], onQueryClick, onFunctionClick, onDeleteQuery, onDeleteFunction
+    savedQueries = [], savedFunctions = [], onQueryClick, onFunctionClick, onDeleteQuery, onDeleteFunction, onEditFunction
 }) => {
     const [viewMode, setViewMode] = useState<'az' | 'tags'>('az');
     const [showConnDropdown, setShowConnDropdown] = useState(false);
@@ -756,6 +778,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                                         icon={<FunctionSquare size={14} color="#f59e0b" />}
                                         onClick={() => onFunctionClick?.(func)}
                                         onDelete={() => onDeleteFunction?.(func.id)}
+                                        onEdit={() => onEditFunction?.(func)}
                                     />
                                 ))
                             ) : (

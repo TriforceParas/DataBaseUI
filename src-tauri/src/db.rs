@@ -28,7 +28,9 @@ pub async fn init_db<R: Runtime>(app: &AppHandle<R>) -> Result<Pool<Sqlite>, Str
         .await
         .map_err(|e| format!("Failed to connect to database: {}", e))?;
 
-    sqlx::query(
+    create_table_schema(
+        &pool,
+        "connections",
         "CREATE TABLE IF NOT EXISTS connections (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             name TEXT NOT NULL,
@@ -36,11 +38,11 @@ pub async fn init_db<R: Runtime>(app: &AppHandle<R>) -> Result<Pool<Sqlite>, Str
             created_at DATETIME DEFAULT CURRENT_TIMESTAMP
         );",
     )
-    .execute(&pool)
-    .await
-    .map_err(|e| format!("Failed to create connections table: {}", e))?;
+    .await?;
 
-    sqlx::query(
+    create_table_schema(
+        &pool,
+        "tags",
         "CREATE TABLE IF NOT EXISTS tags (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             name TEXT NOT NULL,
@@ -48,11 +50,11 @@ pub async fn init_db<R: Runtime>(app: &AppHandle<R>) -> Result<Pool<Sqlite>, Str
             created_at DATETIME DEFAULT CURRENT_TIMESTAMP
         );",
     )
-    .execute(&pool)
-    .await
-    .map_err(|e| format!("Failed to create tags table: {}", e))?;
+    .await?;
 
-    sqlx::query(
+    create_table_schema(
+        &pool,
+        "table_tags",
         "CREATE TABLE IF NOT EXISTS table_tags (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             table_name TEXT NOT NULL,
@@ -63,12 +65,12 @@ pub async fn init_db<R: Runtime>(app: &AppHandle<R>) -> Result<Pool<Sqlite>, Str
             UNIQUE(table_name, connection_id, tag_id)
         );",
     )
-    .execute(&pool)
-    .await
-    .map_err(|e| format!("Failed to create table_tags table: {}", e))?;
+    .await?;
 
     // Saved Queries table
-    sqlx::query(
+    create_table_schema(
+        &pool,
+        "saved_queries",
         "CREATE TABLE IF NOT EXISTS saved_queries (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             name TEXT NOT NULL,
@@ -78,12 +80,12 @@ pub async fn init_db<R: Runtime>(app: &AppHandle<R>) -> Result<Pool<Sqlite>, Str
             FOREIGN KEY(connection_id) REFERENCES connections(id) ON DELETE CASCADE
         );",
     )
-    .execute(&pool)
-    .await
-    .map_err(|e| format!("Failed to create saved_queries table: {}", e))?;
+    .await?;
 
     // Saved Functions table
-    sqlx::query(
+    create_table_schema(
+        &pool,
+        "saved_functions",
         "CREATE TABLE IF NOT EXISTS saved_functions (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             name TEXT NOT NULL,
@@ -93,9 +95,19 @@ pub async fn init_db<R: Runtime>(app: &AppHandle<R>) -> Result<Pool<Sqlite>, Str
             FOREIGN KEY(connection_id) REFERENCES connections(id) ON DELETE CASCADE
         );",
     )
-    .execute(&pool)
-    .await
-    .map_err(|e| format!("Failed to create saved_functions table: {}", e))?;
+    .await?;
 
     Ok(pool)
+}
+
+async fn create_table_schema(
+    pool: &Pool<Sqlite>,
+    table_name: &str,
+    schema_sql: &str,
+) -> Result<(), String> {
+    sqlx::query(schema_sql)
+        .execute(pool)
+        .await
+        .map_err(|e| format!("Failed to create {} table: {}", table_name, e))?;
+    Ok(())
 }

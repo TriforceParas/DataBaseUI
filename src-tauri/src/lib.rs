@@ -32,10 +32,12 @@ pub fn run() {
             commands::save_query,
             commands::list_queries,
             commands::delete_query,
+            commands::update_query,
             // Saved Functions
             commands::save_function,
             commands::list_functions,
-            commands::delete_function
+            commands::delete_function,
+            commands::update_function
         ])
         .setup(|app| {
             if cfg!(debug_assertions) {

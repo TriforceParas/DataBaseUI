@@ -4,6 +4,7 @@
     height: 100vh;
     width: 100vw;
     color: var(--text-primary);
+    overflow: hidden;
 }
 
 .navBar {
@@ -161,6 +162,19 @@
     display: flex;
     overflow-x: auto;
     gap: 4px;
+}
+
+.tabsContainer::-webkit-scrollbar {
+    height: 2px;
+}
+
+.tabsContainer::-webkit-scrollbar-thumb {
+    background: var(--accent-primary, #3b82f6);
+    border-radius: 2px;
+}
+
+.tabsContainer::-webkit-scrollbar-track {
+    background: transparent;
 }
 
 .tab {
@@ -488,4 +502,21 @@
         opacity: 1;
         transform: translateX(0);
     }
+}
+.statusBar {
+    height: 28px;
+    background-color: var(--bg-tertiary);
+    border-top: 1px solid var(--border-color);
+    display: flex;
+    align-items: center;
+    padding: 0 1rem;
+    gap: 1.5rem;
+    font-size: 0.8rem;
+    color: var(--text-secondary);
+}
+
+.statusItem {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
 }

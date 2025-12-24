@@ -11,7 +11,7 @@ interface QueryEditorProps {
     selectedRowCount?: number;
     onCopy?: (format: 'CSV' | 'JSON') => void;
     onExport?: (format: 'CSV' | 'JSON') => void;
-    theme?: 'blue' | 'gray' | 'amoled' | 'light';
+    theme?: string;
     tables?: string[]; // For autocomplete
     // Saved Query props
     onSaveQuery?: () => void;

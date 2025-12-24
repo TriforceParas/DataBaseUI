@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import styles from '../styles/ConnectionForm.module.css';
-import { Connection } from '../types';
+import { Connection } from '../types/index';
 
 interface ConnectionFormProps {
     connectionToEdit?: Connection | null;

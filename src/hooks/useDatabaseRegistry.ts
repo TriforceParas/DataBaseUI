@@ -1,11 +1,11 @@
 import { useState, useEffect, useCallback } from 'react';
-import { invoke } from '@tauri-apps/api/core';
-import { Connection, Tag, TableTag, ColumnSchema } from '../types';
+import { Connection, Tag, TableTag } from '../types/index';
+import * as api from '../api';
 
 interface UseDatabaseRegistryReturn {
     tables: string[];
     savedConnections: Connection[];
-    tableSchemas: Record<string, ColumnSchema[]>;
+
     tags: Tag[];
     tableTags: TableTag[];
     refreshTrigger: number;
@@ -17,7 +17,7 @@ interface UseDatabaseRegistryReturn {
 export const useDatabaseRegistry = (connection: Connection): UseDatabaseRegistryReturn => {
     const [tables, setTables] = useState<string[]>([]);
     const [savedConnections, setSavedConnections] = useState<Connection[]>([]);
-    const [tableSchemas, setTableSchemas] = useState<Record<string, ColumnSchema[]>>({});
+
     const [tags, setTags] = useState<Tag[]>([]);
     const [tableTags, setTableTags] = useState<TableTag[]>([]);
     const [refreshTrigger, setRefreshTrigger] = useState(0);
@@ -25,7 +25,7 @@ export const useDatabaseRegistry = (connection: Connection): UseDatabaseRegistry
     const fetchTables = useCallback(async () => {
         setRefreshTrigger(prev => prev + 1);
         try {
-            const fetchedTables = await invoke<string[]>('get_tables', { connectionString: connection.connection_string });
+            const fetchedTables = await api.getTables(connection.connection_string);
             setTables(fetchedTables);
         } catch (e) {
             console.error("Failed to fetch tables:", e);
@@ -34,7 +34,7 @@ export const useDatabaseRegistry = (connection: Connection): UseDatabaseRegistry
 
     const fetchConnections = useCallback(async () => {
         try {
-            const conns = await invoke<Connection[]>('list_connections');
+            const conns = await api.listConnections();
             setSavedConnections(conns);
         } catch (e) {
             console.error("Failed to fetch connections", e);
@@ -43,9 +43,9 @@ export const useDatabaseRegistry = (connection: Connection): UseDatabaseRegistry
 
     const loadTags = useCallback(async () => {
         try {
-            const t = await invoke<Tag[]>('get_tags');
+            const t = await api.getTags();
             setTags(t);
-            const tt = await invoke<TableTag[]>('get_table_tags', { connectionId: connection.id });
+            const tt = await api.getTableTags(connection.id);
             setTableTags(tt);
         } catch (e) { console.error(e); }
     }, [connection.id]);
@@ -60,7 +60,7 @@ export const useDatabaseRegistry = (connection: Connection): UseDatabaseRegistry
     return {
         tables,
         savedConnections,
-        tableSchemas,
+
         tags,
         tableTags,
         refreshTrigger,

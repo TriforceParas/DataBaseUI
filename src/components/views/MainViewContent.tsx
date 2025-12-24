@@ -1,5 +1,5 @@
 import React from 'react';
-import { Tab, PendingChange, ColumnSchema, SystemLog, PaginationState, TableDataState } from '../../types';
+import { Tab, PendingChange, ColumnSchema, SystemLog, PaginationState, TableDataState } from '../../types/index';
 import { TableCreatorState } from '../editors';
 import { EmptyStateView } from './EmptyStateView';
 import { TableTabView } from './TableTabView';
@@ -28,7 +28,7 @@ interface MainViewContentProps {
     setActiveDropdown: React.Dispatch<React.SetStateAction<'copy' | 'export' | 'pageSize' | null>>;
     logs: SystemLog[];
     tables: string[];
-    theme: 'blue' | 'gray' | 'amoled' | 'light';
+    theme: string;
 
     // TableCreator State
     tableCreatorStates: Record<string, TableCreatorState>;
@@ -43,7 +43,7 @@ interface MainViewContentProps {
     resultsHeight: number;
     isResizing: boolean;
     toggleResults: () => void;
-    startResizing: () => void;
+    startResizing: (e: React.MouseEvent) => void;
 
     // All Handlers
     onInsertRow: () => void;
@@ -61,8 +61,8 @@ interface MainViewContentProps {
     handleAddQuery: () => void;
     handleSaveQuery: () => void;
     handleSaveFunction: () => void;
-    handleUpdateQuery: (() => void) | undefined;
-    handleUpdateFunction: (() => void) | undefined;
+    handleUpdateQuery: ((id: number, name: string, sql: string) => void) | undefined;
+    handleUpdateFunction: ((id: number, name: string, body: string) => void) | undefined;
     handleExportQuery: () => void;
     handleSort: (column: string) => void;
     handleRefresh: () => void;
@@ -234,7 +234,14 @@ export const MainViewContent: React.FC<MainViewContentProps> = ({
             onSaveFunction={handleSaveFunction}
             onExportSql={handleExportQuery}
             isSaved={!!(tabs.find(t => t.id === activeTabId)?.savedQueryId || tabs.find(t => t.id === activeTabId)?.savedFunctionId)}
-            onSaveChanges={tabs.find(t => t.id === activeTabId)?.savedQueryId ? handleUpdateQuery : tabs.find(t => t.id === activeTabId)?.savedFunctionId ? handleUpdateFunction : undefined}
+            onSaveChanges={() => {
+                const query = tabQueries[activeTabId] || '';
+                if (activeTab.savedQueryId && handleUpdateQuery) {
+                    handleUpdateQuery(activeTab.savedQueryId, activeTab.title, query);
+                } else if (activeTab.savedFunctionId && handleUpdateFunction) {
+                    handleUpdateFunction(activeTab.savedFunctionId, activeTab.title, query);
+                }
+            }}
             results={results}
             resultsVisible={resultsVisible}
             resultsHeight={resultsHeight}

@@ -5,16 +5,17 @@ import { DuplicateTableModal } from './DuplicateTableModal';
 import { SaveQueryModal } from './SaveQueryModal';
 import { NewConnectionModal } from './NewConnectionModal';
 import { TableEditRowModal } from './TableEditRowModal';
-import { TabResult, PendingChange } from '../../types';
+import { TabResult, PendingChange } from '../../types/index';
 
 interface ModalManagerProps {
     preferences: {
         isOpen: boolean;
         onClose: () => void;
-        theme: 'blue' | 'gray' | 'amoled' | 'light';
-        setTheme: (t: 'blue' | 'gray' | 'amoled' | 'light') => void;
+        theme: string;
+        setTheme: (t: string) => void;
         zoom: number;
         setZoom: React.Dispatch<React.SetStateAction<number>>;
+        availableThemes: { id: string, name: string, colors: { bg: string, text: string, accent: string } }[];
     };
     newConnection: {
         isOpen: boolean;
@@ -81,6 +82,7 @@ export const ModalManager: React.FC<ModalManagerProps> = ({
                 setTheme={preferences.setTheme}
                 zoom={preferences.zoom}
                 setZoom={preferences.setZoom}
+                availableThemes={preferences.availableThemes}
             />
 
             <NewConnectionModal

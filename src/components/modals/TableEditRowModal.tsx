@@ -1,6 +1,6 @@
 import React from 'react';
 import { InsertRowModal } from './InsertRowModal';
-import { TabResult, PendingChange } from '../../types';
+import { TabResult, PendingChange } from '../../types/index';
 
 interface TableEditRowModalProps {
     isOpen: boolean;

@@ -1,6 +1,6 @@
 import React from 'react';
 import { TableCreator, TableCreatorState } from '../editors';
-import { PendingChange } from '../../types';
+import { PendingChange } from '../../types/index';
 
 interface TableCreatorViewProps {
     activeTabId: string;

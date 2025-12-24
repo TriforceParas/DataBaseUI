@@ -1,7 +1,7 @@
 import { useCallback } from 'react';
-import { QueryResult, SystemLog, Tab } from '../types';
-import { saveExportFile } from '../helpers/screenshotHelper';
-import { generateDataText } from '../helpers/dataHandlers';
+import { QueryResult, SystemLog, Tab } from '../types/index';
+import { saveExportFile } from '../utils/screenshotHelper';
+import { generateDataText } from '../utils/dataHandlers';
 
 interface UsePersistenceActionsProps {
     activeTab: Tab | undefined;

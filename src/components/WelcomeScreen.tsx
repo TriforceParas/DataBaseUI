@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import { getCurrentWindow } from '@tauri-apps/api/window';
 import styles from '../styles/Welcome.module.css';
-import { Connection } from '../types';
+import { Connection } from '../types/index';
 import { Pencil, Trash2, Zap, Plus, FlaskConical } from 'lucide-react';
 import { ConnectionForm } from './ConnectionForm';
 

@@ -1,6 +1,6 @@
 import React from 'react';
-import styles from '../../../styles/MainLayout.module.css';
-import { RefreshCw, Search, Plus, PanelLeftClose, PanelLeftOpen, Settings, Activity, ListPlus, Workflow } from 'lucide-react';
+import styles from '../../styles/MainLayout.module.css';
+import { Icons } from '../../assets/icons';
 import { WindowControls } from './WindowControls';
 
 interface NavbarProps {
@@ -65,17 +65,17 @@ export const Navbar: React.FC<NavbarProps> = ({
                                 onClick={() => { setShowPreferences(true); setShowDbMenu(false); }}
                                 style={{ padding: '8px 12px', cursor: 'pointer', fontSize: '0.9rem', display: 'flex', alignItems: 'center', gap: '8px' }}
                             >
-                                <Settings size={14} /> Preferences
+                                <Icons.Settings size={14} /> Preferences
                             </div>
                         </div>
                     )}
                 </div>
 
-                <button className={styles.iconBtn} onClick={handleAddTableTab} title="New Table"><Plus size={18} /></button>
-                <button className={styles.iconBtn} onClick={fetchTables} title="Refresh Connection" style={{ color: 'var(--text-primary)' }}><RefreshCw size={18} /></button>
-                <button className={styles.iconBtn} title="Search"><Search size={18} /></button>
+                <button className={styles.iconBtn} onClick={handleAddTableTab} title="New Table"><Icons.Plus size={18} /></button>
+                <button className={styles.iconBtn} onClick={fetchTables} title="Refresh Connection" style={{ color: 'var(--text-primary)' }}><Icons.RefreshCw size={18} /></button>
+                <button className={styles.iconBtn} title="Search"><Icons.Search size={18} /></button>
                 <button className={styles.iconBtn} onClick={() => setSidebarOpen(!sidebarOpen)} title={sidebarOpen ? "Hide Sidebar" : "Show Sidebar"}>
-                    {sidebarOpen ? <PanelLeftClose size={18} /> : <PanelLeftOpen size={18} />}
+                    {sidebarOpen ? <Icons.SidebarClose size={18} /> : <Icons.SidebarOpen size={18} />}
                 </button>
                 <div className={styles.verticalDivider}></div>
                 <button className={styles.outlineBtn} onClick={handleAddQuery} title="New SQL Query">SQL</button>
@@ -113,10 +113,10 @@ export const Navbar: React.FC<NavbarProps> = ({
                 <div className={styles.verticalDivider}></div>
                 <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
                     <button className={styles.iconBtn} onClick={handleOpenLogs} title="Logs">
-                        <Activity size={18} />
+                        <Icons.Activity size={18} />
                     </button>
                     <button className={styles.iconBtn} onClick={handleOpenSchema} title="Schema">
-                        <Workflow size={18} />
+                        <Icons.Workflow size={18} />
                     </button>
                     <button
                         className={styles.iconBtn}
@@ -127,7 +127,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                             color: showEditWindow ? 'var(--text-primary)' : 'var(--text-secondary)'
                         }}
                     >
-                        <ListPlus size={18} />
+                        <Icons.ListPlus size={18} />
                     </button>
                 </div>
 

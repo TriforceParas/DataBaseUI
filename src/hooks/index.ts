@@ -10,3 +10,5 @@ export * from './useDatabaseRegistry';
 export * from './useChangeManager';
 export * from './useAppSystem';
 export * from './useAppNavigation';
+export * from './useSchemaOperations';
+export * from './useDataMutation';

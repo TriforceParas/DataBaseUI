@@ -967,7 +967,7 @@ pub async fn open_loading_window<R: tauri::Runtime>(
 
     let win = WebviewWindowBuilder::new(&app, label, WebviewUrl::App(url.into()))
         .title("Processing")
-        .inner_size(300.0, 180.0)
+        .inner_size(400.0, 250.0)
         .decorations(false)
         .transparent(true)
         .always_on_top(true)

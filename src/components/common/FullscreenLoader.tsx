@@ -16,33 +16,37 @@ export const FullscreenLoader: React.FC<FullscreenLoaderProps> = ({ isVisible, m
             left: 0,
             right: 0,
             bottom: 0,
-            backgroundColor: 'transparent',
+            backgroundColor: 'rgba(0, 0, 0, 0.6)', // Dim backdrop
+            backdropFilter: 'blur(4px)',
             display: 'flex',
             flexDirection: 'column',
             alignItems: 'center',
             justifyContent: 'center',
-            color: 'white',
+            color: 'var(--text-primary)',
             fontFamily: 'sans-serif',
             height: '100vh',
             width: '100vw',
+            zIndex: 9999,
             overflow: 'hidden'
         }}>
             <div style={{
-                background: 'rgba(30, 30, 40, 0.95)',
-                padding: '1.5rem',
+                background: 'var(--bg-secondary)',
+                padding: '2.5rem',
                 borderRadius: '16px',
-                border: '1px solid rgba(255, 255, 255, 0.1)',
-                boxShadow: '0 0 0 1px rgba(0,0,0,0.5)',
+                border: '1px solid var(--border-color)',
+                boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
                 display: 'flex',
                 flexDirection: 'column',
                 alignItems: 'center',
-                gap: '1rem',
-                width: '100%',
-                height: '100%',
-                justifyContent: 'center'
+                gap: '1.5rem',
+                width: 'auto',
+                minWidth: '400px',
+                maxWidth: '90%',
+                justifyContent: 'center',
+                boxSizing: 'border-box'
             }}>
                 <div style={{ position: 'relative' }}>
-                    <Loader2 className="animate-spin" size={48} style={{ color: '#3b82f6' }} />
+                    <Loader2 className="animate-spin" size={48} style={{ color: 'var(--accent-primary)' }} />
                     <div style={{
                         position: 'absolute',
                         top: 0,
@@ -50,22 +54,24 @@ export const FullscreenLoader: React.FC<FullscreenLoaderProps> = ({ isVisible, m
                         right: 0,
                         bottom: 0,
                         borderRadius: '50%',
-                        boxShadow: '0 0 20px rgba(59, 130, 246, 0.5)',
-                        opacity: 0.5,
+                        boxShadow: '0 0 20px var(--accent-primary)',
+                        opacity: 0.4,
                         animation: 'pulse 2s infinite'
                     }} />
                 </div>
 
-                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.2rem', textAlign: 'center' }}>
-                    <h3 style={{ fontSize: '0.95rem', fontWeight: 600, letterSpacing: '0.5px', margin: 0 }}>Generating Screenshot...</h3>
-                    <span style={{ fontSize: '0.75rem', color: 'rgba(255, 255, 255, 0.6)' }}>Please wait...</span>
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.5rem', textAlign: 'center' }}>
+                    <h3 style={{ fontSize: '1.1rem', fontWeight: 600, letterSpacing: '0.5px', margin: 0, color: 'var(--text-primary)' }}>
+                        {message}
+                    </h3>
+                    <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>Please wait...</span>
                 </div>
 
                 {/* Refined Progress Bar */}
                 <div style={{
                     width: '100%',
                     height: '6px',
-                    background: 'rgba(255, 255, 255, 0.1)',
+                    background: 'var(--bg-tertiary)',
                     borderRadius: '10px',
                     overflow: 'hidden',
                     position: 'relative'
@@ -76,11 +82,11 @@ export const FullscreenLoader: React.FC<FullscreenLoaderProps> = ({ isVisible, m
                         left: 0,
                         height: '100%',
                         width: '30%',
-                        background: 'linear-gradient(90deg, #3b82f6, #60a5fa, #3b82f6)',
+                        background: 'linear-gradient(90deg, var(--accent-primary), var(--accent-secondary), var(--accent-primary))',
                         backgroundSize: '200% 100%',
                         borderRadius: '10px',
                         animation: 'shimmer 1.5s infinite linear',
-                        boxShadow: '0 0 10px rgba(59, 130, 246, 0.5)'
+                        boxShadow: '0 0 10px var(--accent-primary)'
                     }} />
                 </div>
             </div>

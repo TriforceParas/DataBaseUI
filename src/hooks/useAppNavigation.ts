@@ -1,5 +1,5 @@
 import { useCallback } from 'react';
-import { Connection, Tab, PendingChange, QueryResult } from '../types';
+import { Connection, Tab, PendingChange, QueryResult } from '../types/index';
 
 interface UseAppNavigationProps {
     tabs: Tab[];

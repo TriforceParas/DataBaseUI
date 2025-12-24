@@ -1,0 +1,20 @@
+{
+    "name": "Amoled",
+    "id": "amoled",
+    "type": "dark",
+    "colors": {
+        "bg-primary": "#000000",
+        "bg-secondary": "#121212",
+        "bg-tertiary": "#1e1e1e",
+        "accent-primary": "#6366f1",
+        "accent-secondary": "#818cf8",
+        "accent-hover": "#4f46e5",
+        "text-primary": "#f8fafc",
+        "text-secondary": "#94a3b8",
+        "text-muted": "#64748b",
+        "border-color": "#333333",
+        "input-bg": "#121212",
+        "success": "#10b981",
+        "error": "#ef4444"
+    }
+}

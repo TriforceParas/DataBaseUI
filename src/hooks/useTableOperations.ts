@@ -1,7 +1,7 @@
 
 import { useState } from 'react';
-import { invoke } from '@tauri-apps/api/core';
-import { Connection } from '../types';
+import { Connection } from '../types/index';
+import * as api from '../api';
 
 interface UseTableOperationsProps {
     connection: Connection;
@@ -30,7 +30,7 @@ export const useTableOperations = ({ connection, onRefreshTables, onTableDropped
         if (!duplicateTableModal) return;
 
         try {
-            await invoke('duplicate_table', {
+            await api.duplicateTable({
                 connectionString: connection.connection_string,
                 sourceTable: duplicateTableModal,
                 newTable: newName,
@@ -62,17 +62,11 @@ export const useTableOperations = ({ connection, onRefreshTables, onTableDropped
 
         try {
             if (tableConfirmModal.type === 'truncate') {
-                await invoke('truncate_table', {
-                    connectionString: connection.connection_string,
-                    tableName: tableConfirmModal.tableName
-                });
+                await api.truncateTable(connection.connection_string, tableConfirmModal.tableName);
                 onRefreshTables();
                 addLog(`TRUNCATE TABLE ${tableConfirmModal.tableName}`, 'Success', tableConfirmModal.tableName, undefined, 0, 'System');
             } else if (tableConfirmModal.type === 'drop') {
-                await invoke('drop_table', {
-                    connectionString: connection.connection_string,
-                    tableName: tableConfirmModal.tableName
-                });
+                await api.dropTable(connection.connection_string, tableConfirmModal.tableName);
                 // Close any tabs for this table
                 onTableDropped(tableConfirmModal.tableName);
                 onRefreshTables();

@@ -1,8 +1,8 @@
 import React from 'react';
 import { Activity, Copy, ChevronDown, Download, ChevronLeft, ChevronRight } from 'lucide-react';
 import styles from '../../styles/MainLayout.module.css';
-import { DataGrid } from '../DataGrid';
-import { Tab, SystemLog, PaginationState } from '../../types';
+import { DataGrid } from '../datagrid/DataGrid';
+import { Tab, SystemLog, PaginationState } from '../../types/index';
 
 interface LogTabViewProps {
     activeTab: Tab;

@@ -1,6 +1,5 @@
-
 import { useState, useCallback } from 'react';
-import { TabItem, SavedQuery } from '../types';
+import { TabItem, SavedQuery } from '../types/index';
 import { DragEndEvent } from '@dnd-kit/core';
 import { arrayMove } from '@dnd-kit/sortable';
 
@@ -14,13 +13,13 @@ export const useTabs = () => {
     const activeTab = tabs.find(t => t.id === activeTabId);
 
     const handleAddTableTab = useCallback(() => {
-        const newTabId = `create-table-${Date.now()}`;
+        const newTabId = `create - table - ${Date.now()} `;
         setTabs(prev => [...prev, { id: newTabId, type: 'create-table', title: 'New Table' }]);
         setActiveTabId(newTabId);
     }, []);
 
     const handleAddQuery = useCallback(() => {
-        const newTabId = `query-${Date.now()}`;
+        const newTabId = `query - ${Date.now()} `;
         setTabs(prev => [...prev, { id: newTabId, type: 'query', title: 'New Query', isPreview: false }]);
         setActiveTabId(newTabId);
     }, []);
@@ -80,7 +79,7 @@ export const useTabs = () => {
                 setActiveTabId(existing.id);
                 return prev;
             }
-            const tabId = `query-${query.id}-${Date.now()}`;
+            const tabId = `query - ${query.id} -${Date.now()} `;
             setTabQueries(q => ({ ...q, [tabId]: query.query }));
             setActiveTabId(tabId);
             return [...prev, { id: tabId, type: 'query', title: query.name, savedQueryId: query.id }];

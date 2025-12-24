@@ -1,6 +1,6 @@
 import { useCallback } from 'react';
-import { Connection, PendingChange, QueryResult, Tab } from '../types';
-import { buildDeleteSql, buildUpdateSql } from '../helpers/dataHandlers';
+import { Connection, PendingChange, QueryResult, Tab } from '../types/index';
+import { buildDeleteSql, buildUpdateSql } from '../utils/dataHandlers';
 
 interface UseTableActionsProps {
     activeTab: Tab | undefined;

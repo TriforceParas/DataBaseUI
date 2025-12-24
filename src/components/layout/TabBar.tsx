@@ -19,8 +19,8 @@ import {
 import { CSS } from '@dnd-kit/utilities';
 import { Activity, Code2, Plus, Table, Workflow, X } from 'lucide-react';
 
-import styles from '../../../styles/MainLayout.module.css';
-import { Tag, TableTag, TabItem } from '../../../types';
+import styles from '../../styles/MainLayout.module.css';
+import { Tag, TableTag, TabItem } from '../../types/index';
 
 // Tab Interface moved to types.ts
 

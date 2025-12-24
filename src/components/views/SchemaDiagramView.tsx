@@ -1,14 +1,14 @@
 import React, { useRef } from 'react';
 import { SchemaVisualizer } from '../editors';
-import { ColumnSchema } from '../../types';
+import { ColumnSchema } from '../../types/index';
 import { invoke } from '@tauri-apps/api/core';
-import { captureSchemaScreenshot } from '../../helpers/screenshotHelper';
+import { captureSchemaScreenshot } from '../../utils/screenshotHelper';
 
 interface SchemaDiagramViewProps {
     tables: string[];
     tableSchemas: Record<string, ColumnSchema[]>;
     onTableClick: (tableName: string) => void;
-    theme: 'blue' | 'gray' | 'amoled' | 'light';
+    theme: string;
     setIsCapturing: (capturing: boolean) => void;
     addToast: (title: string, message: string, filePath?: string, type?: 'success' | 'error' | 'info') => void;
 }

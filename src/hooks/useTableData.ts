@@ -1,14 +1,15 @@
-
 import { useState, useCallback } from 'react';
-import { invoke } from '@tauri-apps/api/core';
-import { Connection, QueryResult, SortState, TabResult } from '../types';
+import { Connection, SortState, TabResult, ColumnSchema } from '../types/index';
+import * as api from '../api';
 
 interface UseTableDataProps {
     connection: Connection;
     addLog: (query: string, status: 'Success' | 'Error', table?: string, error?: string, rows?: number, user?: string) => void;
+    tableSchemas: Record<string, ColumnSchema[]>;
+    setTableSchemas: React.Dispatch<React.SetStateAction<Record<string, ColumnSchema[]>>>;
 }
 
-export const useTableData = ({ connection, addLog }: UseTableDataProps) => {
+export const useTableData = ({ connection, addLog, tableSchemas, setTableSchemas }: UseTableDataProps) => {
     const [results, setResults] = useState<Record<string, TabResult>>({});
     const [paginationMap, setPaginationMap] = useState<Record<string, { page: number, pageSize: number, total: number }>>({});
     const [sortState, setSortState] = useState<SortState | null>(null);
@@ -33,6 +34,14 @@ export const useTableData = ({ connection, addLog }: UseTableDataProps) => {
         const pageSize = pageSizeOverride !== undefined ? pageSizeOverride : currentPag.pageSize;
 
         try {
+            // Check if we need to fetch schema (for keys info)
+            if (!tableSchemas[tableName]) {
+                api.getTableSchema(connection.connection_string, tableName)
+                    .then(schema => {
+                        setTableSchemas(prev => ({ ...prev, [tableName]: schema }));
+                    }).catch(err => console.error("Failed to background fetch schema for keys:", err));
+            }
+
             const isMysql = connection.connection_string.startsWith('mysql:');
             const q = isMysql ? '`' : '"';
             const offset = (page - 1) * pageSize;
@@ -50,17 +59,11 @@ export const useTableData = ({ connection, addLog }: UseTableDataProps) => {
             const countQuery = `SELECT COUNT(*) as count FROM ${q}${tableName}${q}`;
 
             // Execute
-            const res = await invoke<QueryResult[]>('execute_query', {
-                connectionString: connection.connection_string,
-                query
-            });
+            const res = await api.executeQuery(connection.connection_string, query);
             const lastRes = res.length > 0 ? res[res.length - 1] : null;
 
             // Get total count (separate call is standard for pagination)
-            const countRes = await invoke<QueryResult[]>('execute_query', {
-                connectionString: connection.connection_string,
-                query: countQuery
-            });
+            const countRes = await api.executeQuery(connection.connection_string, countQuery);
             const total = countRes.length > 0 && countRes[0].rows.length > 0 ? Number(countRes[0].rows[0][0]) : 0;
 
             updateTabResult(tabId, { data: lastRes, allData: res, loading: false, error: null });
@@ -73,7 +76,7 @@ export const useTableData = ({ connection, addLog }: UseTableDataProps) => {
             updateTabResult(tabId, { loading: false, error: String(e) });
             addLog(`SELECT * FROM ${tableName}`, 'Error', tableName, String(e), 0, 'System');
         }
-    }, [connection, paginationMap, sortState, addLog]); // Dependencies
+    }, [connection, paginationMap, sortState, addLog, tableSchemas, setTableSchemas]); // Dependencies
 
     const handleRunQuery = useCallback(async (tabId: string, query: string) => {
         if (!query.trim()) return;
@@ -83,10 +86,7 @@ export const useTableData = ({ connection, addLog }: UseTableDataProps) => {
             // Simple naive check for table name for logging - inherently imprecise for arbitrary queries
             // But 'User' queries don't strictly require table matching for the 'Table' column in logs
             // as much as System actions do.
-            const res = await invoke<QueryResult[]>('execute_query', {
-                connectionString: connection.connection_string,
-                query
-            });
+            const res = await api.executeQuery(connection.connection_string, query);
             const lastRes = res.length > 0 ? res[res.length - 1] : null;
 
             updateTabResult(tabId, { data: lastRes, allData: res, loading: false, error: null });

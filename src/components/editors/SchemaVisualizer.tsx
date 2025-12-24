@@ -69,7 +69,7 @@ interface SchemaVisualizerProps {
     tableSchemas: Record<string, ColumnSchema[]>;
     onTableClick?: (tableName: string) => void;
     onDownload?: () => void;
-    theme?: 'blue' | 'gray' | 'amoled' | 'light';
+    theme?: string;
 }
 
 // Helper to categorize columns - collapsed by default (shows only PKs and FKs)

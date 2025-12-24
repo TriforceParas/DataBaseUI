@@ -1,9 +1,9 @@
 
 import React from 'react';
-import { ChevronUp, ChevronDown, Table, RefreshCw, ChevronLeft, ChevronRight, Activity, Copy, Download } from 'lucide-react';
-import { DataGrid } from '../../DataGrid';
-import { TabResult, PendingChange } from '../../../types';
-import styles from '../../../styles/MainLayout.module.css';
+import { Icons } from '../../assets/icons';
+import { DataGrid } from '../datagrid/DataGrid';
+import { TabResult, PendingChange } from '../../types/index';
+import styles from '../../styles/MainLayout.module.css';
 
 interface ResultsPaneProps {
     activeTabId: string;
@@ -16,7 +16,7 @@ interface ResultsPaneProps {
 
     // Actions
     toggleResults: () => void;
-    startResizing: () => void;
+    startResizing: (e: React.MouseEvent) => void;
     onRefresh: () => void;
     onPageChange: (newPage: number) => void;
     onPageSizeChange: (newSize: number) => void;
@@ -41,6 +41,10 @@ interface ResultsPaneProps {
     // Export handlers
     onExport: (format: 'CSV' | 'JSON') => void;
     onCopy: (format: 'CSV' | 'JSON') => void;
+
+    // Schema info
+    primaryKeys?: Set<string>;
+    foreignKeys?: Set<string>;
 }
 
 export const ResultsPane: React.FC<ResultsPaneProps> = ({
@@ -64,7 +68,9 @@ export const ResultsPane: React.FC<ResultsPaneProps> = ({
     onUpdateValue,
     pendingChanges,
     onExport,
-    onCopy
+    onCopy,
+    primaryKeys,
+    foreignKeys
 }) => {
 
     const currentResult = results[activeTabId];
@@ -87,7 +93,7 @@ export const ResultsPane: React.FC<ResultsPaneProps> = ({
             {/* Resize Handle */}
             {resultsVisible && (
                 <div
-                    onMouseDown={(e) => { e.preventDefault(); startResizing(); }}
+                    onMouseDown={(e) => { e.preventDefault(); startResizing(e); }}
                     style={{
                         height: '4px',
                         cursor: 'ns-resize',
@@ -108,11 +114,11 @@ export const ResultsPane: React.FC<ResultsPaneProps> = ({
                 style={{ userSelect: 'none', padding: '0 0.5rem', height: '32px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid var(--border-color)' }}
             >
                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontWeight: 600, fontSize: '0.8rem' }}>
-                    <Table size={14} /> Query Results
+                    <Icons.Table size={14} /> Query Results
                 </div>
                 <div style={{ display: 'flex', gap: '0.5rem' }}>
                     <button className={styles.iconBtn} onClick={(e) => { e.stopPropagation(); toggleResults(); }}>
-                        {resultsVisible ? <ChevronDown size={14} /> : <ChevronUp size={14} />}
+                        {resultsVisible ? <Icons.ChevronDown size={14} /> : <Icons.ChevronUp size={14} />}
                     </button>
                 </div>
             </div>
@@ -144,7 +150,7 @@ export const ResultsPane: React.FC<ResultsPaneProps> = ({
                             {activeTabType === 'table' && (
                                 <div className={styles.toolbar} style={{ padding: '0.25rem 0.5rem', borderBottom: '1px solid var(--border-color)', display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
                                     <button className={styles.toolbarBtn} onClick={onRefresh} title="Refresh">
-                                        <RefreshCw size={14} />
+                                        <Icons.RefreshCw size={14} />
                                     </button>
                                     <div style={{ width: '1px', height: '16px', backgroundColor: 'var(--border-color)', margin: '0 4px' }} />
 
@@ -154,7 +160,7 @@ export const ResultsPane: React.FC<ResultsPaneProps> = ({
                                         disabled={pagination.page <= 1}
                                         onClick={() => onPageChange(pagination.page - 1)}
                                     >
-                                        <ChevronLeft size={14} />
+                                        <Icons.ChevronLeft size={14} />
                                     </button>
                                     <span style={{ fontSize: '0.8rem' }}>
                                         Page {pagination.page} of {Math.max(1, totalPages)}
@@ -164,7 +170,7 @@ export const ResultsPane: React.FC<ResultsPaneProps> = ({
                                         disabled={pagination.page >= totalPages}
                                         onClick={() => onPageChange(pagination.page + 1)}
                                     >
-                                        <ChevronRight size={14} />
+                                        <Icons.ChevronRight size={14} />
                                     </button>
 
                                     <div style={{ position: 'relative' }}>
@@ -173,7 +179,7 @@ export const ResultsPane: React.FC<ResultsPaneProps> = ({
                                             onClick={() => setActiveDropdown(activeDropdown === 'pageSize' ? null : 'pageSize')}
                                             style={{ fontSize: '0.8rem', minWidth: '60px', justifyContent: 'space-between' }}
                                         >
-                                            {pagination.pageSize} rows <ChevronDown size={12} />
+                                            {pagination.pageSize} rows <Icons.ChevronDown size={12} />
                                         </button>
                                         {activeDropdown === 'pageSize' && (
                                             <div className={styles.dropdownMenu} style={{ bottom: '100%', top: 'auto', marginBottom: '4px' }}>
@@ -191,7 +197,7 @@ export const ResultsPane: React.FC<ResultsPaneProps> = ({
                                     {/* Export / Copy */}
                                     <div style={{ position: 'relative' }}>
                                         <button className={styles.toolbarBtn} onClick={() => setActiveDropdown(activeDropdown === 'copy' ? null : 'copy')}>
-                                            <Copy size={14} /> Copy <ChevronDown size={12} />
+                                            <Icons.Copy size={14} /> Copy <Icons.ChevronDown size={12} />
                                         </button>
                                         {activeDropdown === 'copy' && (
                                             <div className={styles.dropdownMenu} style={{ bottom: '100%', top: 'auto', marginBottom: '4px', right: 0 }}>
@@ -203,7 +209,7 @@ export const ResultsPane: React.FC<ResultsPaneProps> = ({
 
                                     <div style={{ position: 'relative' }}>
                                         <button className={styles.toolbarBtn} onClick={() => setActiveDropdown(activeDropdown === 'export' ? null : 'export')}>
-                                            <Download size={14} /> Export <ChevronDown size={12} />
+                                            <Icons.Download size={14} /> Export <Icons.ChevronDown size={12} />
                                         </button>
                                         {activeDropdown === 'export' && (
                                             <div className={styles.dropdownMenu} style={{ bottom: '100%', top: 'auto', marginBottom: '4px', right: 0 }}>
@@ -226,6 +232,8 @@ export const ResultsPane: React.FC<ResultsPaneProps> = ({
                                     onSelectionChange={setSelectedIndices}
                                     onCellEdit={activeTabType === 'table' ? onUpdateValue : undefined}
                                     pendingChanges={activeTabType === 'table' && pendingChanges ? pendingChanges[activeTabId] : undefined}
+                                    primaryKeys={primaryKeys}
+                                    foreignKeys={foreignKeys}
                                 />
                             </div>
 
@@ -234,7 +242,7 @@ export const ResultsPane: React.FC<ResultsPaneProps> = ({
                             {activeTabType === 'table' && (
                                 <div className={styles.statusBar}>
                                     <div className={styles.statusItem}>
-                                        <Activity size={12} />
+                                        <Icons.Activity size={12} />
                                         <span>{currentResult?.loading ? 'Executing...' : 'Ready'}</span>
                                     </div>
                                     <div className={styles.statusItem}>

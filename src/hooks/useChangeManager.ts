@@ -1,7 +1,7 @@
 import { useState, useCallback } from 'react';
-import { invoke } from '@tauri-apps/api/core';
-import { Connection, PendingChange, QueryResult, Tab } from '../types';
-import { generateRowChangeSql } from '../helpers/sqlHelpers';
+import { Connection, PendingChange, QueryResult, Tab } from '../types/index';
+import { generateRowChangeSql } from '../utils/sqlHelpers';
+import * as api from '../api';
 
 interface UseChangeManagerOptions {
     onSuccess?: () => void;
@@ -63,7 +63,7 @@ export const useChangeManager = (
                 const schemaChanges = changes.filter(c => c.type === 'ADD_COLUMN' || c.type === 'DROP_COLUMN');
                 for (const change of schemaChanges) {
                     if (change.generatedSql) {
-                        await invoke('execute_query', { connectionString: connection.connection_string, query: change.generatedSql });
+                        await api.executeQuery(connection.connection_string, change.generatedSql);
                         addLog(change.generatedSql, 'Success', change.tableName, undefined, 1);
                     }
                 }
@@ -81,7 +81,7 @@ export const useChangeManager = (
                     const query = generateRowChangeSql(change, cols, isMysql);
 
                     if (query) {
-                        await invoke('execute_query', { connectionString: connection.connection_string, query });
+                        await api.executeQuery(connection.connection_string, query);
                         addLog(query, 'Success', change.tableName, undefined, 1);
                     }
                 }

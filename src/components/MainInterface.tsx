@@ -1,16 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { invoke } from '@tauri-apps/api/core';
+import * as api from '../api';
 
-import styles from '../styles/MainLayout.module.css';
-
-import { Connection, QueryResult, PendingChange, ColumnSchema, SavedFunction } from '../types';
-import { Sidebar, Navbar, TabBar, ChangelogSidebar } from './layout';
+import { Connection, PendingChange, ColumnSchema, SavedFunction } from '../types/index';
+import { MainLayout } from './layout/MainLayout';
 import { TableCreatorState } from './editors';
-import { ModalManager } from './modals/ModalManager';
-import { MainViewContent } from './views';
-import { useSystemLogs, useSavedItems, useTableOperations, useTableData, useResultsPane, useTabs, useTableActions, usePersistenceActions, useDatabaseRegistry, useChangeManager, useAppSystem } from '../hooks';
-import { ToastContainer, useToast } from './Toast';
-
+import { useSystemLogs, useSavedItems, useTableOperations, useTableData, useResultsPane, useTabs, useTableActions, usePersistenceActions, useDatabaseRegistry, useChangeManager, useAppSystem, useSchemaOperations, useDataMutation } from '../hooks';
+import { useToast } from './common/Toast';
 interface MainInterfaceProps {
     connection: Connection;
     onSwitchConnection: (conn: Connection) => void;
@@ -24,7 +19,7 @@ export const MainInterface: React.FC<MainInterfaceProps> = ({ connection, onSwit
         zoom, setZoom,
         showDbMenu, setShowDbMenu,
         isCapturing, setIsCapturing,
-        handleZoom
+        availableThemes
     } = useAppSystem(connection);
 
     // --- Modal State ---
@@ -58,13 +53,6 @@ export const MainInterface: React.FC<MainInterfaceProps> = ({ connection, onSwit
         handleOpenSavedQuery
     } = useTabs();
 
-    // Legacy mapping (if needed, or verify naming below)
-    // handleCloseTab in MainInterface signature? No, usually directly used.
-
-    // resultsVisible removed (duplicate)
-
-    // Results state
-    // Results state (Extracted to useTableData)
     const {
         results,
         setResults,
@@ -75,7 +63,7 @@ export const MainInterface: React.FC<MainInterfaceProps> = ({ connection, onSwit
         handleSort,
         fetchTableData,
         handleRunQuery: runQuery
-    } = useTableData({ connection, addLog });
+    } = useTableData({ connection, addLog, tableSchemas, setTableSchemas });
 
     // Results Pane UI State (Extracted to useResultsPane)
     const {
@@ -112,14 +100,8 @@ export const MainInterface: React.FC<MainInterfaceProps> = ({ connection, onSwit
     const [panelColumns, setPanelColumns] = useState<string[]>([]);
     const [editData, setEditData] = useState<Record<string, any>[] | undefined>(undefined);
 
-    // Resize state
-    // Resume Dropdown state
-
     // Dropdown state for Table View
     const [activeDropdown, setActiveDropdown] = useState<'copy' | 'export' | 'pageSize' | null>(null);
-
-    // --- Hooks ---
-    // Moved useSystemLogs to top
 
     // Saved Items
     const {
@@ -148,7 +130,6 @@ export const MainInterface: React.FC<MainInterfaceProps> = ({ connection, onSwit
     const {
         pendingChanges, setPendingChanges,
         showChangelog, setShowChangelog,
-        changelogConfirm, setChangelogConfirm,
         highlightRowIndex, setHighlightRowIndex,
         handleRevertChange,
         handleConfirmChanges,
@@ -198,9 +179,6 @@ export const MainInterface: React.FC<MainInterfaceProps> = ({ connection, onSwit
     const handleDeleteQuery = deleteQuery;
     const handleDeleteFunction = deleteFunction;
 
-    // handleOpenSavedQuery provided by useTabs
-
-
     // Execute saved function and show results (or switch to existing)
     const handleExecuteFunction = async (func: SavedFunction) => {
         // Check if tab already exists for this function
@@ -216,10 +194,7 @@ export const MainInterface: React.FC<MainInterfaceProps> = ({ connection, onSwit
         setResults(prev => ({ ...prev, [tabId]: { data: null, loading: true, error: null } }));
 
         try {
-            const res = await invoke<QueryResult[]>('execute_query', {
-                connectionString: connection.connection_string,
-                query: func.function_body
-            });
+            const res = await api.executeQuery(connection.connection_string, func.function_body);
             const lastRes = res.length > 0 ? res[res.length - 1] : null;
             setResults(prev => ({ ...prev, [tabId]: { data: lastRes, allData: res, loading: false, error: null } }));
             addLog(func.function_body, 'Success', undefined, undefined, lastRes ? lastRes.rows.length : 0, 'User');
@@ -243,13 +218,6 @@ export const MainInterface: React.FC<MainInterfaceProps> = ({ connection, onSwit
         setActiveTabId(tabId);
     };
 
-
-
-    // handleDragEnd provided by useTabs
-
-    // DnD Sensors are managed in TabBar now, and Resize Logic is in useResultsPane
-    // Cleaned up.
-
     useEffect(() => {
         fetchTables();
     }, [connection]);
@@ -267,8 +235,6 @@ export const MainInterface: React.FC<MainInterfaceProps> = ({ connection, onSwit
         setEditData(undefined);
     }, [activeTabId]);
 
-    // activeTab provided by useTabs
-
     // Fetch data when switching to a table tab if not already loaded
     useEffect(() => {
         if (activeTab && activeTab.type === 'table') {
@@ -285,20 +251,6 @@ export const MainInterface: React.FC<MainInterfaceProps> = ({ connection, onSwit
         }
     }, [sortState]);
 
-
-    // fetchTableData provided by useTableData hook
-    // fetchConnections provided by useDatabaseRegistry
-
-    // fetchTableData provided by useTableData hook
-
-
-
-    const handleRunQuery = async (query: string) => {
-        if (!activeTabId) return;
-        runQuery(activeTabId, query);
-    };
-
-    // handleAddTableTab and handleAddQuery provided by useTabs
 
     const handleRefresh = () => {
         if (!activeTab) return;
@@ -362,88 +314,16 @@ export const MainInterface: React.FC<MainInterfaceProps> = ({ connection, onSwit
         ));
     };
 
-    // ---- Table Context Menu Actions ----
-
-    // Get Table Schema - Opens a tab showing the schema
-    const handleGetTableSchema = async (tableName: string) => {
-        try {
-            const schema = await invoke<ColumnSchema[]>('get_table_schema', {
-                connectionString: connection.connection_string,
-                tableName
-            });
-
-            // Convert schema to QueryResult format for display in DataGrid
-            const schemaResult: QueryResult = {
-                columns: ['Column', 'Type', 'Nullable', 'Default', 'Key'],
-                rows: schema.map(col => [
-                    col.name,
-                    col.data_type,
-                    col.is_nullable,
-                    col.column_default || 'NULL',
-                    col.column_key
-                ])
-            };
-
-            // Create a schema tab
-            const tabId = `schema-${tableName}`;
-            const existingTab = tabs.find(t => t.id === tabId);
-            if (!existingTab) {
-                setTabs([...tabs, { id: tabId, type: 'table', title: `Schema: ${tableName}` }]);
-            }
-            setActiveTabId(tabId);
-            setResults(prev => ({
-                ...prev,
-                [tabId]: { data: schemaResult, loading: false, error: null }
-            }));
-            addLog(`SHOW COLUMNS FROM ${tableName}`, 'Success', tableName, undefined, 0, 'System');
-        } catch (e) {
-            console.error('Failed to get table schema:', e);
-            addLog(`SHOW COLUMNS FROM ${tableName}`, 'Error', tableName, String(e), 0, 'System');
-        }
-    };
-
-    // Edit Table Schema - Opens the TableCreator with existing schema
-    const handleEditTableSchema = async (tableName: string) => {
-        try {
-            // Fetch existing schema
-            const schema = await invoke<ColumnSchema[]>('get_table_schema', {
-                connectionString: connection.connection_string,
-                tableName
-            });
-
-            // Convert ColumnSchema to ColumnDef format
-            const columns = schema.map(col => ({
-                name: col.name,
-                type: col.data_type.toUpperCase().replace(/\(.*\)/, ''), // Strip length from type
-                length: col.data_type.match(/\((\d+)\)/)?.[1] || '', // Extract length if exists
-                defaultValue: col.column_default || '',
-                isNullable: col.is_nullable.toLowerCase() === 'yes' || col.is_nullable === '1',
-                isPrimaryKey: col.column_key === 'PRI' || col.column_key.toLowerCase().includes('pk'),
-                isAutoIncrement: (col.column_default || '').toLowerCase().includes('auto_increment') ||
-                    col.data_type.toLowerCase().includes('serial'),
-                isUnique: col.column_key === 'UNI' || col.column_key.toLowerCase().includes('unique')
-            }));
-
-            const tabId = `edit-table-${Date.now()}`;
-            const initialState: TableCreatorState = {
-                tableName,
-                columns,
-                foreignKeys: []
-            };
-
-            // Store both current and original state
-            setTableCreatorStates(prev => ({ ...prev, [tabId]: initialState }));
-            setOriginalSchemas(prev => ({ ...prev, [tabId]: JSON.parse(JSON.stringify(initialState)) }));
-
-            setTabs([...tabs, { id: tabId, type: 'create-table', title: `Edit: ${tableName}` }]);
-            setActiveTabId(tabId);
-        } catch (e) {
-            console.error('Failed to fetch table schema:', e);
-            alert(`Failed to fetch table schema: ${e}`);
-        }
-    };
-
-
+    const { handleGetTableSchema, handleEditTableSchema } = useSchemaOperations({
+        connection,
+        tabs,
+        setTabs,
+        setActiveTabId,
+        setResults,
+        setTableCreatorStates,
+        setOriginalSchemas,
+        addLog
+    });
 
     const closeTab = (e: React.MouseEvent, id: string) => {
         closeTabState(e, id); // Call hook's close logic
@@ -463,8 +343,6 @@ export const MainInterface: React.FC<MainInterfaceProps> = ({ connection, onSwit
         }
     };
 
-
-
     const handleOpenInsertSidebar = () => {
         if (!activeTab || activeTab.type !== 'table') return;
 
@@ -478,131 +356,19 @@ export const MainInterface: React.FC<MainInterfaceProps> = ({ connection, onSwit
         }
     };
 
-    // handleOpenEdit removed
-
-
-
-    const handlePanelSubmit = async (data: Record<string, any>[]) => {
-        if (!activeTab || activeTab.type !== 'table') return;
-
-        // PENDING UPDATE Logic
-        if (selectedIndices.size > 0 && editData) {
-            const indices = Array.from(selectedIndices).sort((a, b) => a - b);
-            const currentData = results[activeTab.id]?.data;
-            if (!currentData) return;
-
-            const cols = currentData.columns;
-            const idColIdx = cols.findIndex(c => c.toLowerCase() === 'id');
-            const idColName = idColIdx !== -1 ? cols[idColIdx] : null;
-            const isMysql = connection.connection_string.startsWith('mysql:');
-            const q = isMysql ? '`' : '"';
-
-            const safeVal = (v: any) => {
-                if (v === null || v === 'NULL') return 'NULL';
-                if (!isNaN(Number(v)) && v !== '') return v;
-                return `'${String(v).replace(/'/g, "''")}'`;
-            };
-
-            const newChanges: PendingChange[] = [];
-
-            data.forEach((newRow, i) => {
-                const rowIndex = indices[i];
-                if (rowIndex === undefined || !currentData.rows[rowIndex]) return;
-                const oldRow = currentData.rows[rowIndex];
-
-                Object.keys(newRow).forEach(col => {
-                    const colIdx = currentData.columns.indexOf(col);
-                    if (colIdx === -1) return;
-                    const oldVal = oldRow[colIdx];
-                    const newVal = newRow[col];
-
-                    if (String(oldVal) !== String(newVal)) {
-                        let generatedSql = '';
-                        if (idColName) {
-                            const idVal = oldRow[idColIdx];
-                            generatedSql = `UPDATE ${q}${activeTab.title}${q} SET ${q}${col}${q} = ${safeVal(newVal)} WHERE ${q}${idColName}${q} = ${safeVal(idVal)}`;
-                        } else {
-                            // Where fallback
-                            const whereClause = cols.map((c, idx) => {
-                                const val = oldRow[idx];
-                                return `${q}${c}${q} ${val === null ? 'IS NULL' : `= ${safeVal(val)}`}`;
-                            }).join(' AND ');
-                            generatedSql = `UPDATE ${q}${activeTab.title}${q} SET ${q}${col}${q} = ${safeVal(newVal)} WHERE ${whereClause}`;
-                        }
-
-                        newChanges.push({
-                            type: 'UPDATE',
-                            tableName: activeTab.title,
-                            rowIndex: rowIndex,
-                            rowData: oldRow,
-                            column: col,
-                            oldValue: oldVal,
-                            newValue: newVal,
-                            generatedSql
-                        });
-                    }
-                });
-            });
-
-            setPendingChanges(prev => {
-                const current = prev[activeTab.id] || [];
-                const filtered = current.filter(c =>
-                    !(c.type === 'UPDATE' && newChanges.some(nc => nc.rowIndex === c.rowIndex && nc.column === c.column))
-                );
-                return { ...prev, [activeTab.id]: [...filtered, ...newChanges] };
-            });
-
-            setShowEditWindow(false);
-            setEditData(undefined);
-            setSelectedIndices(new Set());
-            return;
-        }
-
-        // INSERT (Immediate)
-        const isMysql = connection.connection_string.startsWith('mysql:');
-        const q = isMysql ? '`' : '"';
-        const tableName = activeTab.title;
-
-        const keys = Object.keys(data[0] || {}).filter(k => k);
-        if (keys.length === 0) return;
-        const allKeys = Array.from(new Set(data.flatMap(d => Object.keys(d))));
-        const validKeys = allKeys.filter(k => k && k !== '');
-        if (validKeys.length === 0) return;
-        const cols = validKeys.map(k => `${q}${k}${q}`).join(', ');
-        const valueGroups = data.map(d => {
-            return `(${validKeys.map(k => {
-                const val = d[k];
-                if (val === null || val === undefined || val === 'NULL') return 'NULL';
-                if (!isNaN(Number(val)) && val !== '') return val;
-                return `'${String(val).replace(/'/g, "''")}'`;
-            }).join(', ')})`;
-        });
-        const query = `INSERT INTO ${q}${tableName}${q} (${cols}) VALUES ${valueGroups.join(', ')}`;
-
-        try {
-            await invoke('execute_query', {
-                connectionString: connection.connection_string,
-                query
-            });
-            setShowEditWindow(false);
-            setEditData(undefined);
-            fetchTableData(activeTab.id, activeTab.title);
-            addLog(query, 'Success', activeTab.title, undefined, valueGroups.length);
-        } catch (e) {
-            alert(`Insert failed: ${e}`);
-            addLog(`Insert failed: ${e}`, 'Error', activeTab.title, String(e));
-        }
-    };
-
-    // executeConfirmChanges wrapper (calls hook's method with runtime dependencies)
-    const executeConfirmChangesWrapper = () => {
-        changeManager.executeConfirmChanges(tabs, results, addLog, fetchTableData);
-    };
-
-    // executeDiscardChanges wrapper
-    const executeDiscardChangesWrapper = () => {
-        changeManager.executeDiscardChanges(setSelectedIndices);
-    };
+    const { handlePanelSubmit } = useDataMutation({
+        activeTab,
+        results,
+        selectedIndices,
+        editData,
+        connection,
+        setPendingChanges,
+        setShowEditWindow,
+        setEditData,
+        setSelectedIndices,
+        fetchTableData,
+        addLog
+    });
 
     // handleNavigateToChange wrapper (needs handleTableClick which is local)
     const handleNavigateToChangeWrapper = (tabId: string, rowIndex: number) => {
@@ -619,8 +385,6 @@ export const MainInterface: React.FC<MainInterfaceProps> = ({ connection, onSwit
         setHighlightRowIndex(rowIndex);
         setTimeout(() => setHighlightRowIndex(null), 2000);
     };
-
-
 
     const handleSwitchConnectionWrapper = (conn: Connection) => {
         const hasChanges = Object.values(pendingChanges).some(list => list.length > 0);
@@ -647,231 +411,177 @@ export const MainInterface: React.FC<MainInterfaceProps> = ({ connection, onSwit
     };
 
     const handleOpenLogs = () => {
-        const logTabId = 'logs-tab';
+        const logTabId = 'system-logs';
         const existing = tabs.find(t => t.id === logTabId);
         if (!existing) {
-            setTabs([...tabs, { id: logTabId, type: 'log', title: 'System Logs' }]);
+            setTabs([...tabs, { id: logTabId, type: 'logs', title: 'System Logs' }]);
         }
         setActiveTabId(logTabId);
     };
 
+    const handleOpenSchema = () => {
+        // Open Database Schema Diagram tab
+        const tabId = 'schema-diagram';
+        const existingTab = tabs.find(t => t.id === tabId);
+        if (existingTab) {
+            setActiveTabId(tabId);
+        } else {
+            // Fetch all table schemas first
+            Promise.all(tables.map(async (tableName) => {
+                if (!tableSchemas[tableName]) {
+                    try {
+                        const schema = await api.getTableSchema(connection.connection_string, tableName);
+                        setTableSchemas(prev => ({ ...prev, [tableName]: schema }));
+                    } catch (e) {
+                        console.error(`Failed to get schema for ${tableName}`, e);
+                    }
+                }
+            })).then(() => {
+                setTabs([...tabs, { id: tabId, type: 'schema-diagram' as any, title: 'Database Schema' }]);
+                setActiveTabId(tabId);
+            });
+        }
+    };
 
-
-    const totalChanges = Object.values(pendingChanges).reduce((acc, curr) => acc + curr.length, 0);
+    // totalChanges is calculated inside MainLayout now if needed, or we pass pendingChanges. 
+    // MainLayout computes it.
 
     return (
-        <div className={styles.container} style={{
-            zoom: zoom,
-            width: `calc(100vw / ${zoom})`,
-            height: `calc(100vh / ${zoom})`,
-            filter: isCapturing ? 'blur(5px)' : 'none', // Apply blur when capturing
-            pointerEvents: isCapturing ? 'none' : 'auto', // Disable interaction
-            transition: 'filter 0.3s ease'
-        } as any}>
-            <ModalManager
-                preferences={{
-                    isOpen: showPreferences,
-                    onClose: () => setShowPreferences(false),
-                    theme,
-                    setTheme,
-                    zoom,
-                    setZoom
-                }}
-                newConnection={{
-                    isOpen: showNewConnModal,
-                    onClose: () => setShowNewConnModal(false),
-                    onSuccess: () => { setShowNewConnModal(false); fetchConnections(); }
-                }}
-                tableConfirm={{
-                    modal: tableConfirmModal,
-                    setModal: setTableConfirmModal,
-                    onConfirm: confirmTableOperation
-                }}
-                duplicateTable={{
-                    tableName: duplicateTableModal,
-                    setTableName: setDuplicateTableModal,
-                    existingTables: tables,
-                    onConfirm: confirmDuplicateTable
-                }}
-                changelogConfirm={{
-                    modal: changelogConfirm,
-                    setModal: setChangelogConfirm,
-                    pendingChangesCount: Object.values(pendingChanges).flat().length,
-                    onConfirm: executeConfirmChangesWrapper,
-                    onDiscard: executeDiscardChangesWrapper
-                }}
-                saveItem={{
-                    modal: saveModal,
-                    setModal: setSaveModal,
-                    onSaveQuery: (name) => handleSaveQuery(name),
-                    onSaveFunction: (name) => handleSaveFunction(name)
-                }}
-                editRow={{
-                    isOpen: renderEditWindow && !!activeTabId,
-                    onClose: () => setRenderEditWindow(false),
-                    activeTabId: activeTabId,
-                    activeTabType: activeTab?.type,
-                    activeTabTitle: activeTab?.title || '',
-                    results: results,
-                    selectedIndices: selectedIndices,
-                    setSelectedIndices: setSelectedIndices,
-                    pendingChanges: pendingChanges,
-                    setPendingChanges: setPendingChanges,
-                    panelColumns: panelColumns,
-                    onInsert: handlePanelSubmit,
-                    onAddRow: handleInsertRow,
-                    onCellEdit: handleCellEdit
-                }}
-            />
-            {/* <FullscreenLoader isVisible={isCapturing} message="Generating High-Quality Screenshot..." /> */}
-            <ToastContainer toasts={toasts} onDismiss={dismissToast} />
+        <MainLayout
+            // System / UI
+            theme={theme}
+            setTheme={setTheme}
+            availableThemes={availableThemes}
+            sidebarOpen={sidebarOpen}
+            setSidebarOpen={setSidebarOpen}
+            zoomLevel={zoom}
+            setZoom={setZoom}
 
+            // Navbar State
+            showDbMenu={showDbMenu}
+            setShowDbMenu={setShowDbMenu}
+            setShowPreferences={setShowPreferences}
+            showChangelog={showChangelog}
+            setShowChangelog={setShowChangelog}
 
-            <Navbar
-                sidebarOpen={sidebarOpen}
-                setSidebarOpen={setSidebarOpen}
-                showDbMenu={showDbMenu}
-                setShowDbMenu={setShowDbMenu}
-                setShowPreferences={setShowPreferences}
-                handleAddTableTab={handleAddTableTab}
-                fetchTables={fetchTables}
-                handleAddQuery={handleAddQuery}
-                showChangelog={showChangelog}
-                setShowChangelog={setShowChangelog}
-                totalChanges={totalChanges}
-                handleOpenLogs={handleOpenLogs}
-                handleOpenEditWindow={handleOpenInsertSidebar}
-                showEditWindow={showEditWindow}
-                handleOpenSchema={() => {
-                    // Open Database Schema Diagram tab
-                    const tabId = 'schema-diagram';
-                    const existingTab = tabs.find(t => t.id === tabId);
-                    if (existingTab) {
-                        setActiveTabId(tabId);
-                    } else {
-                        // Fetch all table schemas first
-                        Promise.all(tables.map(async (tableName) => {
-                            if (!tableSchemas[tableName]) {
-                                try {
-                                    const schema = await invoke<ColumnSchema[]>('get_table_schema', {
-                                        connectionString: connection.connection_string,
-                                        tableName
-                                    });
-                                    setTableSchemas(prev => ({ ...prev, [tableName]: schema }));
-                                } catch (e) {
-                                    console.error(`Failed to get schema for ${tableName}`, e);
-                                }
-                            }
-                        })).then(() => {
-                            setTabs([...tabs, { id: tabId, type: 'schema-diagram' as any, title: 'Database Schema' }]);
-                            setActiveTabId(tabId);
-                        });
-                    }
-                }}
-            />
+            // Data
+            connection={connection}
+            tabs={tabs}
+            activeTabId={activeTabId}
+            activeTab={activeTab}
 
-            <div className={styles.body}>
-                <Sidebar
-                    sidebarOpen={sidebarOpen}
-                    connection={connection}
-                    tables={tables}
-                    savedConnections={savedConnections}
-                    onSwitchConnection={handleSwitchConnectionWrapper}
-                    onTableClick={handleTableClick}
-                    onAddConnection={() => setShowNewConnModal(true)}
-                    onGetTableSchema={handleGetTableSchema}
-                    onEditTableSchema={handleEditTableSchema}
-                    onDuplicateTable={handleDuplicateTable}
-                    onTruncateTable={handleTruncateTable}
-                    onDropTable={handleDropTable}
-                    savedQueries={savedQueries}
-                    savedFunctions={savedFunctions}
-                    onQueryClick={handleOpenSavedQuery}
-                    onFunctionClick={handleExecuteFunction}
-                    onDeleteQuery={handleDeleteQuery}
-                    onDeleteFunction={handleDeleteFunction}
-                    onEditFunction={handleEditFunction}
-                />
+            // Navbar Actions
+            handleAddTableTab={handleAddTableTab}
+            handleAddQuery={handleAddQuery}
+            handleOpenLogs={handleOpenLogs}
+            handleOpenEditWindow={handleOpenInsertSidebar}
+            handleOpenSchema={handleOpenSchema}
+            onRefresh={handleRefresh}
 
-                <div className={styles.content}>
-                    <TabBar
-                        tabs={tabs}
-                        activeTabId={activeTabId}
-                        onTabClick={setActiveTabId}
-                        onTabClose={closeTab}
-                        onTabDoubleClick={pinTab}
-                        onDragEnd={handleDragEnd}
-                        tags={tags}
-                        tableTags={tableTags}
-                    />
+            // Sidebar Props
+            tables={tables}
+            tags={tags}
+            tableTags={tableTags}
+            onSwitchConnection={handleSwitchConnectionWrapper}
+            onTableClick={handleTableClick}
+            onAddConnection={() => setShowNewConnModal(true)}
+            onGetTableSchema={handleGetTableSchema}
+            onEditTableSchema={handleEditTableSchema}
+            onDuplicateTable={handleDuplicateTable}
+            onTruncateTable={handleTruncateTable}
+            onDropTable={handleDropTable}
+            savedQueries={savedQueries}
+            savedFunctions={savedFunctions}
+            savedConnections={savedConnections}
+            onQueryClick={handleOpenSavedQuery}
+            onFunctionClick={handleExecuteFunction}
+            onDeleteQuery={handleDeleteQuery}
+            onDeleteFunction={handleDeleteFunction}
+            onEditFunction={handleEditFunction}
 
-                    <div className={styles.mainView}>
-                        <MainViewContent
-                            activeTab={activeTab}
-                            activeTabId={activeTabId}
-                            tabs={tabs}
-                            results={results}
-                            selectedIndices={selectedIndices}
-                            setSelectedIndices={setSelectedIndices}
-                            paginationMap={paginationMap}
-                            setPaginationMap={setPaginationMap}
-                            pendingChanges={pendingChanges}
-                            setPendingChanges={setPendingChanges}
-                            highlightRowIndex={highlightRowIndex}
-                            tableSchemas={tableSchemas}
-                            activeDropdown={activeDropdown}
-                            setActiveDropdown={setActiveDropdown}
-                            logs={logs}
-                            tables={tables}
-                            theme={theme}
-                            tableCreatorStates={tableCreatorStates}
-                            originalSchemas={originalSchemas}
-                            setTableCreatorStates={setTableCreatorStates}
-                            connectionString={connection.connection_string}
-                            tabQueries={tabQueries}
-                            setTabQueries={setTabQueries}
-                            resultsVisible={resultsVisible}
-                            resultsHeight={resultsHeight}
-                            isResizing={isResizing}
-                            toggleResults={toggleResults}
-                            startResizing={startResizing}
-                            onInsertRow={handleInsertRow}
-                            onDeleteRows={handleDeleteRows}
-                            onCopy={handleCopy}
-                            onExport={handleExport}
-                            fetchTableData={fetchTableData}
-                            setSortState={setSortState}
-                            onCellEdit={handleCellEdit}
-                            onRowDelete={handleRowDelete}
-                            onRunQuery={handleRunQuery}
-                            onTableClick={handleTableClick}
-                            onTableCreated={handleTableCreated}
-                            setShowChangelog={setShowChangelog}
-                            handleAddQuery={handleAddQuery}
-                            handleSaveQuery={() => setSaveModal({ type: 'query' })}
-                            handleSaveFunction={() => setSaveModal({ type: 'function' })}
-                            handleUpdateQuery={tabs.find(t => t.id === activeTabId)?.savedQueryId ? handleUpdateQuery : undefined}
-                            handleUpdateFunction={tabs.find(t => t.id === activeTabId)?.savedFunctionId ? handleUpdateFunction : undefined}
-                            handleExportQuery={handleExportQuery}
-                            handleSort={handleSort}
-                            handleRefresh={handleRefresh}
-                            setIsCapturing={setIsCapturing}
-                            addToast={addToast}
-                        />
-                    </div>
-                </div>
-                <ChangelogSidebar
-                    isOpen={showChangelog}
-                    onClose={() => setShowChangelog(false)}
-                    changes={pendingChanges}
-                    tabs={tabs}
-                    onConfirm={handleConfirmChanges}
-                    onDiscard={handleDiscardChanges}
-                    onRevert={handleRevertChange}
-                    onNavigate={handleNavigateToChangeWrapper}
-                />
-            </div>
+            // TabBar Props
+            setActiveTabId={setActiveTabId}
+            closeTab={closeTab}
+            pinTab={pinTab}
+            handleDragEnd={handleDragEnd}
 
-        </div>
+            // MainViewContent Props
+            results={results}
+            selectedIndices={selectedIndices}
+            setSelectedIndices={setSelectedIndices}
+            paginationMap={paginationMap}
+            setPaginationMap={setPaginationMap}
+            pendingChanges={pendingChanges}
+            setPendingChanges={setPendingChanges}
+            highlightRowIndex={highlightRowIndex}
+            tableSchemas={tableSchemas}
+            activeDropdown={activeDropdown}
+            setActiveDropdown={setActiveDropdown}
+            logs={logs}
+            tableCreatorStates={tableCreatorStates}
+            originalSchemas={originalSchemas}
+            setTableCreatorStates={setTableCreatorStates}
+            tabQueries={tabQueries}
+            setTabQueries={setTabQueries}
+            resultsVisible={resultsVisible}
+            resultsHeight={resultsHeight}
+            isResizing={isResizing}
+            toggleResults={toggleResults}
+            startResizing={startResizing}
+            handleInsertRow={handleInsertRow}
+            handleDeleteRows={handleDeleteRows}
+            handleCopy={handleCopy}
+            handleExport={handleExport}
+            fetchTableData={fetchTableData}
+            setSortState={setSortState}
+            handleCellEdit={handleCellEdit}
+            handleRowDelete={handleRowDelete}
+            handleRunQuery={runQuery}
+            handleTableCreated={handleTableCreated}
+            handleSaveQuery={() => setSaveModal({ type: 'query' })}
+            handleSaveFunction={() => setSaveModal({ type: 'function' })}
+            handleUpdateQuery={tabs.find(t => t.id === activeTabId)?.savedQueryId ? handleUpdateQuery : undefined}
+            handleUpdateFunction={tabs.find(t => t.id === activeTabId)?.savedFunctionId ? handleUpdateFunction : undefined}
+            handleExportQuery={handleExportQuery}
+            handleSort={handleSort}
+            setIsCapturing={setIsCapturing}
+            addToast={addToast}
+
+            // Changelog Actions
+            handleConfirmChanges={handleConfirmChanges}
+            handleDiscardChanges={handleDiscardChanges}
+            handleRevertChange={handleRevertChange}
+            handleNavigateToChange={handleNavigateToChangeWrapper}
+
+            // Modals props
+            tableConfirmModal={tableConfirmModal}
+            setTableConfirmModal={setTableConfirmModal}
+            confirmTableOperation={confirmTableOperation}
+            duplicateTableModal={duplicateTableModal}
+            setDuplicateTableModal={setDuplicateTableModal}
+            confirmDuplicateTable={confirmDuplicateTable}
+
+            // ModalManager Props
+            saveModal={saveModal}
+            setSaveModal={setSaveModal}
+            showNewConnModal={showNewConnModal}
+            setShowNewConnModal={setShowNewConnModal}
+            showEditWindow={showEditWindow}
+            setShowEditWindow={setShowEditWindow}
+            renderEditWindow={renderEditWindow}
+            setRenderEditWindow={setRenderEditWindow}
+            panelColumns={panelColumns}
+            editData={editData}
+            setEditData={setEditData}
+            handlePanelSubmit={handlePanelSubmit}
+            saveQuery={handleSaveQuery}
+            saveFunction={handleSaveFunction}
+            showPreferences={showPreferences}
+
+            // Misc
+            isCapturing={isCapturing}
+            toasts={toasts}
+            onDismissToast={dismissToast}
+        />
     );
 };

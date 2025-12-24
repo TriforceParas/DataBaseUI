@@ -1,7 +1,7 @@
 import React from 'react';
 import { QueryEditor } from '../editors';
 import { ResultsPane } from '../layout';
-import { Tab, TableDataState, PendingChange, PaginationState } from '../../types';
+import { Tab, TableDataState, PendingChange, PaginationState } from '../../types/index';
 
 interface QueryViewProps {
     activeTab: Tab;
@@ -12,7 +12,7 @@ interface QueryViewProps {
     setSelectedIndices: (indices: Set<number> | ((prev: Set<number>) => Set<number>)) => void;
     onCopy: (format: 'CSV' | 'JSON') => void;
     onExport: (format: 'CSV' | 'JSON') => void;
-    theme: 'blue' | 'gray' | 'amoled' | 'light';
+    theme: string;
     tables: string[];
     onSaveQuery: () => void;
     onSaveFunction: () => void;
@@ -27,7 +27,7 @@ interface QueryViewProps {
     isResizing: boolean;
     paginationMap: Record<string, PaginationState>;
     toggleResults: () => void;
-    startResizing: () => void;
+    startResizing: (e: React.MouseEvent) => void;
     onRefresh: () => void;
     onPageChange: (p: number) => void;
     onPageSizeChange: (s: number) => void;

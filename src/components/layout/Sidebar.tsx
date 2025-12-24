@@ -1,10 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import styles from '../../../styles/MainLayout.module.css';
-import { Connection, Tag, TableTag, SavedQuery, SavedFunction } from '../../../types';
-import { ChevronDown, ChevronRight, Table, Check, Plus, Trash2, Folder, Pencil, Copy, FileText, AlertTriangle, Code2, FunctionSquare } from 'lucide-react';
+import styles from '../../styles/MainLayout.module.css';
+import { Connection, Tag, TableTag, SavedQuery, SavedFunction } from '../../types/index';
+import { Icons } from '../../assets/icons';
 import { invoke } from '@tauri-apps/api/core';
 import { TagManager } from './TagManager';
-import { ConfirmModal } from '../../modals/ConfirmModal';
+import { ConfirmModal } from '../modals/ConfirmModal';
 import { DndContext, useDraggable, useDroppable, DragEndEvent, useSensor, useSensors, PointerSensor, KeyboardSensor } from '@dnd-kit/core';
 
 interface SidebarProps {
@@ -83,11 +83,11 @@ const DraggableTableItem = ({
     } : undefined;
 
     const menuItems = [
-        { label: 'Get Table Schema', icon: <FileText size={14} />, action: () => onGetSchema?.(table) },
-        { label: 'Edit Table Schema', icon: <Pencil size={14} />, action: () => onEditSchema?.(table) },
-        { label: 'Duplicate Table', icon: <Copy size={14} />, action: () => onDuplicate?.(table) },
-        { label: 'Truncate Table', icon: <AlertTriangle size={14} />, action: () => onTruncate?.(table), danger: true },
-        { label: 'Drop Table', icon: <Trash2 size={14} />, action: () => onDrop?.(table), danger: true },
+        { label: 'Get Table Schema', icon: <Icons.FileText size={14} />, action: () => onGetSchema?.(table) },
+        { label: 'Edit Table Schema', icon: <Icons.Pencil size={14} />, action: () => onEditSchema?.(table) },
+        { label: 'Duplicate Table', icon: <Icons.Copy size={14} />, action: () => onDuplicate?.(table) },
+        { label: 'Truncate Table', icon: <Icons.AlertCircle size={14} />, action: () => onTruncate?.(table), danger: true },
+        { label: 'Drop Table', icon: <Icons.Trash2 size={14} />, action: () => onDrop?.(table), danger: true },
     ];
 
     return (
@@ -112,7 +112,7 @@ const DraggableTableItem = ({
                 onMouseEnter={() => setIsHovered(true)}
                 onMouseLeave={() => setIsHovered(false)}
             >
-                <Table size={14} style={{ marginRight: '0.5rem', opacity: 0.7 }} />
+                <Icons.Table size={14} style={{ marginRight: '0.5rem', opacity: 0.7 }} />
                 {table}
             </div>
 
@@ -241,7 +241,7 @@ const SavedItemWithContextMenu = ({
                             onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--bg-tertiary)'}
                             onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
                         >
-                            <Pencil size={14} /> Edit
+                            <Icons.Pencil size={14} /> Edit
                         </div>
                     )}
                     <div
@@ -259,7 +259,7 @@ const SavedItemWithContextMenu = ({
                         onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--bg-tertiary)'}
                         onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
                     >
-                        <Trash2 size={14} /> Delete
+                        <Icons.Trash2 size={14} /> Delete
                     </div>
                 </div>
             )}
@@ -310,7 +310,7 @@ const CollapsibleSection = ({
                     ...headerStyle
                 }}
             >
-                {isOpen ? <ChevronDown size={14} style={{ marginRight: '0.5rem', opacity: 0.7 }} /> : <ChevronRight size={14} style={{ marginRight: '0.5rem', opacity: 0.7 }} />}
+                {isOpen ? <Icons.ChevronDown size={14} style={{ marginRight: '0.5rem', opacity: 0.7 }} /> : <Icons.ChevronRight size={14} style={{ marginRight: '0.5rem', opacity: 0.7 }} />}
                 {icon && <span style={{ marginRight: '0.5rem', display: 'flex' }}>{icon}</span>}
                 <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{title}</span>
                 {count !== undefined && <span style={{ marginLeft: 'auto', opacity: 0.5, fontSize: '0.75rem' }}>{count}</span>}
@@ -392,7 +392,7 @@ const TagGroup = ({
                     userSelect: 'none'
                 }}
             >
-                {isOpen ? <ChevronDown size={14} style={{ marginRight: '0.5rem', opacity: 0.7 }} /> : <ChevronRight size={14} style={{ marginRight: '0.5rem', opacity: 0.7 }} />}
+                {isOpen ? <Icons.ChevronDown size={14} style={{ marginRight: '0.5rem', opacity: 0.7 }} /> : <Icons.ChevronRight size={14} style={{ marginRight: '0.5rem', opacity: 0.7 }} />}
                 <div style={{ width: 10, height: 10, borderRadius: '50%', backgroundColor: color || '#64748b', marginRight: '0.6rem' }}></div>
                 <span style={{ flex: 1 }}>{tag ? tag.name : 'Untagged Tables'}</span>
                 <span style={{ marginLeft: 'auto', opacity: 0.5, fontSize: '0.75rem' }}>{tables.length}</span>
@@ -429,7 +429,7 @@ const TagGroup = ({
                         onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--bg-tertiary)'}
                         onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
                     >
-                        <Pencil size={14} /> Edit
+                        <Icons.Pencil size={14} /> Edit
                     </div>
                     <div
                         onClick={() => { onDeleteTag?.(tag); setContextMenu(null); }}
@@ -445,7 +445,7 @@ const TagGroup = ({
                         onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--bg-tertiary)'}
                         onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
                     >
-                        <Trash2 size={14} /> Delete
+                        <Icons.Trash2 size={14} /> Delete
                     </div>
                 </div>
             )}
@@ -633,7 +633,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 <span style={{ fontWeight: 600, fontSize: '1rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginRight: '0.5rem' }}>
                     {connection.name}
                 </span>
-                <ChevronDown size={14} style={{ opacity: 0.5 }} />
+                <Icons.ChevronDown size={14} style={{ opacity: 0.5 }} />
 
                 {/* Connection Dropdown */}
                 {showConnDropdown && (
@@ -676,7 +676,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                                 onClick={(e) => { e.stopPropagation(); onSwitchConnection(conn); setShowConnDropdown(false); }}
                             >
                                 {conn.name}
-                                {conn.id === connection.id && <Check size={14} />}
+                                {conn.id === connection.id && <Icons.Check size={14} />}
                             </div>
                         ))}
                         <div
@@ -692,7 +692,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                             }}
                             onClick={(e) => { e.stopPropagation(); onAddConnection(); setShowConnDropdown(false); }}
                         >
-                            <Plus size={14} /> New Connection
+                            <Icons.Plus size={14} /> New Connection
                         </div>
                     </div>
                 )}
@@ -716,7 +716,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                         <CollapsibleSection
                             title="Tables"
                             count={tables.length}
-                            icon={<Folder size={14} color="#64748b" />}
+                            icon={<Icons.Folder size={14} color="#64748b" />}
                             isOpen={expandedSections.has('az-tables')}
                             onToggle={() => toggleSection('az-tables')}
                         >
@@ -744,7 +744,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                         <CollapsibleSection
                             title="Queries"
                             count={savedQueries.length}
-                            icon={<Code2 size={14} color="#8b5cf6" />}
+                            icon={<Icons.FileCode size={14} color="#8b5cf6" />}
                             isOpen={expandedSections.has('az-queries')}
                             onToggle={() => toggleSection('az-queries')}
                         >
@@ -753,7 +753,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                                     <SavedItemWithContextMenu
                                         key={query.id}
                                         name={query.name}
-                                        icon={<Code2 size={14} color="#8b5cf6" />}
+                                        icon={<Icons.FileCode size={14} color="#8b5cf6" />}
                                         onClick={() => onQueryClick?.(query)}
                                         onDelete={() => onDeleteQuery?.(query.id)}
                                     />
@@ -766,7 +766,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                         <CollapsibleSection
                             title="Functions"
                             count={savedFunctions.length}
-                            icon={<FunctionSquare size={14} color="#f59e0b" />}
+                            icon={<Icons.FileCode size={14} color="#f59e0b" />}
                             isOpen={expandedSections.has('az-functions')}
                             onToggle={() => toggleSection('az-functions')}
                         >
@@ -775,7 +775,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                                     <SavedItemWithContextMenu
                                         key={func.id}
                                         name={func.name}
-                                        icon={<FunctionSquare size={14} color="#f59e0b" />}
+                                        icon={<Icons.FileCode size={14} color="#f59e0b" />}
                                         onClick={() => onFunctionClick?.(func)}
                                         onDelete={() => onDeleteFunction?.(func.id)}
                                         onEdit={() => onEditFunction?.(func)}

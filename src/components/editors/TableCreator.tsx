@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import styles from '../../styles/TableCreator.module.css';
 import { Plus, Trash2, Key, X, Save, Fingerprint, RotateCcw } from 'lucide-react';
+import { PendingChange } from '../../types/index';
 
 export interface ColumnDef {
     name: string;
@@ -27,7 +28,7 @@ export interface TableCreatorState {
     columns: ColumnDef[];
     foreignKeys: ForeignKeyDef[];
 }
-import { PendingChange } from '../../types';
+
 
 interface TableCreatorProps {
     connectionString: string;
@@ -46,7 +47,7 @@ const DEFAULT_STATE: TableCreatorState = {
     foreignKeys: []
 };
 
-export const TableCreator: React.FC<TableCreatorProps> = ({ connectionString, onSuccess, mode = 'create', initialState, onStateChange, originalColumns, onSchemaChange, tabId }) => {
+export const TableCreator: React.FC<TableCreatorProps> = ({ connectionString, onSuccess, mode = 'create', initialState, onStateChange, originalColumns, onSchemaChange }) => {
     const [tableName, setTableName] = useState(initialState?.tableName ?? DEFAULT_STATE.tableName);
     const [columns, setColumns] = useState<ColumnDef[]>(initialState?.columns ?? DEFAULT_STATE.columns);
     const [foreignKeys, setForeignKeys] = useState<ForeignKeyDef[]>(initialState?.foreignKeys ?? DEFAULT_STATE.foreignKeys);

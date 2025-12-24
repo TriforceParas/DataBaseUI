@@ -1,6 +1,6 @@
 import React from 'react';
-import { DataGrid } from '../DataGrid';
-import { TableDataState } from '../../types';
+import { DataGrid } from '../datagrid/DataGrid';
+import { TableDataState } from '../../types/index';
 
 interface FunctionOutputViewProps {
     tabId: string;

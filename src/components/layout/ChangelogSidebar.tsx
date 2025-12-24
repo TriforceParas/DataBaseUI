@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
-import { PendingChange } from '../../../types';
+import type { PendingChange } from '../../types/index';
 import { Check, Trash2, Undo2 } from 'lucide-react';
-import styles from '../../../styles/MainLayout.module.css';
+import styles from '../../styles/MainLayout.module.css';
 
 interface ChangelogSidebarProps {
     isOpen: boolean;

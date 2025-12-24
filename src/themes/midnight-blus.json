@@ -1,0 +1,20 @@
+{
+    "name": "Midnight Blues",
+    "id": "midnight-blues",
+    "type": "dark",
+    "colors": {
+        "bg-primary": "#0f111a",
+        "bg-secondary": "#1a1d2d",
+        "bg-tertiary": "#25293a",
+        "accent-primary": "#6366f1",
+        "accent-secondary": "#818cf8",
+        "accent-hover": "#4f46e5",
+        "text-primary": "#f8fafc",
+        "text-secondary": "#94a3b8",
+        "text-muted": "#64748b",
+        "border-color": "#334155",
+        "input-bg": "#1e293b",
+        "success": "#10b981",
+        "error": "#ef4444"
+    }
+}

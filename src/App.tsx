@@ -1,9 +1,10 @@
 import { useState, useEffect } from "react";
-import { invoke } from "@tauri-apps/api/core";
 import { WelcomeScreen } from "./components/WelcomeScreen";
 import { MainInterface } from "./components/MainInterface";
-import { FullscreenLoader } from "./components/FullscreenLoader";
-import { Connection } from "./types";
+import { FullscreenLoader } from "./components/common/FullscreenLoader";
+import { Connection } from "./types/index";
+import { applyTheme, getSavedTheme } from "./utils/themeUtils";
+import * as api from "./api";
 
 function App() {
   const [activeConnection, setActiveConnection] = useState<Connection | null>(null);
@@ -11,8 +12,8 @@ function App() {
 
   useEffect(() => {
     // Apply theme immediately on load
-    const savedTheme = localStorage.getItem('app-theme') || 'blue';
-    document.documentElement.dataset.theme = savedTheme;
+    const savedTheme = getSavedTheme();
+    applyTheme(savedTheme);
 
     const init = async () => {
       const params = new URLSearchParams(window.location.search);
@@ -20,7 +21,7 @@ function App() {
 
       if (connId) {
         try {
-          const connections = await invoke<Connection[]>('list_connections');
+          const connections = await api.listConnections();
           const target = connections.find(c => c.id === Number(connId));
           if (target) {
             setActiveConnection(target);
@@ -36,7 +37,7 @@ function App() {
 
   const handleOpenConnection = async (conn: Connection) => {
     try {
-      await invoke('open_connection_window', { connectionId: conn.id });
+      await api.openConnectionWindow(conn.id);
     } catch (e) {
       console.error("Failed to open connection window", e);
     }

@@ -1,13 +1,12 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Connection } from '../types';
-
-type Theme = 'blue' | 'gray' | 'amoled' | 'light';
+import { Connection } from '../types/index';
+import { THEMES, applyTheme, getSavedTheme } from '../utils/themeUtils';
 
 interface UseAppSystemReturn {
     sidebarOpen: boolean;
     setSidebarOpen: React.Dispatch<React.SetStateAction<boolean>>;
-    theme: Theme;
-    setTheme: React.Dispatch<React.SetStateAction<Theme>>;
+    theme: string;
+    setTheme: React.Dispatch<React.SetStateAction<string>>;
     zoom: number;
     setZoom: React.Dispatch<React.SetStateAction<number>>;
     showDbMenu: boolean;
@@ -15,6 +14,7 @@ interface UseAppSystemReturn {
     isCapturing: boolean;
     setIsCapturing: React.Dispatch<React.SetStateAction<boolean>>;
     handleZoom: (delta: number) => void;
+    availableThemes: { id: string, name: string, colors: { bg: string, text: string, accent: string } }[];
 }
 
 export const useAppSystem = (connection: Connection): UseAppSystemReturn => {
@@ -23,10 +23,7 @@ export const useAppSystem = (connection: Connection): UseAppSystemReturn => {
     const [isCapturing, setIsCapturing] = useState(false);
 
     // Preference State - Load from localStorage
-    const [theme, setTheme] = useState<Theme>(() => {
-        const saved = localStorage.getItem('app-theme');
-        return (saved as Theme) || 'blue';
-    });
+    const [theme, setTheme] = useState<string>(getSavedTheme);
     const [zoom, setZoom] = useState(() => {
         const saved = localStorage.getItem('app-zoom');
         return saved ? parseFloat(saved) : 1;
@@ -45,8 +42,7 @@ export const useAppSystem = (connection: Connection): UseAppSystemReturn => {
 
     // Save and apply theme
     useEffect(() => {
-        document.documentElement.dataset.theme = theme;
-        localStorage.setItem('app-theme', theme);
+        applyTheme(theme);
     }, [theme]);
 
     // Save zoom
@@ -104,6 +100,15 @@ export const useAppSystem = (connection: Connection): UseAppSystemReturn => {
         setShowDbMenu,
         isCapturing,
         setIsCapturing,
-        handleZoom
+        handleZoom,
+        availableThemes: Object.values(THEMES).map((t: any) => ({
+            id: t.id,
+            name: t.name,
+            colors: {
+                bg: t.colors['bg-primary'],
+                text: t.colors['text-primary'],
+                accent: t.colors['accent-primary']
+            }
+        }))
     };
 };

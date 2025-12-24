@@ -1,6 +1,6 @@
 
 import { useState } from 'react';
-import { LogEntry } from '../types';
+import { LogEntry } from '../types/index';
 
 export const useSystemLogs = () => {
     const [logs, setLogs] = useState<LogEntry[]>([]);

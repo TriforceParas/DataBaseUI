@@ -5,13 +5,14 @@ import { ZoomIn, ZoomOut, X } from 'lucide-react';
 interface PreferencesModalProps {
     isOpen: boolean;
     onClose: () => void;
-    theme: 'blue' | 'gray' | 'amoled' | 'light';
-    setTheme: (t: 'blue' | 'gray' | 'amoled' | 'light') => void;
+    theme: string;
+    setTheme: (t: string) => void;
     zoom: number;
     setZoom: (z: number) => void;
+    availableThemes: { id: string, name: string, colors: { bg: string, text: string, accent: string } }[];
 }
 
-export const PreferencesModal: React.FC<PreferencesModalProps> = ({ isOpen, onClose, theme, setTheme, zoom, setZoom }) => {
+export const PreferencesModal: React.FC<PreferencesModalProps> = ({ isOpen, onClose, theme, setTheme, zoom, setZoom, availableThemes }) => {
     if (!isOpen) return null;
 
     const handleZoom = (delta: number) => {
@@ -29,23 +30,26 @@ export const PreferencesModal: React.FC<PreferencesModalProps> = ({ isOpen, onCl
                 <div style={{ marginBottom: '1.5rem' }}>
                     <h3 style={{ fontSize: '0.9rem', color: 'var(--text-secondary)', marginBottom: '0.8rem', textTransform: 'uppercase' }}>Theme</h3>
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.8rem' }}>
-                        {[
-                            { id: 'blue', label: 'Midnight Blue', color: '#0f111a' },
-                            { id: 'gray', label: 'Dark', color: '#202020' },
-                            { id: 'amoled', label: 'AMOLED', color: '#000' },
-                            { id: 'light', label: 'Light', color: '#fff' }
-                        ].map(t => (
+                        {availableThemes.map(t => (
                             <div
                                 key={t.id}
-                                onClick={() => setTheme(t.id as any)}
+                                onClick={() => setTheme(t.id)}
                                 style={{
-                                    padding: '0.8rem', borderRadius: '6px', border: `2px solid ${theme === t.id ? 'var(--accent-primary)' : 'var(--border-color)'}`,
-                                    cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.9rem',
-                                    backgroundColor: t.color, color: t.id === 'light' ? '#000' : '#fff'
+                                    padding: '0.8rem',
+                                    borderRadius: '6px',
+                                    border: `2px solid ${theme === t.id ? t.colors.accent : 'var(--border-color)'}`,
+                                    cursor: 'pointer',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: '8px',
+                                    fontSize: '0.9rem',
+                                    backgroundColor: t.colors.bg,
+                                    color: t.colors.text,
+                                    transition: 'all 0.2s ease'
                                 }}
                             >
-                                {theme === t.id && <div style={{ width: 8, height: 8, borderRadius: '50%', background: 'var(--accent-primary)' }} />}
-                                {t.label}
+                                {theme === t.id && <div style={{ width: 8, height: 8, borderRadius: '50%', background: t.colors.accent }} />}
+                                {t.name}
                             </div>
                         ))}
                     </div>

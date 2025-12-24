@@ -1,0 +1,20 @@
+{
+    "name": "Olive Grove",
+    "id": "olive-grove",
+    "type": "dark",
+    "colors": {
+        "bg-primary": "#1a1c12",
+        "bg-secondary": "#25281a",
+        "bg-tertiary": "#363a26",
+        "accent-primary": "#a3a948",
+        "accent-secondary": "#c6cc6b",
+        "accent-hover": "#808630",
+        "text-primary": "#f2f3e8",
+        "text-secondary": "#c2c79a",
+        "text-muted": "#a3a94880",
+        "border-color": "#42462e",
+        "input-bg": "#25281a",
+        "success": "#859900",
+        "error": "#dc322f"
+    }
+}

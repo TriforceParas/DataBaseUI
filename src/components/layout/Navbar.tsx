@@ -58,7 +58,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                         <div
                             className={styles.dropdownMenu}
                             data-dropdown="true" // Mark as dropdown content
-                            style={{ position: 'absolute', top: '100%', left: 0, zIndex: 200, backgroundColor: 'var(--bg-secondary)', border: '1px solid var(--border-color)', borderRadius: '6px', marginTop: '8px', boxShadow: 'var(--shadow-lg)', minWidth: '150px', padding: '0.4rem' }}
+                            style={{ position: 'absolute', top: '100%', left: 0, zIndex: 200, backgroundColor: 'var(--bg-secondary)', border: '1px solid var(--border-color)', borderRadius: '6px', marginTop: '8px', boxShadow: 'var(--shadow-lg)', minWidth: '150px', padding: '0.4rem', userSelect: 'none' }}
                         >
                             <div
                                 className={styles.dropdownItem}

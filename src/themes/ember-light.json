@@ -1,0 +1,20 @@
+{
+    "name": "Ember (Light)",
+    "id": "ember-light",
+    "type": "light",
+    "colors": {
+        "bg-primary": "#fffaf5",
+        "bg-secondary": "#fff1e6",
+        "bg-tertiary": "#ffe4cc",
+        "accent-primary": "#f97316",
+        "accent-secondary": "#ea580c",
+        "accent-hover": "#c2410c",
+        "text-primary": "#431407",
+        "text-secondary": "#7c2d12",
+        "text-muted": "#f9731699",
+        "border-color": "#fed7aa",
+        "input-bg": "#fffaf5",
+        "success": "#16a34a",
+        "error": "#dc2626"
+    }
+}

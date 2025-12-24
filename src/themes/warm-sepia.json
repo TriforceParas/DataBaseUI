@@ -1,0 +1,20 @@
+{
+    "name": "Warm / Sepia",
+    "id": "warm-sepia",
+    "type": "light",
+    "colors": {
+        "bg-primary": "#fdf6e3",
+        "bg-secondary": "#eee8d5",
+        "bg-tertiary": "#e3dbbf",
+        "accent-primary": "#b58900",
+        "accent-secondary": "#cb4b16",
+        "accent-hover": "#946f00",
+        "text-primary": "#586e75",
+        "text-secondary": "#657b83",
+        "text-muted": "#839496",
+        "border-color": "#dcd3b6",
+        "input-bg": "#fdf6e3",
+        "success": "#859900",
+        "error": "#dc322f"
+    }
+}

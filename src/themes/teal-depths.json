@@ -1,0 +1,20 @@
+{
+    "name": "Teal Depths",
+    "id": "teal-depths",
+    "type": "dark",
+    "colors": {
+        "bg-primary": "#042f2e",
+        "bg-secondary": "#0d4d4a",
+        "bg-tertiary": "#134e4a",
+        "accent-primary": "#2dd4bf",
+        "accent-secondary": "#5eead4",
+        "accent-hover": "#14b8a6",
+        "text-primary": "#f0fdfa",
+        "text-secondary": "#99f6e4",
+        "text-muted": "#2dd4bf80",
+        "border-color": "#115e59",
+        "input-bg": "#0d4d4a",
+        "success": "#10b981",
+        "error": "#ef4444"
+    }
+}

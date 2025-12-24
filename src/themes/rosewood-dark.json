@@ -1,0 +1,20 @@
+{
+    "name": "Rosewood (Dark)",
+    "id": "rosewood-dark",
+    "type": "dark",
+    "colors": {
+        "bg-primary": "#18080e",
+        "bg-secondary": "#241017",
+        "bg-tertiary": "#321a22",
+        "accent-primary": "#a64a75",
+        "accent-secondary": "#c26d94",
+        "accent-hover": "#8a3d61",
+        "text-primary": "#fcecf2",
+        "text-secondary": "#d9b8c7",
+        "text-muted": "#a64a7580",
+        "border-color": "#40252c",
+        "input-bg": "#241017",
+        "success": "#10b981",
+        "error": "#ef4444"
+    }
+}

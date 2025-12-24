@@ -1,0 +1,20 @@
+{
+    "name": "Slate Blue",
+    "id": "slate-blue",
+    "type": "dark",
+    "colors": {
+        "bg-primary": "#0f172a",
+        "bg-secondary": "#1e293b",
+        "bg-tertiary": "#334155",
+        "accent-primary": "#60a5fa",
+        "accent-secondary": "#93c5fd",
+        "accent-hover": "#3b82f6",
+        "text-primary": "#f1f5f9",
+        "text-secondary": "#cbd5e1",
+        "text-muted": "#64748b",
+        "border-color": "#334155",
+        "input-bg": "#1e293b",
+        "success": "#10b981",
+        "error": "#ef4444"
+    }
+}

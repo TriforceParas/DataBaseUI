@@ -1,0 +1,20 @@
+{
+    "name": "Oxblood",
+    "id": "oxblood",
+    "type": "dark",
+    "colors": {
+        "bg-primary": "#1a0505",
+        "bg-secondary": "#2d0a0a",
+        "bg-tertiary": "#3d0f0f",
+        "accent-primary": "#ff4d4d",
+        "accent-secondary": "#ff8080",
+        "accent-hover": "#cc0000",
+        "text-primary": "#f5f5dc",
+        "text-secondary": "#d2b48c",
+        "text-muted": "#8b4513",
+        "border-color": "#4d1a1a",
+        "input-bg": "#2d0a0a",
+        "success": "#22c55e",
+        "error": "#ef4444"
+    }
+}

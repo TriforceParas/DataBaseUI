@@ -1,0 +1,20 @@
+{
+    "name": "Slate Blue (Light)",
+    "id": "slate-blue-light",
+    "type": "light",
+    "colors": {
+        "bg-primary": "#f1f5f9",
+        "bg-secondary": "#e2e8f0",
+        "bg-tertiary": "#cbd5e1",
+        "accent-primary": "#2563eb",
+        "accent-secondary": "#3b82f6",
+        "accent-hover": "#1d4ed8",
+        "text-primary": "#0f172a",
+        "text-secondary": "#334155",
+        "text-muted": "#64748b",
+        "border-color": "#cbd5e1",
+        "input-bg": "#f1f5f9",
+        "success": "#16a34a",
+        "error": "#dc2626"
+    }
+}

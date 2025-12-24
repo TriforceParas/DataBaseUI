@@ -36,6 +36,7 @@
     background: transparent;
     border: none;
     cursor: pointer;
+    user-select: none;
 }
 
 .iconBtn:hover {
@@ -64,6 +65,7 @@
     padding: 0 0.75rem;
     font-size: 0.85rem;
     font-weight: 500;
+    user-select: none;
 }
 
 .outlineBtn:hover {
@@ -81,6 +83,7 @@
     justify-content: space-between;
     cursor: pointer;
     color: var(--text-primary);
+    user-select: none;
 }
 
 .sidebarConnection:hover {
@@ -110,6 +113,7 @@
     font-size: 0.75rem;
     cursor: pointer;
     border-radius: 2px;
+    user-select: none;
 }
 
 .filterBtnActive {
@@ -155,13 +159,14 @@
     cursor: pointer;
     background: transparent;
     color: var(--text-primary);
+    user-select: none;
 }
 
 .tabsContainer {
     flex: 1;
     display: flex;
     overflow-x: auto;
-    }
+}
 
 .tabsContainer::-webkit-scrollbar {
     height: 2px;
@@ -189,6 +194,7 @@
     color: var(--text-secondary);
     white-space: nowrap;
     border: 1px solid transparent;
+    user-select: none;
 }
 
 .tab:hover {
@@ -212,6 +218,7 @@
     line-height: 0.5;
     margin-left: 5px;
     opacity: 0.5;
+    user-select: none;
 }
 
 .tabClose:hover {
@@ -249,6 +256,7 @@
 .toolbarBtn {
     background: transparent;
     border: none;
+    user-select: none;
     color: var(--text-primary);
     display: flex;
     align-items: center;
@@ -260,6 +268,24 @@
 }
 
 .toolbarBtn:hover {
+    background-color: var(--bg-tertiary);
+}
+
+.secondaryBtn {
+    background: transparent;
+    border: 1px solid var(--border-color);
+    color: var(--text-primary);
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    padding: 0.4rem 0.8rem;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 0.9rem;
+    user-select: none;
+}
+
+.secondaryBtn:hover {
     background-color: var(--bg-tertiary);
 }
 
@@ -345,6 +371,7 @@
     transition: width 0.3s ease;
     overflow: hidden;
     white-space: nowrap;
+    user-select: none;
 }
 
 .sidebar>* {
@@ -381,6 +408,7 @@
     border-radius: var(--radius-sm);
     color: var(--text-secondary);
     font-size: 0.9rem;
+    user-select: none;
 }
 
 .tableItem:hover {
@@ -502,6 +530,7 @@
         transform: translateX(0);
     }
 }
+
 .statusBar {
     height: 28px;
     background-color: var(--bg-tertiary);

@@ -1,0 +1,20 @@
+{
+    "name": "Cyan Frost",
+    "id": "cyan-frost",
+    "type": "dark",
+    "colors": {
+        "bg-primary": "#05161a",
+        "bg-secondary": "#072e33",
+        "bg-tertiary": "#0c7075",
+        "accent-primary": "#05d9e8",
+        "accent-secondary": "#00ffff",
+        "accent-hover": "#29b6f6",
+        "text-primary": "#e4f1fe",
+        "text-secondary": "#6495ed",
+        "text-muted": "#05d9e880",
+        "border-color": "#05445e",
+        "input-bg": "#072e33",
+        "success": "#00ffcc",
+        "error": "#ff4d4d"
+    }
+}

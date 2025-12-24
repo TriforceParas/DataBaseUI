@@ -1,0 +1,20 @@
+{
+    "name": "Forest Green (Light)",
+    "id": "forest-green-light",
+    "type": "light",
+    "colors": {
+        "bg-primary": "#f1f7f4",
+        "bg-secondary": "#e2ede7",
+        "bg-tertiary": "#d4e3db",
+        "accent-primary": "#166534",
+        "accent-secondary": "#15803d",
+        "accent-hover": "#14532d",
+        "text-primary": "#052e16",
+        "text-secondary": "#14532d",
+        "text-muted": "#16653499",
+        "border-color": "#b7cfc1",
+        "input-bg": "#f1f7f4",
+        "success": "#16a34a",
+        "error": "#dc2626"
+    }
+}

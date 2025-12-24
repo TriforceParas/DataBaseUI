@@ -1,0 +1,20 @@
+{
+    "name": "Midnight Blue (Light)",
+    "id": "midnight-blue-light",
+    "type": "light",
+    "colors": {
+        "bg-primary": "#f0f4f8",
+        "bg-secondary": "#e1e8f0",
+        "bg-tertiary": "#d1dae5",
+        "accent-primary": "#1e40af",
+        "accent-secondary": "#1d4ed8",
+        "accent-hover": "#1e3a8a",
+        "text-primary": "#0f172a",
+        "text-secondary": "#1e293b",
+        "text-muted": "#475569",
+        "border-color": "#cbd5e1",
+        "input-bg": "#f0f4f8",
+        "success": "#10b981",
+        "error": "#ef4444"
+    }
+}

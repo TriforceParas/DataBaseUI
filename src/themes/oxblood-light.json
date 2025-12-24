@@ -1,0 +1,20 @@
+{
+    "name": "Oxblood (Light)",
+    "id": "oxblood-light",
+    "type": "light",
+    "colors": {
+        "bg-primary": "#fdf2f2",
+        "bg-secondary": "#fbe7e7",
+        "bg-tertiary": "#f9dada",
+        "accent-primary": "#991b1b",
+        "accent-secondary": "#b91c1c",
+        "accent-hover": "#7f1d1d",
+        "text-primary": "#450a0a",
+        "text-secondary": "#7f1d1d",
+        "text-muted": "#991b1b88",
+        "border-color": "#f1c4c4",
+        "input-bg": "#fdf2f2",
+        "success": "#16a34a",
+        "error": "#dc2626"
+    }
+}

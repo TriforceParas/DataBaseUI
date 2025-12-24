@@ -32,8 +32,10 @@ export interface SavedFunction {
 
 export interface ColumnSchema {
     name: string;
-    data_type: string;
-    is_nullable: string;
-    column_default: string | null;
-    column_key: string;
+    type_name: string;
+    is_nullable: boolean;
+    is_primary_key: boolean;
+    is_auto_increment: boolean;
+    is_unique: boolean;
+    default_value: string | null;
 }

@@ -14,6 +14,9 @@ import {
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 import dagre from 'dagre';
+import { ColumnSchema } from '../../types/index';
+
+// ... (imports remain)
 import { Key, Link, Table, ChevronDown, ChevronUp, Download } from 'lucide-react';
 
 // Dagre layout helper
@@ -56,14 +59,6 @@ const getLayoutedElements = (nodes: Node[], edges: Edge[], direction = 'LR') => 
     return { nodes: layoutedNodes, edges };
 };
 
-interface ColumnSchema {
-    name: string;
-    data_type: string;
-    is_nullable: string;
-    column_default: string | null;
-    column_key: string;
-}
-
 interface SchemaVisualizerProps {
     tables: string[];
     tableSchemas: Record<string, ColumnSchema[]>;
@@ -79,8 +74,9 @@ const categorizeColumns = (columns: ColumnSchema[], expanded: boolean) => {
     const others: ColumnSchema[] = [];
 
     columns.forEach(col => {
-        const isPK = col.column_key === 'PRI';
-        const isFK = col.column_key === 'MUL' || col.column_key === 'FK' || (col.name.endsWith('_id') && col.name !== 'id');
+        const isPK = col.is_primary_key;
+        // Heuristic for FKs since backend doesn't support it yet
+        const isFK = (col.name.endsWith('_id') && col.name !== 'id');
 
         if (isPK) pks.push(col);
         else if (isFK) fks.push(col);
@@ -93,12 +89,21 @@ const categorizeColumns = (columns: ColumnSchema[], expanded: boolean) => {
     };
 };
 
+
+// ... 
+
+// Logic inside calculateNodesAndEdges needs update too
+// I'll handle that via separate chunks or confirm if I can do it here. 
+// The chunk above covers restoring the function and interface. 
+// I need another chunk for the logic inside calculateNodesAndEdges.
+
 const TableHandles = ({ columns }: { columns: ColumnSchema[] }) => {
     return (
         <>
             {columns.map((col, idx) => {
-                const isPK = col.column_key === 'PRI';
-                const isFK = col.column_key === 'MUL' || col.column_key === 'FK' || (col.name.endsWith('_id') && col.name !== 'id');
+                const isPK = col.is_primary_key;
+                // Heuristic for FKs
+                const isFK = (col.name.endsWith('_id') && col.name !== 'id');
                 const topOffset = 44 + (idx * 28) + (28 / 2);
 
                 return (
@@ -140,8 +145,9 @@ const TableHandles = ({ columns }: { columns: ColumnSchema[] }) => {
 };
 
 const ColumnRow = ({ col, isLast }: { col: ColumnSchema, isLast: boolean }) => {
-    const isPK = col.column_key === 'PRI';
-    const isFK = col.column_key === 'MUL' || col.column_key === 'FK' || (col.name.endsWith('_id') && col.name !== 'id');
+    const isPK = col.is_primary_key;
+    // Heuristic for FKs
+    const isFK = (col.name.endsWith('_id') && col.name !== 'id');
 
     return (
         <div
@@ -166,7 +172,7 @@ const ColumnRow = ({ col, isLast }: { col: ColumnSchema, isLast: boolean }) => {
                 </span>
             </div>
             <span style={{ color: 'var(--text-secondary)', fontSize: '0.65rem', fontFamily: 'monospace' }}>
-                {col.data_type}
+                {col.type_name}
             </span>
         </div>
     );
@@ -298,7 +304,7 @@ const calculateNodesAndEdges = (tables: string[], tableSchemas: Record<string, C
                 );
 
                 // Prevent self-reference if this is just the PK naming convention
-                if (matchedTable === tableName && col.column_key === 'PRI') {
+                if (matchedTable === tableName && col.is_primary_key) {
                     return;
                 }
 
@@ -307,7 +313,7 @@ const calculateNodesAndEdges = (tables: string[], tableSchemas: Record<string, C
                     const singularName = matchedTable.toLowerCase().endsWith('s') ? matchedTable.slice(0, -1) : matchedTable;
 
                     const pkColumn =
-                        targetSchema.find(c => c.column_key === 'PRI') ||
+                        targetSchema.find(c => c.is_primary_key) ||
                         targetSchema.find(c => c.name.toLowerCase() === 'id') ||
                         targetSchema.find(c => c.name.toLowerCase() === `${matchedTable}_id`.toLowerCase()) ||
                         targetSchema.find(c => c.name.toLowerCase() === `${singularName}_id`.toLowerCase());

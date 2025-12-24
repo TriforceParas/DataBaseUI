@@ -1,0 +1,20 @@
+{
+    "name": "Ember (Dark)",
+    "id": "ember-dark",
+    "type": "dark",
+    "colors": {
+        "bg-primary": "#0d0603",
+        "bg-secondary": "#1a0c06",
+        "bg-tertiary": "#261208",
+        "accent-primary": "#f25c05",
+        "accent-secondary": "#ff8c42",
+        "accent-hover": "#d94a00",
+        "text-primary": "#fff5f0",
+        "text-secondary": "#ffb38a",
+        "text-muted": "#f25c0580",
+        "border-color": "#401d0a",
+        "input-bg": "#1a0c06",
+        "success": "#10b981",
+        "error": "#ef4444"
+    }
+}

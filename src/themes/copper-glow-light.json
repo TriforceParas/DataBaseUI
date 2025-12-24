@@ -1,0 +1,20 @@
+{
+    "name": "Copper Glow (Light)",
+    "id": "copper-glow-light",
+    "type": "light",
+    "colors": {
+        "bg-primary": "#fff7ed",
+        "bg-secondary": "#ffedd5",
+        "bg-tertiary": "#fed7aa",
+        "accent-primary": "#c2410c",
+        "accent-secondary": "#ea580c",
+        "accent-hover": "#9a3412",
+        "text-primary": "#431407",
+        "text-secondary": "#7c2d12",
+        "text-muted": "#fb923c99",
+        "border-color": "#fdba74",
+        "input-bg": "#fff7ed",
+        "success": "#16a34a",
+        "error": "#dc2626"
+    }
+}

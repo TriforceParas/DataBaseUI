@@ -1,5 +1,7 @@
 mod commands;
 mod db;
+mod models;
+mod utils;
 
 use db::AppState;
 use tauri::Manager;
@@ -10,39 +12,41 @@ pub fn run() {
         .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_shell::init())
         .invoke_handler(tauri::generate_handler![
-            commands::save_connection,
-            commands::list_connections,
-            commands::verify_connection,
-            commands::delete_connection,
-            commands::update_connection,
-            commands::get_tables,
-            commands::create_tag,
-            commands::update_tag,
-            commands::delete_tag,
-            commands::get_tags,
-            commands::assign_tag,
-            commands::remove_tag_from_table,
-            commands::get_table_tags,
-            commands::execute_query,
-            commands::get_columns,
-            commands::open_connection_window,
-            commands::get_table_schema,
-            commands::truncate_table,
-            commands::drop_table,
-            commands::duplicate_table,
-            // Saved Queries
-            commands::save_query,
-            commands::list_queries,
-            commands::delete_query,
-            commands::update_query,
-            // Saved Functions
-            commands::save_function,
-            commands::list_functions,
-            commands::delete_function,
-            commands::update_function,
-            // Loading Window
-            commands::open_loading_window,
-            commands::close_loading_window
+            // Connection
+            commands::connection::save_connection,
+            commands::connection::list_connections,
+            commands::connection::verify_connection,
+            commands::connection::delete_connection,
+            commands::connection::update_connection,
+            // DB Ops
+            commands::db_ops::get_tables,
+            commands::db_ops::execute_query,
+            commands::db_ops::get_columns,
+            commands::db_ops::get_table_schema,
+            commands::db_ops::truncate_table,
+            commands::db_ops::drop_table,
+            commands::db_ops::duplicate_table,
+            // Tags
+            commands::tag::create_tag,
+            commands::tag::update_tag,
+            commands::tag::delete_tag,
+            commands::tag::get_tags,
+            commands::tag::assign_tag,
+            commands::tag::remove_tag_from_table,
+            commands::tag::get_table_tags,
+            // Saved Items
+            commands::saved::save_query,
+            commands::saved::list_queries,
+            commands::saved::delete_query,
+            commands::saved::update_query,
+            commands::saved::save_function,
+            commands::saved::list_functions,
+            commands::saved::delete_function,
+            commands::saved::update_function,
+            // Window
+            commands::window::open_connection_window,
+            commands::window::open_loading_window,
+            commands::window::close_loading_window
         ])
         .setup(|app| {
             if cfg!(debug_assertions) {

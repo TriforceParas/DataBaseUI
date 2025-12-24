@@ -14,7 +14,7 @@ interface UseAppSystemReturn {
     isCapturing: boolean;
     setIsCapturing: React.Dispatch<React.SetStateAction<boolean>>;
     handleZoom: (delta: number) => void;
-    availableThemes: { id: string, name: string, colors: { bg: string, text: string, accent: string } }[];
+    availableThemes: { id: string, name: string, type: string, colors: { bg: string, text: string, accent: string } }[];
 }
 
 export const useAppSystem = (connection: Connection): UseAppSystemReturn => {
@@ -104,6 +104,7 @@ export const useAppSystem = (connection: Connection): UseAppSystemReturn => {
         availableThemes: Object.values(THEMES).map((t: any) => ({
             id: t.id,
             name: t.name,
+            type: t.type,
             colors: {
                 bg: t.colors['bg-primary'],
                 text: t.colors['text-primary'],

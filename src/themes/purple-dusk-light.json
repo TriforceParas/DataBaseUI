@@ -1,0 +1,20 @@
+{
+    "name": "Purple Dusk (Light)",
+    "id": "purple-dusk-light",
+    "type": "light",
+    "colors": {
+        "bg-primary": "#f5f3ff",
+        "bg-secondary": "#ede9fe",
+        "bg-tertiary": "#ddd6fe",
+        "accent-primary": "#6d28d9",
+        "accent-secondary": "#7c3aed",
+        "accent-hover": "#5b21b6",
+        "text-primary": "#2e1065",
+        "text-secondary": "#4c1d95",
+        "text-muted": "#6d28d988",
+        "border-color": "#c4b5fd",
+        "input-bg": "#f5f3ff",
+        "success": "#10b981",
+        "error": "#ef4444"
+    }
+}

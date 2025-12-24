@@ -1,0 +1,20 @@
+{
+    "name": "Sandstone (Dark)",
+    "id": "sandstone-dark",
+    "type": "dark",
+    "colors": {
+        "bg-primary": "#1c1917",
+        "bg-secondary": "#292524",
+        "bg-tertiary": "#44403c",
+        "accent-primary": "#d6d3d1",
+        "accent-secondary": "#e7e5e4",
+        "accent-hover": "#a8a29e",
+        "text-primary": "#fafaf9",
+        "text-secondary": "#d6d3d1",
+        "text-muted": "#a8a29e",
+        "border-color": "#44403c",
+        "input-bg": "#292524",
+        "success": "#a3e635",
+        "error": "#f87171"
+    }
+}

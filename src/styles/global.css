@@ -59,3 +59,9 @@ textarea {
 ::-webkit-scrollbar-thumb:hover {
     background: var(--border-color);
 }
+
+/* Prevent selection on Monaco gutter and line numbers */
+.monaco-editor .margin,
+.monaco-editor .line-numbers {
+    user-select: none !important;
+}

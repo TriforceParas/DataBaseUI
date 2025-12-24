@@ -1,0 +1,20 @@
+{
+    "name": "Plum Shadow (Light)",
+    "id": "plum-shadow-light",
+    "type": "light",
+    "colors": {
+        "bg-primary": "#fdf4ff",
+        "bg-secondary": "#fae8ff",
+        "bg-tertiary": "#f5d0fe",
+        "accent-primary": "#9333ea",
+        "accent-secondary": "#a855f7",
+        "accent-hover": "#7e22ce",
+        "text-primary": "#3b0764",
+        "text-secondary": "#581c87",
+        "text-muted": "#d946ef99",
+        "border-color": "#e879f9",
+        "input-bg": "#fdf4ff",
+        "success": "#16a34a",
+        "error": "#dc2626"
+    }
+}

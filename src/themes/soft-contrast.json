@@ -1,0 +1,20 @@
+{
+    "name": "Soft Contrast",
+    "id": "soft-contrast",
+    "type": "light",
+    "colors": {
+        "bg-primary": "#f8f9fa",
+        "bg-secondary": "#e9ecef",
+        "bg-tertiary": "#dee2e6",
+        "accent-primary": "#495057",
+        "accent-secondary": "#6c757d",
+        "accent-hover": "#343a40",
+        "text-primary": "#212529",
+        "text-secondary": "#495057",
+        "text-muted": "#6c757d",
+        "border-color": "#ced4da",
+        "input-bg": "#f8f9fa",
+        "success": "#28a745",
+        "error": "#dc3545"
+    }
+}

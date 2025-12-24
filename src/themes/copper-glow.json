@@ -1,0 +1,20 @@
+{
+    "name": "Copper Glow",
+    "id": "copper-glow",
+    "type": "dark",
+    "colors": {
+        "bg-primary": "#140c08",
+        "bg-secondary": "#21140e",
+        "bg-tertiary": "#2e1d15",
+        "accent-primary": "#d97706",
+        "accent-secondary": "#f59e0b",
+        "accent-hover": "#b45309",
+        "text-primary": "#fff7ed",
+        "text-secondary": "#fdba74",
+        "text-muted": "#d9770680",
+        "border-color": "#3d241d",
+        "input-bg": "#21140e",
+        "success": "#10b981",
+        "error": "#ef4444"
+    }
+}

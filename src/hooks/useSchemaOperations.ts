@@ -34,10 +34,10 @@ export const useSchemaOperations = ({
                 columns: ['Column', 'Type', 'Nullable', 'Default', 'Key'],
                 rows: schema.map((col: ColumnSchema) => [
                     col.name,
-                    col.data_type,
-                    col.is_nullable,
-                    col.column_default || 'NULL',
-                    col.column_key
+                    col.type_name,
+                    col.is_nullable ? 'YES' : 'NO',
+                    col.default_value || 'NULL',
+                    col.is_primary_key ? 'PRI' : col.is_unique ? 'UNI' : ''
                 ])
             };
 
@@ -67,14 +67,13 @@ export const useSchemaOperations = ({
             // Convert ColumnSchema to ColumnDef format
             const columns = schema.map((col: ColumnSchema) => ({
                 name: col.name,
-                type: col.data_type.toUpperCase().replace(/\(.*\)/, ''), // Strip length from type
-                length: col.data_type.match(/\((\d+)\)/)?.[1] || '', // Extract length if exists
-                defaultValue: col.column_default || '',
-                isNullable: col.is_nullable.toLowerCase() === 'yes' || col.is_nullable === '1',
-                isPrimaryKey: col.column_key === 'PRI' || col.column_key.toLowerCase().includes('pk'),
-                isAutoIncrement: (col.column_default || '').toLowerCase().includes('auto_increment') ||
-                    col.data_type.toLowerCase().includes('serial'),
-                isUnique: col.column_key === 'UNI' || col.column_key.toLowerCase().includes('unique')
+                type: col.type_name.toUpperCase().replace(/\(.*\)/, ''), // Strip length from type
+                length: col.type_name.match(/\((\d+)\)/)?.[1] || '', // Extract length if exists
+                defaultValue: col.default_value || '',
+                isNullable: col.is_nullable,
+                isPrimaryKey: col.is_primary_key,
+                isAutoIncrement: col.is_auto_increment,
+                isUnique: col.is_unique
             }));
 
             const tabId = `edit-table-${Date.now()}`;

@@ -81,7 +81,7 @@ export const ChangelogSidebar: React.FC<ChangelogSidebarProps> = ({
 
             <div style={{ flex: 1, overflowY: 'auto', padding: '1rem', backgroundColor: 'var(--bg-primary)' }}>
                 {totalChanges === 0 ? (
-                    <div style={{ textAlign: 'center', color: 'var(--text-secondary)', marginTop: '2rem', fontStyle: 'italic', fontSize: '0.9rem' }}>
+                    <div style={{ textAlign: 'center', color: 'var(--text-secondary)', marginTop: '2rem', fontStyle: 'italic', fontSize: '0.9rem', userSelect: 'none' }}>
                         No pending changes
                     </div>
                 ) : viewMode === 'visual' ? (
@@ -137,7 +137,8 @@ export const ChangelogSidebar: React.FC<ChangelogSidebarProps> = ({
                                                 marginBottom: '0.75rem',
                                                 border: '1px solid var(--border-color)',
                                                 cursor: isSchemaChange ? 'default' : 'pointer',
-                                                transition: 'background-color 0.2s'
+                                                transition: 'background-color 0.2s',
+                                                userSelect: 'none'
                                             }}
                                             onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--bg-tertiary)'}
                                             onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'var(--bg-secondary)'}

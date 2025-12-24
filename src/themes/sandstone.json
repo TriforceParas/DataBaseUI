@@ -1,0 +1,20 @@
+{
+    "name": "Sandstone",
+    "id": "sandstone",
+    "type": "light",
+    "colors": {
+        "bg-primary": "#f5f2e9",
+        "bg-secondary": "#e9e4d5",
+        "bg-tertiary": "#ddd7c1",
+        "accent-primary": "#a67c52",
+        "accent-secondary": "#bf9b7a",
+        "accent-hover": "#8c6239",
+        "text-primary": "#4a3b2a",
+        "text-secondary": "#6b563d",
+        "text-muted": "#a68d71",
+        "border-color": "#d1c9b0",
+        "input-bg": "#f5f2e9",
+        "success": "#6b8e23",
+        "error": "#b22222"
+    }
+}

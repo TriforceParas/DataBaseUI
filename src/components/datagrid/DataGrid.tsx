@@ -96,7 +96,7 @@ export const DataGrid: React.FC<DataGridProps> = ({
     const rowCount = displayRows.length;
     const colCount = data.columns.length;
 
-    const getCellId = (r: number, c: number) => `${r}:${c} `;
+    const getCellId = (r: number, c: number) => `${r}:${c}`;
 
     // --- Selection Logic ---
 

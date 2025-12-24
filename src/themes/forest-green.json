@@ -1,0 +1,20 @@
+{
+    "name": "Forest Green",
+    "id": "forest-green",
+    "type": "dark",
+    "colors": {
+        "bg-primary": "#050d0a",
+        "bg-secondary": "#0a1410",
+        "bg-tertiary": "#101d18",
+        "accent-primary": "#4ade80",
+        "accent-secondary": "#86efac",
+        "accent-hover": "#22c55e",
+        "text-primary": "#e6edea",
+        "text-secondary": "#9fbdae",
+        "text-muted": "#6a8d7a",
+        "border-color": "#1a2e25",
+        "input-bg": "#0a1410",
+        "success": "#4ade80",
+        "error": "#f87171"
+    }
+}

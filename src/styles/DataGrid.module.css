@@ -16,6 +16,7 @@
     padding: 2rem;
     text-align: center;
     color: var(--text-muted);
+    user-select: none;
 }
 
 .gridContainer {

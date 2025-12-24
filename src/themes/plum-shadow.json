@@ -1,0 +1,20 @@
+{
+    "name": "Plum Shadow",
+    "id": "plum-shadow",
+    "type": "dark",
+    "colors": {
+        "bg-primary": "#1a0f1a",
+        "bg-secondary": "#261626",
+        "bg-tertiary": "#331d33",
+        "accent-primary": "#d16ad1",
+        "accent-secondary": "#e0a3e0",
+        "accent-hover": "#b055b0",
+        "text-primary": "#fdf2fd",
+        "text-secondary": "#d9b8d9",
+        "text-muted": "#d16ad180",
+        "border-color": "#402540",
+        "input-bg": "#261626",
+        "success": "#10b981",
+        "error": "#ef4444"
+    }
+}

@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import Editor, { OnMount } from '@monaco-editor/react';
+import { THEMES } from '../../utils/themeUtils';
 import styles from '../../styles/MainLayout.module.css';
 import { Play, ChevronDown, Copy, Download, Save, FunctionSquare } from 'lucide-react';
 
@@ -40,10 +41,11 @@ const extractQueryAtLine = (model: any, lineNumber: number): string | null => {
 
 export const QueryEditor: React.FC<QueryEditorProps> = ({
     value, onChange, onRunQuery, selectedRowCount = 0, onCopy, onExport,
-    theme = 'blue', tables = [],
+    theme = 'midnight-blue', tables = [],
     onSaveQuery, onSaveFunction, onExportSql, onSaveChanges, isSaved = false
 }) => {
-    const editorTheme = theme === 'light' ? 'light' : 'vs-dark';
+    // Monaco theme selection: use the app theme ID or fallback
+    const editorTheme = `app-${theme}`;
     const editorRef = useRef<any>(null);
     const monacoRef = useRef<any>(null);
     const providerRef = useRef<any>(null);
@@ -55,6 +57,27 @@ export const QueryEditor: React.FC<QueryEditorProps> = ({
 
     // Dropdown state
     const [activeDropdown, setActiveDropdown] = useState<'copy' | 'export' | null>(null);
+
+    const handleBeforeMount = (monaco: any) => {
+        // Register all app themes in Monaco
+        Object.values(THEMES).forEach((t: any) => {
+            monaco.editor.defineTheme(`app-${t.id}`, {
+                base: t.type === 'light' ? 'vs' : 'vs-dark',
+                inherit: true,
+                rules: [],
+                colors: {
+                    'editor.background': t.colors['bg-primary'],
+                    'editor.foreground': t.colors['text-primary'],
+                    'editorCursor.foreground': t.colors['accent-primary'],
+                    'editor.lineHighlightBackground': t.colors['bg-secondary'],
+                    'editorLineNumber.foreground': t.colors['text-muted'],
+                    'editorLineNumber.activeForeground': t.colors['text-primary'],
+                    'editorIndentGuide.background': t.colors['border-color'],
+                    'editor.selectionBackground': t.colors['accent-primary'] + '40', // 25% opacity
+                }
+            });
+        });
+    };
 
     const handleEditorChange = (val: string | undefined) => {
         if (val !== undefined) {
@@ -228,7 +251,8 @@ export const QueryEditor: React.FC<QueryEditorProps> = ({
                 backgroundColor: 'var(--bg-secondary)',
                 display: 'flex',
                 justifyContent: 'space-between',
-                alignItems: 'center'
+                alignItems: 'center',
+                userSelect: 'none'
             }}>
                 <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
                     <button
@@ -372,9 +396,10 @@ export const QueryEditor: React.FC<QueryEditorProps> = ({
                     height="100%"
                     defaultLanguage="sql"
                     value={value}
-                    onChange={handleEditorChange}
-                    onMount={handleEditorDidMount}
                     theme={editorTheme}
+                    beforeMount={handleBeforeMount}
+                    onMount={handleEditorDidMount}
+                    onChange={handleEditorChange}
                     options={{
                         minimap: { enabled: false },
                         scrollBeyondLastLine: false,

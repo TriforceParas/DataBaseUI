@@ -1,0 +1,20 @@
+{
+    "name": "High Contrast",
+    "id": "high-contrast",
+    "type": "dark",
+    "colors": {
+        "bg-primary": "#000000",
+        "bg-secondary": "#121212",
+        "bg-tertiary": "#1e1e1e",
+        "accent-primary": "#00ff00",
+        "accent-secondary": "#39ff14",
+        "accent-hover": "#32cd32",
+        "text-primary": "#ffffff",
+        "text-secondary": "#e0e0e0",
+        "text-muted": "#aaaaaa",
+        "border-color": "#ffffff",
+        "input-bg": "#000000",
+        "success": "#00ff00",
+        "error": "#ff0000"
+    }
+}

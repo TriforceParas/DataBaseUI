@@ -1,0 +1,20 @@
+{
+    "name": "Light Contrast",
+    "id": "light-contrast",
+    "type": "light",
+    "colors": {
+        "bg-primary": "#ffffff",
+        "bg-secondary": "#f0f0f0",
+        "bg-tertiary": "#e0e0e0",
+        "accent-primary": "#0000ff",
+        "accent-secondary": "#4d4dff",
+        "accent-hover": "#0000cc",
+        "text-primary": "#000000",
+        "text-secondary": "#333333",
+        "text-muted": "#666666",
+        "border-color": "#000000",
+        "input-bg": "#ffffff",
+        "success": "#008000",
+        "error": "#ff0000"
+    }
+}

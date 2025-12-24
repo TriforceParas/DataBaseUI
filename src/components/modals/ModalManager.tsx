@@ -15,7 +15,7 @@ interface ModalManagerProps {
         setTheme: (t: string) => void;
         zoom: number;
         setZoom: React.Dispatch<React.SetStateAction<number>>;
-        availableThemes: { id: string, name: string, colors: { bg: string, text: string, accent: string } }[];
+        availableThemes: { id: string, name: string, type: string, colors: { bg: string, text: string, accent: string } }[];
     };
     newConnection: {
         isOpen: boolean;

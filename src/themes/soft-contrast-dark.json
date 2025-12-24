@@ -1,0 +1,20 @@
+{
+    "name": "Soft Contrast (Dark)",
+    "id": "soft-contrast-dark",
+    "type": "dark",
+    "colors": {
+        "bg-primary": "#1f2937",
+        "bg-secondary": "#374151",
+        "bg-tertiary": "#4b5563",
+        "accent-primary": "#9ca3af",
+        "accent-secondary": "#d1d5db",
+        "accent-hover": "#4b5563",
+        "text-primary": "#f9fafb",
+        "text-secondary": "#e5e7eb",
+        "text-muted": "#9ca3af",
+        "border-color": "#4b5563",
+        "input-bg": "#374151",
+        "success": "#34d399",
+        "error": "#f87171"
+    }
+}

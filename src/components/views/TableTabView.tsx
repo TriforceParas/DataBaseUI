@@ -128,23 +128,27 @@ export const TableTabView: React.FC<TableTabViewProps> = ({
                             className={styles.secondaryBtn}
                             onClick={() => setActiveDropdown(activeDropdown === 'pageSize' ? null : 'pageSize')}
                         >
-                            {pag.pageSize} rows <Icons.ChevronDown size={12} style={{ marginLeft: 4 }} />
+                            {pag.pageSize >= pag.total && pag.total > 0 ? 'All Rows' : `${pag.pageSize} rows`} <Icons.ChevronDown size={12} style={{ marginLeft: 4 }} />
                         </button>
                         {activeDropdown === 'pageSize' && (
                             <div className={styles.dropdownMenu} style={{ position: 'absolute', top: '100%', right: 0, zIndex: 100, backgroundColor: 'var(--bg-primary)', border: '1px solid var(--border-color)', borderRadius: '4px', marginTop: '4px', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)', minWidth: '80px' }}>
-                                {[20, 50, 100, 200].map(size => (
-                                    <div
-                                        key={size}
-                                        className={styles.dropdownItem}
-                                        onClick={() => {
-                                            setActiveDropdown(null);
-                                            onPageSizeChange(size);
-                                        }}
-                                        style={{ padding: '8px 12px', cursor: 'pointer', fontSize: '0.9rem', backgroundColor: pag.pageSize === size ? 'var(--bg-tertiary)' : 'transparent' }}
-                                    >
-                                        {size}
-                                    </div>
-                                ))}
+                                {[20, 50, 100, 200, 'All'].map(size => {
+                                    const isAll = size === 'All';
+                                    const value = isAll ? (pag.total || 10000) : (size as number);
+                                    return (
+                                        <div
+                                            key={size}
+                                            className={styles.dropdownItem}
+                                            onClick={() => {
+                                                setActiveDropdown(null);
+                                                onPageSizeChange(value);
+                                            }}
+                                            style={{ padding: '8px 12px', cursor: 'pointer', fontSize: '0.9rem', backgroundColor: pag.pageSize === value ? 'var(--bg-tertiary)' : 'transparent' }}
+                                        >
+                                            {size === 'All' ? 'All Rows' : size}
+                                        </div>
+                                    );
+                                })}
                             </div>
                         )}
                     </div>
@@ -165,8 +169,8 @@ export const TableTabView: React.FC<TableTabViewProps> = ({
                         pendingChanges={pendingChanges[activeTab.id]}
                         highlightRowIndex={highlightRowIndex}
                         onCellEdit={onCellEdit}
-                        primaryKeys={new Set(tableSchemas[activeTab.title]?.filter(c => c.column_key === 'PRI').map(c => c.name) || [])}
-                        foreignKeys={new Set(tableSchemas[activeTab.title]?.filter(c => c.column_key === 'MUL').map(c => c.name) || [])}
+                        primaryKeys={new Set(tableSchemas[activeTab.title]?.filter(c => c.is_primary_key).map(c => c.name) || [])}
+                        foreignKeys={new Set(tableSchemas[activeTab.title]?.filter(c => c.name.endsWith('_id') && c.name !== 'id').map(c => c.name) || [])}
                         onDeleteRow={onRowDelete}
                         onRecoverRow={onRecoverRow}
                     />

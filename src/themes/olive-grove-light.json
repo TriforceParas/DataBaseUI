@@ -1,0 +1,20 @@
+{
+    "name": "Olive Grove (Light)",
+    "id": "olive-grove-light",
+    "type": "light",
+    "colors": {
+        "bg-primary": "#f7fee7",
+        "bg-secondary": "#ecfccb",
+        "bg-tertiary": "#d9f99d",
+        "accent-primary": "#65a30d",
+        "accent-secondary": "#84cc16",
+        "accent-hover": "#4d7c0f",
+        "text-primary": "#1a2e05",
+        "text-secondary": "#365314",
+        "text-muted": "#a3e63599",
+        "border-color": "#bef264",
+        "input-bg": "#f7fee7",
+        "success": "#16a34a",
+        "error": "#dc2626"
+    }
+}

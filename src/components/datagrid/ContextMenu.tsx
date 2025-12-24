@@ -42,7 +42,8 @@ export const ContextMenu: React.FC<ContextMenuProps> = ({
                 boxShadow: '0 4px 12px rgba(0,0,0,0.3)',
                 zIndex: 9999,
                 minWidth: '150px',
-                overflow: 'hidden'
+                overflow: 'hidden',
+                userSelect: 'none'
             }}
             onClick={e => e.stopPropagation()}
         >

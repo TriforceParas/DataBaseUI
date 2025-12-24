@@ -138,6 +138,7 @@ export const InsertRowModal: React.FC<InsertRowModalProps> = ({ isOpen, onClose,
             flexDirection: 'column',
             transform: visible ? 'translateX(0)' : 'translateX(100%)',
             transition: 'transform 0.3s ease-in-out',
+            userSelect: 'none'
         }}>
             <div style={{ display: 'flex', padding: '1rem', gap: '1rem' }}>
                 <button
@@ -273,7 +274,8 @@ export const InsertRowModal: React.FC<InsertRowModalProps> = ({ isOpen, onClose,
                             color: 'var(--text-primary)',
                             padding: '1rem',
                             fontFamily: 'monospace',
-                            resize: 'none'
+                            resize: 'none',
+                            userSelect: 'text'
                         }}
                         value={jsonContent}
                         onChange={e => setJsonContent(e.target.value)}

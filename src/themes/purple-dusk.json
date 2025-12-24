@@ -1,0 +1,20 @@
+{
+    "name": "Purple Dusk",
+    "id": "purple-dusk",
+    "type": "dark",
+    "colors": {
+        "bg-primary": "#12091f",
+        "bg-secondary": "#1c122e",
+        "bg-tertiary": "#261b3d",
+        "accent-primary": "#c084fc",
+        "accent-secondary": "#d8b4fe",
+        "accent-hover": "#a855f7",
+        "text-primary": "#f3e8ff",
+        "text-secondary": "#a78bfa",
+        "text-muted": "#7c3aed80",
+        "border-color": "#3b2b5a",
+        "input-bg": "#1c122e",
+        "success": "#22c55e",
+        "error": "#ef4444"
+    }
+}

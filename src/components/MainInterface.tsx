@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import * as api from '../api';
 
-import { Connection, PendingChange, ColumnSchema, SavedFunction } from '../types/index';
+import { Connection, ColumnSchema, SavedFunction } from '../types/index';
 import { MainLayout } from './layout/MainLayout';
 import { TableCreatorState } from './editors';
 import { useSystemLogs, useSavedItems, useTableOperations, useTableData, useResultsPane, useTabs, useTableActions, usePersistenceActions, useDatabaseRegistry, useChangeManager, useAppSystem, useSchemaOperations, useDataMutation } from '../hooks';
@@ -188,7 +188,7 @@ export const MainInterface: React.FC<MainInterfaceProps> = ({ connection, onSwit
             return;
         }
         const tabId = `func-${func.id}-${Date.now()}`;
-        setTabs([...tabs, { id: tabId, type: 'function-output', title: `ƒ ${func.name}`, savedFunctionId: func.id }]);
+        setTabs([...tabs, { id: tabId, type: 'function-output', title: func.name, savedFunctionId: func.id }]);
         setTabQueries(prev => ({ ...prev, [tabId]: func.function_body }));
         setActiveTabId(tabId);
         setResults(prev => ({ ...prev, [tabId]: { data: null, loading: true, error: null } }));
@@ -213,7 +213,7 @@ export const MainInterface: React.FC<MainInterfaceProps> = ({ connection, onSwit
             return;
         }
         const tabId = `func-edit-${func.id}-${Date.now()}`;
-        setTabs([...tabs, { id: tabId, type: 'query', title: `ƒ ${func.name}`, savedFunctionId: func.id }]);
+        setTabs([...tabs, { id: tabId, type: 'function', title: func.name, savedFunctionId: func.id }]);
         setTabQueries(prev => ({ ...prev, [tabId]: func.function_body }));
         setActiveTabId(tabId);
     };

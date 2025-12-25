@@ -181,8 +181,8 @@ const ColumnRow = ({ col, isLast }: { col: ColumnSchema, isLast: boolean }) => {
 const TableHeader = ({ label, onClick }: { label: string; onClick?: (name: string) => void }) => (
     <div
         style={{
-            background: 'var(--accent-color)',
-            color: 'white',
+            background: 'var(--accent-primary)',
+            color: 'var(--bg-primary)',
             padding: '0.6rem 0.75rem',
             fontWeight: 600,
             fontSize: '0.85rem',
@@ -345,10 +345,8 @@ export const SchemaVisualizer: React.FC<SchemaVisualizerProps> = ({
     tables,
     tableSchemas,
     onTableClick,
-    onDownload,
-    theme = 'blue'
+    onDownload
 }) => {
-    const isDark = theme !== 'light';
 
     // Generate raw nodes and edges first, then apply layout
     const { layoutedNodes, layoutedEdges } = useMemo(
@@ -361,27 +359,37 @@ export const SchemaVisualizer: React.FC<SchemaVisualizerProps> = ({
 
     // Dynamic styles
     const controlsStyle = {
-        background: isDark ? '#1e1e1e' : '#ffffff',
-        border: `1px solid ${isDark ? '#333' : '#ddd'}`,
-        borderRadius: '6px',
-        boxShadow: '0 2px 8px rgba(0,0,0,0.2)'
+        background: 'var(--bg-secondary)',
+        border: '1px solid var(--border-color)',
+        borderRadius: '8px',
+        boxShadow: '0 4px 12px rgba(0,0,0,0.4)',
+        padding: '2px', // Slight padding for the inner buttons
+        display: 'flex',
+        flexDirection: 'column' as const
     };
 
     return (
         <div style={{ width: '100%', height: '100%', background: 'var(--bg-primary)', position: 'relative' }}>
             <style>{`
                 .react-flow__controls button {
-                    background: ${isDark ? '#2a2a2a' : '#f5f5f5'} !important;
-                    border: 1px solid ${isDark ? '#444' : '#ddd'} !important;
-                    border-radius: 4px !important;
-                    color: ${isDark ? '#fff' : '#333'} !important;
-                    margin: 2px !important;
+                    background: transparent !important;
+                    border: none !important;
+                    color: var(--text-primary) !important;
+                    margin: 0 !important;
+                    width: 32px !important;
+                    height: 32px !important;
+                    display: flex !important;
+                    align-items: center !important;
+                    justify-content: center !important;
                 }
                 .react-flow__controls button:hover {
-                    background: ${isDark ? '#3a3a3a' : '#e5e5e5'} !important;
+                    background: var(--bg-tertiary) !important;
+                    border-radius: 4px !important;
                 }
                 .react-flow__controls button svg {
-                    fill: ${isDark ? '#fff' : '#333'} !important;
+                    fill: var(--text-primary) !important;
+                    width: 14px !important;
+                    height: 14px !important;
                 }
             `}</style>
 
@@ -400,7 +408,7 @@ export const SchemaVisualizer: React.FC<SchemaVisualizerProps> = ({
                 nodesConnectable={false}
                 elementsSelectable={true}
             >
-                <Background color={isDark ? '#333' : '#ddd'} gap={20} />
+                <Background color="var(--border-color)" gap={20} />
                 <Controls style={controlsStyle}>
                     {onDownload && (
                         <ControlButton onClick={onDownload} title="Save Image">

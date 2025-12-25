@@ -8,6 +8,7 @@
     /* Use var */
     color: var(--text-primary);
     overflow: hidden;
+    user-select: none;
 }
 
 .leftPanel {
@@ -130,6 +131,7 @@
     font-weight: 600;
     font-size: 1rem;
     color: var(--text-primary);
+    user-select: none;
 }
 
 .cardSubtitle {
@@ -139,6 +141,7 @@
     overflow: hidden;
     text-overflow: ellipsis;
     font-family: monospace;
+    user-select: text;
 }
 
 .footer {

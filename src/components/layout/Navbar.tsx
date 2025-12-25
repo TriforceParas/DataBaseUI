@@ -116,7 +116,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                         <Icons.Activity size={18} />
                     </button>
                     <button className={styles.iconBtn} onClick={handleOpenSchema} title="Schema">
-                        <Icons.Workflow size={18} />
+                        <Icons.Schema size={18} />
                     </button>
                     <button
                         className={styles.iconBtn}

@@ -159,7 +159,7 @@ export const MainViewContent: React.FC<MainViewContentProps> = ({
         );
     }
 
-    if (activeTab.type === 'log') {
+    if (activeTab.type === 'logs') {
         return (
             <LogTabView
                 activeTab={activeTab}

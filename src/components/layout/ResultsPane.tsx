@@ -74,7 +74,7 @@ export const ResultsPane: React.FC<ResultsPaneProps> = ({
 }) => {
 
     const currentResult = results[activeTabId];
-    const pagination = paginationMap[activeTabId] || { page: 1, pageSize: 50, total: 0 };
+    const pagination = paginationMap[activeTabId] || { page: 1, pageSize: 20, total: 0 };
     const totalPages = Math.ceil(pagination.total / pagination.pageSize);
 
     if (!activeTabId) return null;
@@ -183,8 +183,8 @@ export const ResultsPane: React.FC<ResultsPaneProps> = ({
                                         </button>
                                         {activeDropdown === 'pageSize' && (
                                             <div className={styles.dropdownMenu} style={{ bottom: '100%', top: 'auto', marginBottom: '4px' }}>
-                                                {[10, 50, 100, 500, 1000].map(size => (
-                                                    <div key={size} className={styles.dropdownItem} onClick={() => { onPageSizeChange(size); setActiveDropdown(null); }}>
+                                                {[20, 50, 100, 500, 1000].map(size => (
+                                                    <div key={size} className={styles.dropdownItem} onClick={() => { onPageSizeChange(size); setActiveDropdown(null); }} style={{ color: 'var(--text-primary)' }}>
                                                         {size} rows
                                                     </div>
                                                 ))}

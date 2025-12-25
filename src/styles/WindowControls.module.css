@@ -16,7 +16,7 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    color: var(--text-secondary);
+    color: var(--text-primary);
     transition: background-color 0.2s, color 0.2s;
     border-radius: 0;
     /* Square edges for corners */

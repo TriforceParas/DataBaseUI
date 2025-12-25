@@ -716,7 +716,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                         <CollapsibleSection
                             title="Tables"
                             count={tables.length}
-                            icon={<Icons.Folder size={14} color="#64748b" />}
+                            icon={<Icons.Folder size={14} color="var(--text-secondary)" />}
                             isOpen={expandedSections.has('az-tables')}
                             onToggle={() => toggleSection('az-tables')}
                         >
@@ -735,7 +735,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                                         onDuplicate={onDuplicateTable}
                                         onTruncate={onTruncateTable}
                                         onDrop={onDropTable}
-                                        style={{ color: color || 'var(--text-primary)' }} // Pass color to item
+                                        style={{ color: 'var(--text-primary)' }} // Tab names follow the dark/white light/black rule
                                     />
                                 );
                             })}
@@ -744,7 +744,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                         <CollapsibleSection
                             title="Queries"
                             count={savedQueries.length}
-                            icon={<Icons.FileCode size={14} color="#8b5cf6" />}
+                            icon={<Icons.Code2 size={14} color="var(--text-secondary)" />}
                             isOpen={expandedSections.has('az-queries')}
                             onToggle={() => toggleSection('az-queries')}
                         >
@@ -753,7 +753,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                                     <SavedItemWithContextMenu
                                         key={query.id}
                                         name={query.name}
-                                        icon={<Icons.FileCode size={14} color="#8b5cf6" />}
+                                        icon={<Icons.Code2 size={14} color="#8b5cf6" />}
                                         onClick={() => onQueryClick?.(query)}
                                         onDelete={() => onDeleteQuery?.(query.id)}
                                     />
@@ -766,7 +766,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                         <CollapsibleSection
                             title="Functions"
                             count={savedFunctions.length}
-                            icon={<Icons.FileCode size={14} color="#f59e0b" />}
+                            icon={<Icons.MathFunction size={14} color="#f59e0b" />}
                             isOpen={expandedSections.has('az-functions')}
                             onToggle={() => toggleSection('az-functions')}
                         >
@@ -775,7 +775,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                                     <SavedItemWithContextMenu
                                         key={func.id}
                                         name={func.name}
-                                        icon={<Icons.FileCode size={14} color="#f59e0b" />}
+                                        icon={<Icons.MathFunction size={14} color="#f59e0b" />}
                                         onClick={() => onFunctionClick?.(func)}
                                         onDelete={() => onDeleteFunction?.(func.id)}
                                         onEdit={() => onEditFunction?.(func)}

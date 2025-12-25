@@ -53,13 +53,13 @@ export const TableTabView: React.FC<TableTabViewProps> = ({
     onRowDelete,
     onRecoverRow
 }) => {
-    const pag = paginationMap[activeTab.id] || { page: 1, pageSize: 50, total: 0 };
+    const pag = paginationMap[activeTab.id] || { page: 1, pageSize: 20, total: 0 };
     const totalPages = Math.ceil(pag.total / pag.pageSize) || 1;
 
     return (
         <>
             <div className={styles.tableToolbar}>
-                <button className={styles.outlineBtn} onClick={onInsertRow} style={{ border: '1px solid var(--accent-primary)', color: 'var(--accent-primary)', backgroundColor: 'transparent' }}>
+                <button className={styles.primaryBtn} onClick={onInsertRow}>
                     <Icons.Plus size={14} /> Insert
                 </button>
 
@@ -128,7 +128,7 @@ export const TableTabView: React.FC<TableTabViewProps> = ({
                             className={styles.secondaryBtn}
                             onClick={() => setActiveDropdown(activeDropdown === 'pageSize' ? null : 'pageSize')}
                         >
-                            {pag.pageSize >= pag.total && pag.total > 0 ? 'All Rows' : `${pag.pageSize} rows`} <Icons.ChevronDown size={12} style={{ marginLeft: 4 }} />
+                            {pag.pageSize >= 5000 ? 'All Rows' : `${pag.pageSize} rows`} <Icons.ChevronDown size={12} style={{ marginLeft: 4 }} />
                         </button>
                         {activeDropdown === 'pageSize' && (
                             <div className={styles.dropdownMenu} style={{ position: 'absolute', top: '100%', right: 0, zIndex: 100, backgroundColor: 'var(--bg-primary)', border: '1px solid var(--border-color)', borderRadius: '4px', marginTop: '4px', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)', minWidth: '80px' }}>

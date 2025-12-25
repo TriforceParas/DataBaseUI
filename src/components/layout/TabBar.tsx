@@ -17,7 +17,7 @@ import {
     useSortable
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import { Activity, Code2, Plus, Table, Workflow, X } from 'lucide-react';
+import { Icons } from '../../assets/icons';
 
 import styles from '../../styles/MainLayout.module.css';
 import { Tag, TableTag, TabItem } from '../../types/index';
@@ -43,12 +43,16 @@ const restrictToHorizontalAxis: Modifier = ({ transform }) => {
 };
 
 const TabIcon = ({ tab, color }: { tab: TabItem; color?: string }) => {
-    if (tab.type === 'query') return <Code2 size={14} style={{ flexShrink: 0, color: 'var(--accent-color)' }} />;
-    if (tab.type === 'table') return <Table size={14} style={{ flexShrink: 0, color: color || 'var(--text-primary)' }} />;
-    if (tab.type === 'log') return <Activity size={14} style={{ flexShrink: 0, color: '#a855f7' }} />;
-    if (tab.type === 'create-table') return <Plus size={14} style={{ flexShrink: 0, color: 'var(--accent-primary)' }} />;
-    if ((tab.type as string) === 'schema-diagram') return <Workflow size={14} style={{ flexShrink: 0, color: '#10b981' }} />;
-    return <Table size={14} style={{ flexShrink: 0 }} />;
+    // Icons follow the theme-aware colors (white in dark, black in light)
+    const iconColor = 'var(--text-primary)';
+
+    if (tab.type === 'query') return <Icons.Code2 size={14} style={{ flexShrink: 0, color: iconColor }} />;
+    if (tab.type === 'function' || tab.type === 'function-output') return <Icons.MathFunction size={14} style={{ flexShrink: 0, color: iconColor }} />;
+    if (tab.type === 'table') return <Icons.Table size={14} style={{ flexShrink: 0, color: iconColor }} />;
+    if (tab.type === 'log') return <Icons.Activity size={14} style={{ flexShrink: 0, color: iconColor }} />;
+    if (tab.type === 'create-table') return <Icons.Plus size={14} style={{ flexShrink: 0, color: iconColor }} />;
+    if ((tab.type as string) === 'schema-diagram') return <Icons.Schema size={14} style={{ flexShrink: 0, color: iconColor }} />;
+    return <Icons.Table size={14} style={{ flexShrink: 0, color: iconColor }} />;
 };
 
 function SortableTab({ tab, isActive, onClick, onClose, onDoubleClick, color }: { tab: TabItem, isActive: boolean, onClick: () => void, onClose: (e: any, id: string) => void, onDoubleClick?: () => void, color?: string }) {
@@ -61,15 +65,15 @@ function SortableTab({ tab, isActive, onClick, onClose, onDoubleClick, color }: 
         transition,
         cursor: 'pointer',
         padding: '0.5rem 1rem',
-        backgroundColor: isActive ? 'var(--bg-primary)' : (isHovered ? 'var(--bg-tertiary)' : 'var(--bg-secondary)'),
+        backgroundColor: isActive ? 'var(--bg-secondary)' : (isHovered ? 'var(--bg-tertiary)' : 'var(--bg-primary)'),
         borderRight: '1px solid var(--border-color)',
-        borderTop: isActive ? `2px solid ${color || 'var(--accent-color)'} ` : '2px solid transparent',
+        borderTop: isActive ? '2px solid var(--text-primary)' : '2px solid transparent',
         display: 'flex',
         alignItems: 'center',
         gap: '0.5rem',
         flexShrink: 0,
         justifyContent: 'space-between',
-        color: isActive ? (color || 'var(--text-primary)') : (isHovered ? (color || 'var(--text-primary)') : 'var(--text-secondary)'),
+        color: isActive ? 'var(--text-primary)' : (isHovered ? 'var(--text-primary)' : 'var(--text-secondary)'),
         userSelect: 'none' as const,
         height: '100%'
     };
@@ -123,7 +127,7 @@ function SortableTab({ tab, isActive, onClick, onClose, onDoubleClick, color }: 
                     color: isCloseHovered ? '#ff4d4d' : 'inherit'
                 }}
             >
-                <X size={12} />
+                <Icons.X size={12} />
             </div>
         </div>
     );
@@ -149,7 +153,7 @@ export const TabBar: React.FC<TabBarProps> = ({ tabs, activeTabId, onTabClick, o
                             if (tab.type === 'table') {
                                 const tt = tableTags.find(t => t.table_name === tab.title);
                                 const tag = tt ? tags.find(t => t.id === tt.tag_id) : undefined;
-                                color = tag?.color;
+                                color = tag ? tag.color : 'var(--text-primary)';
                             }
                             return (
                                 <SortableTab

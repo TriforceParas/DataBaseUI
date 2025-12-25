@@ -6,6 +6,7 @@
     background-color: var(--bg-secondary);
     border-radius: var(--radius-md);
     border: 1px solid var(--border-color);
+    user-select: none;
 }
 
 .input {

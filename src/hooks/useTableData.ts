@@ -29,7 +29,7 @@ export const useTableData = ({ connection, addLog, tableSchemas, setTableSchemas
 
         initTabResult(tabId);
 
-        const currentPag = paginationMap[tabId] || { page: 1, pageSize: 50, total: 0 };
+        const currentPag = paginationMap[tabId] || { page: 1, pageSize: 20, total: 0 };
         const page = pageOverride !== undefined ? pageOverride : currentPag.page;
         const pageSize = pageSizeOverride !== undefined ? pageSizeOverride : currentPag.pageSize;
 

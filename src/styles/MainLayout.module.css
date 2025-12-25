@@ -31,7 +31,7 @@
     align-items: center;
     justify-content: center;
     border-radius: var(--radius-sm);
-    color: var(--text-secondary);
+    color: var(--text-primary);
     transition: all 0.2s;
     background: transparent;
     border: none;
@@ -57,7 +57,7 @@
     align-items: center;
     justify-content: center;
     border-radius: var(--radius-sm);
-    color: var(--text-secondary);
+    color: var(--text-primary);
     transition: all 0.2s;
     background: transparent;
     border: 1px solid var(--border-color);
@@ -71,7 +71,7 @@
 .outlineBtn:hover {
     background-color: var(--bg-tertiary);
     color: var(--text-primary);
-    border-color: var(--text-primary);
+    border-color: var(--accent-primary);
 }
 
 /* Sidebar Styles */
@@ -108,7 +108,7 @@
 .filterBtnActive {
     border: none;
     background: transparent;
-    color: var(--text-secondary);
+    color: var(--text-primary);
     padding: 2px 8px;
     font-size: 0.75rem;
     cursor: pointer;
@@ -236,21 +236,28 @@
 }
 
 .primaryBtn {
-    background-color: #3b82f6;
-    /* Blue */
-    color: white;
-    border: none;
-    padding: 0.4rem 1rem;
+    background-color: var(--accent-primary);
+    color: var(--text-primary);
+    border: 1px solid transparent;
+    padding: 0.35rem 0.8rem;
     border-radius: 4px;
     font-size: 0.9rem;
     display: flex;
     align-items: center;
     gap: 0.4rem;
     cursor: pointer;
+    font-weight: 500;
 }
 
 .primaryBtn:hover {
-    background-color: #2563eb;
+    background-color: var(--accent-hover);
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+.primaryBtn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    background-color: var(--text-muted);
 }
 
 .toolbarBtn {
@@ -278,7 +285,7 @@
     display: flex;
     align-items: center;
     gap: 0.4rem;
-    padding: 0.4rem 0.8rem;
+    padding: 0.35rem 0.8rem;
     border-radius: 4px;
     cursor: pointer;
     font-size: 0.9rem;
@@ -547,4 +554,28 @@
     display: flex;
     align-items: center;
     gap: 0.4rem;
+}
+
+/* Dropdown Menu */
+.dropdownMenu {
+    position: absolute;
+    background-color: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+    min-width: 100px;
+    z-index: 1000;
+    overflow: hidden;
+}
+
+.dropdownItem {
+    padding: 0.5rem 0.75rem;
+    font-size: 0.85rem;
+    color: var(--text-primary);
+    cursor: pointer;
+    transition: background-color 0.15s;
+}
+
+.dropdownItem:hover {
+    background-color: var(--bg-tertiary);
 }

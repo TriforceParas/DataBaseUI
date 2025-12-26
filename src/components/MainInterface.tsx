@@ -96,7 +96,6 @@ export const MainInterface: React.FC<MainInterfaceProps> = ({ connection, onSwit
     };
 
     // Insert/Edit Panel State
-    const [renderEditWindow, setRenderEditWindow] = useState(false);
     const [panelColumns, setPanelColumns] = useState<string[]>([]);
     const [editData, setEditData] = useState<Record<string, any>[] | undefined>(undefined);
 
@@ -346,14 +345,34 @@ export const MainInterface: React.FC<MainInterfaceProps> = ({ connection, onSwit
     const handleOpenInsertSidebar = () => {
         if (!activeTab || activeTab.type !== 'table') return;
 
-        if (showEditWindow) {
-            setShowEditWindow(false);
+        // Close changelog if open, then open edit pane
+        setShowChangelog(false);
+        const currentData = results[activeTab.id]?.data;
+        setPanelColumns(currentData?.columns || []);
+
+        // Populate editData from selection to signal "Edit Mode" to mutation hooks
+        if (currentData && selectedIndices.size > 0) {
+            const sortedIndices = Array.from(selectedIndices).sort((a, b) => a - b);
+            const selectionData = sortedIndices.map(idx => {
+                const rowObj: Record<string, any> = {};
+                if (idx < currentData.rows.length) {
+                    currentData.columns.forEach((col, cIdx) => {
+                        rowObj[col] = currentData.rows[idx][cIdx];
+                    });
+                }
+                return rowObj;
+            }).filter(obj => Object.keys(obj).length > 0);
+
+            if (selectionData.length > 0) {
+                setEditData(selectionData);
+            } else {
+                setEditData(undefined);
+            }
         } else {
-            setShowChangelog(false);
-            setPanelColumns(results[activeTab.id]?.data?.columns || []);
-            setShowEditWindow(true);
-            setRenderEditWindow(true);
+            setEditData(undefined);
         }
+
+        setShowEditWindow(true);
     };
 
     const { handlePanelSubmit } = useDataMutation({
@@ -568,11 +587,7 @@ export const MainInterface: React.FC<MainInterfaceProps> = ({ connection, onSwit
             setShowNewConnModal={setShowNewConnModal}
             showEditWindow={showEditWindow}
             setShowEditWindow={setShowEditWindow}
-            renderEditWindow={renderEditWindow}
-            setRenderEditWindow={setRenderEditWindow}
             panelColumns={panelColumns}
-            editData={editData}
-            setEditData={setEditData}
             handlePanelSubmit={handlePanelSubmit}
             saveQuery={handleSaveQuery}
             saveFunction={handleSaveFunction}

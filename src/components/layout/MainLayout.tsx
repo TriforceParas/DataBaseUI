@@ -1,7 +1,7 @@
 import React, { useMemo } from 'react';
 import { ToastContainer, ToastMessage } from '../common/Toast';
 import { TableConfirmModal, DuplicateTableModal, ModalManager } from '../modals';
-import { Navbar, TabBar, Sidebar, ChangelogSidebar } from '.';
+import { Navbar, TabBar, Sidebar, ChangelogSidebar, EditPaneSidebar } from '.';
 import { MainViewContent } from '../views';
 import styles from '../../styles/MainLayout.module.css';
 import { Connection, PendingChange, TabItem, Tag, TableTag, SavedQuery, SavedFunction, LogEntry, TableDataState, PaginationState, ColumnSchema, SortState } from '../../types/index';
@@ -128,11 +128,7 @@ interface MainLayoutProps {
     setShowNewConnModal: (val: boolean) => void;
     showEditWindow: boolean;
     setShowEditWindow: (val: boolean) => void;
-    renderEditWindow: boolean;
-    setRenderEditWindow: (val: boolean) => void;
     panelColumns: string[];
-    editData: Record<string, any>[] | undefined;
-    setEditData: React.Dispatch<React.SetStateAction<Record<string, any>[] | undefined>>;
     handlePanelSubmit: (data: Record<string, any>[]) => void;
     saveQuery: (name: string) => void;
     saveFunction: (name: string) => void;
@@ -248,22 +244,6 @@ export const MainLayout: React.FC<MainLayoutProps> = (props) => {
                         setModal: props.setSaveModal,
                         onSaveQuery: props.saveQuery,
                         onSaveFunction: props.saveFunction
-                    }}
-                    editRow={{
-                        isOpen: props.renderEditWindow && !!props.activeTabId,
-                        onClose: () => props.setRenderEditWindow(false),
-                        activeTabId: props.activeTabId || '',
-                        activeTabType: props.activeTab?.type,
-                        activeTabTitle: props.activeTab?.title || '',
-                        results: props.results,
-                        selectedIndices: props.selectedIndices,
-                        setSelectedIndices: props.setSelectedIndices,
-                        pendingChanges: props.pendingChanges,
-                        setPendingChanges: props.setPendingChanges,
-                        panelColumns: props.panelColumns,
-                        onInsert: props.handlePanelSubmit,
-                        onAddRow: props.handleInsertRow,
-                        onCellEdit: props.handleCellEdit
                     }}
                 />
 
@@ -387,6 +367,23 @@ export const MainLayout: React.FC<MainLayoutProps> = (props) => {
                         onDiscard={props.handleDiscardChanges}
                         onRevert={props.handleRevertChange}
                         onNavigate={props.handleNavigateToChange}
+                    />
+
+                    <EditPaneSidebar
+                        isOpen={props.showEditWindow}
+                        onClose={() => props.setShowEditWindow(false)}
+                        activeTabId={props.activeTabId || ''}
+                        activeTabType={props.activeTab?.type}
+                        activeTabTitle={props.activeTab?.title || ''}
+                        results={props.results}
+                        selectedIndices={props.selectedIndices}
+                        setSelectedIndices={props.setSelectedIndices}
+                        pendingChanges={props.pendingChanges}
+                        setPendingChanges={props.setPendingChanges}
+                        panelColumns={props.panelColumns}
+                        onInsert={props.handlePanelSubmit}
+                        onAddRow={props.handleInsertRow}
+                        onCellEdit={props.handleCellEdit}
                     />
                 </div>
             </div>

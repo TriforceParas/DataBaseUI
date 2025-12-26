@@ -238,7 +238,7 @@ export const ChangelogSidebar: React.FC<ChangelogSidebarProps> = ({
                 )}
             </div>
 
-            <div style={{ padding: '1rem', borderTop: '1px solid var(--border-color)', backgroundColor: 'var(--bg-secondary)', display: 'flex', gap: '0.5rem' }}>
+            <div style={{ padding: '0.75rem', borderTop: '1px solid var(--border-color)', backgroundColor: 'var(--bg-secondary)', display: 'flex', gap: '0.5rem' }}>
                 <button
                     className={styles.secondaryBtn}
                     style={{ flex: 1, justifyContent: 'center', color: '#ff4d4d', borderColor: 'var(--border-color)' }}

@@ -33,21 +33,25 @@ export const useDataMutation = ({
     const handlePanelSubmit = useCallback(async (data: Record<string, any>[]) => {
         if (!activeTab || activeTab.type !== 'table') return;
 
-        // PENDING UPDATE Logic
-        if (selectedIndices.size > 0 && editData) {
+        // Determine if we are in "Edit Mode" (existing selection)
+        const isEditMode = selectedIndices.size > 0;
+
+        if (isEditMode) {
             const indices = Array.from(selectedIndices).sort((a, b) => a - b);
             const currentData = results[activeTab.id]?.data;
             if (!currentData) return;
 
             const cols = currentData.columns;
-            const idColIdx = cols.findIndex(c => c.toLowerCase() === 'id');
+            const idColIdx = cols.findIndex(c => c.toLowerCase() === 'id' || c.toLowerCase().includes('uuid')); // naive PK hint
             const idColName = idColIdx !== -1 ? cols[idColIdx] : null;
             const isMysql = connection.connection_string.startsWith('mysql:');
             const q = isMysql ? '`' : '"';
 
             const safeVal = (v: any) => {
-                if (v === null || v === 'NULL') return 'NULL';
-                if (!isNaN(Number(v)) && v !== '') return v;
+                if (v === null || v === 'NULL' || v === undefined) return 'NULL';
+                // Be more conservative with numbers to avoid dropping leading zeros on strings
+                if (typeof v === 'number') return v;
+                if (typeof v === 'string' && v.trim() !== '' && !isNaN(Number(v)) && !v.startsWith('0')) return v;
                 return `'${String(v).replace(/'/g, "''")}'`;
             };
 
@@ -55,54 +59,63 @@ export const useDataMutation = ({
 
             data.forEach((newRow, i) => {
                 const rowIndex = indices[i];
-                if (rowIndex === undefined || !currentData.rows[rowIndex]) return;
-                const oldRow = currentData.rows[rowIndex];
+                if (rowIndex === undefined) return;
 
-                Object.keys(newRow).forEach(col => {
-                    const colIdx = currentData.columns.indexOf(col);
-                    if (colIdx === -1) return;
-                    const oldVal = oldRow[colIdx];
-                    const newVal = newRow[col];
+                // Case 1: Updating an existing database row
+                if (rowIndex < currentData.rows.length) {
+                    const oldRow = currentData.rows[rowIndex];
+                    Object.keys(newRow).forEach(col => {
+                        const colIdx = cols.indexOf(col);
+                        if (colIdx === -1) return;
+                        const oldVal = oldRow[colIdx];
+                        const newVal = newRow[col];
 
-                    if (String(oldVal) !== String(newVal)) {
-                        let generatedSql = '';
-                        if (idColName) {
-                            const idVal = oldRow[idColIdx];
-                            generatedSql = `UPDATE ${q}${activeTab.title}${q} SET ${q}${col}${q} = ${safeVal(newVal)} WHERE ${q}${idColName}${q} = ${safeVal(idVal)}`;
-                        } else {
-                            // Where fallback
-                            const whereClause = cols.map((c, idx) => {
-                                const val = oldRow[idx];
-                                return `${q}${c}${q} ${val === null ? 'IS NULL' : `= ${safeVal(val)}`}`;
-                            }).join(' AND ');
-                            generatedSql = `UPDATE ${q}${activeTab.title}${q} SET ${q}${col}${q} = ${safeVal(newVal)} WHERE ${whereClause}`;
+                        if (String(oldVal) !== String(newVal)) {
+                            let generatedSql = '';
+                            if (idColName) {
+                                const idVal = oldRow[idColIdx];
+                                generatedSql = `UPDATE ${q}${activeTab.title}${q} SET ${q}${col}${q} = ${safeVal(newVal)} WHERE ${q}${idColName}${q} = ${safeVal(idVal)}`;
+                            } else {
+                                const whereClause = cols.map((c, idx) => {
+                                    const val = oldRow[idx];
+                                    return `${q}${c}${q} ${val === null ? 'IS NULL' : `= ${safeVal(val)}`}`;
+                                }).join(' AND ');
+                                generatedSql = `UPDATE ${q}${activeTab.title}${q} SET ${q}${col}${q} = ${safeVal(newVal)} WHERE ${whereClause}`;
+                            }
+
+                            newChanges.push({
+                                type: 'UPDATE',
+                                tableName: activeTab.title,
+                                rowIndex: rowIndex,
+                                rowData: oldRow,
+                                column: col,
+                                oldValue: oldVal,
+                                newValue: newVal,
+                                generatedSql
+                            });
                         }
+                    });
+                } else {
+                    // Case 2: Updating a virtual row (already a pending INSERT)
+                    // The 'onCellEdit' handler in EditPaneSidebar already handles this live,
+                    // so we don't need to add duplicate INSERT changes here.
+                    // If we wanted to "commit" new rows from a blank pane, it's handled below.
+                }
+            });
 
-                        newChanges.push({
-                            type: 'UPDATE',
-                            tableName: activeTab.title,
-                            rowIndex: rowIndex,
-                            rowData: oldRow,
-                            column: col,
-                            oldValue: oldVal,
-                            newValue: newVal,
-                            generatedSql
-                        });
-                    }
+            if (newChanges.length > 0) {
+                setPendingChanges(prev => {
+                    const current = prev[activeTab.id] || [];
+                    const filtered = current.filter(c =>
+                        !(c.type === 'UPDATE' && newChanges.some(nc => nc.rowIndex === c.rowIndex && nc.column === c.column))
+                    );
+                    return { ...prev, [activeTab.id]: [...filtered, ...newChanges] };
                 });
-            });
-
-            setPendingChanges(prev => {
-                const current = prev[activeTab.id] || [];
-                const filtered = current.filter(c =>
-                    !(c.type === 'UPDATE' && newChanges.some(nc => nc.rowIndex === c.rowIndex && nc.column === c.column))
-                );
-                return { ...prev, [activeTab.id]: [...filtered, ...newChanges] };
-            });
+            }
 
             setShowEditWindow(false);
             setEditData(undefined);
-            setSelectedIndices(new Set());
+            // Selection is kept as requested
             return;
         }
 

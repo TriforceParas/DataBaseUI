@@ -4,8 +4,6 @@ import { ConfirmModal } from './ConfirmModal';
 import { DuplicateTableModal } from './DuplicateTableModal';
 import { SaveQueryModal } from './SaveQueryModal';
 import { NewConnectionModal } from './NewConnectionModal';
-import { TableEditRowModal } from './TableEditRowModal';
-import { TabResult, PendingChange } from '../../types/index';
 
 interface ModalManagerProps {
     preferences: {
@@ -46,22 +44,6 @@ interface ModalManagerProps {
         onSaveQuery: (name: string) => void;
         onSaveFunction: (name: string) => void;
     };
-    editRow: {
-        isOpen: boolean;
-        onClose: () => void;
-        activeTabId: string;
-        activeTabType?: string;
-        activeTabTitle: string;
-        results: Record<string, TabResult>;
-        selectedIndices: Set<number>;
-        setSelectedIndices: (indices: Set<number>) => void;
-        pendingChanges: Record<string, PendingChange[]>;
-        setPendingChanges: React.Dispatch<React.SetStateAction<Record<string, PendingChange[]>>>;
-        panelColumns: string[];
-        onInsert: (data: Record<string, any>[]) => void;
-        onAddRow: () => void;
-        onCellEdit: (rowIndex: number, column: string, value: any) => void;
-    };
 }
 
 export const ModalManager: React.FC<ModalManagerProps> = ({
@@ -70,8 +52,7 @@ export const ModalManager: React.FC<ModalManagerProps> = ({
     tableConfirm,
     duplicateTable,
     changelogConfirm,
-    saveItem,
-    editRow
+    saveItem
 }) => {
     return (
         <>
@@ -139,23 +120,6 @@ export const ModalManager: React.FC<ModalManagerProps> = ({
                     }
                 }}
                 type={saveItem.modal?.type || 'query'}
-            />
-
-            <TableEditRowModal
-                isOpen={editRow.isOpen}
-                onClose={editRow.onClose}
-                activeTabId={editRow.activeTabId}
-                activeTabType={editRow.activeTabType}
-                activeTabTitle={editRow.activeTabTitle}
-                results={editRow.results}
-                selectedIndices={editRow.selectedIndices}
-                setSelectedIndices={editRow.setSelectedIndices}
-                pendingChanges={editRow.pendingChanges}
-                setPendingChanges={editRow.setPendingChanges}
-                panelColumns={editRow.panelColumns}
-                onInsert={editRow.onInsert}
-                onAddRow={editRow.onAddRow}
-                onCellEdit={editRow.onCellEdit}
             />
         </>
     );

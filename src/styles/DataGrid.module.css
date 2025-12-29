@@ -25,6 +25,10 @@
     overflow: auto;
     position: relative;
     outline: none;
+    user-select: none;
+    -webkit-user-select: none;
+    -moz-user-select: none;
+    -ms-user-select: none;
 }
 
 .table {
@@ -33,6 +37,16 @@
     font-size: 0.9rem;
     color: var(--text-primary);
     user-select: none;
+    -webkit-user-select: none;
+    -moz-user-select: none;
+    -ms-user-select: none;
+}
+
+.table td {
+    user-select: none;
+    -webkit-user-select: none;
+    -moz-user-select: none;
+    -ms-user-select: none;
 }
 
 .emptyRow td {

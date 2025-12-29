@@ -15,7 +15,7 @@ interface WelcomeScreenProps {
 export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onConnect }) => {
     const [connections, setConnections] = useState<Connection[]>([]);
     const [showForm, setShowForm] = useState(false);
-    const [editId, setEditId] = useState<number | null>(null);
+    // const [editId, setEditId] = useState<number | null>(null); // Unused
     const [isConnecting, setIsConnecting] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [connectionToEdit, setConnectionToEdit] = useState<Connection | null>(null);
@@ -36,21 +36,18 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onConnect }) => {
 
     const handleEdit = (conn: Connection) => {
         setConnectionToEdit(conn);
-        setEditId(conn.id);
         setShowForm(true);
         setError(null);
     };
 
     const handleFormSuccess = () => {
         setShowForm(false);
-        setEditId(null);
         setConnectionToEdit(null);
         fetchConnections();
     };
 
     const handleFormCancel = () => {
         setShowForm(false);
-        setEditId(null);
         setConnectionToEdit(null);
     };
 
@@ -98,6 +95,7 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onConnect }) => {
         }
     };
 
+
     return (
         <div className={styles.container}>
             {/* Left Panel - Branding */}
@@ -117,9 +115,12 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onConnect }) => {
 
                 <div className={styles.headerRow}>
                     <h2 className={styles.sectionTitle}>Recent Connections</h2>
-                    <button className={styles.newBtn} onClick={toggleForm}>
-                        <Plus size={16} /> New
-                    </button>
+
+                    <div style={{ display: 'flex', gap: '0.5rem' }}>
+                        <button className={styles.newBtn} onClick={toggleForm}>
+                            <Plus size={16} /> New Connection
+                        </button>
+                    </div>
                 </div>
 
                 {isConnecting && (
@@ -198,6 +199,7 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onConnect }) => {
                     </div>
                 </div>
             )}
+
         </div>
     );
 };

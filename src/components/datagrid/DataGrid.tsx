@@ -174,10 +174,106 @@ export const DataGrid: React.FC<DataGridProps> = ({
         if (tableContainerRef.current) tableContainerRef.current.focus();
     };
 
+    // --- Copy/Paste Functionality ---
+
+    const getSelectedCellsData = () => {
+        if (selectedCells.size === 0) return '';
+        
+        // Parse cell IDs and find bounds
+        const cells = Array.from(selectedCells).map(id => {
+            const [r, c] = id.split(':').map(Number);
+            return { r, c };
+        });
+        
+        const minR = Math.min(...cells.map(c => c.r));
+        const maxR = Math.max(...cells.map(c => c.r));
+        const minC = Math.min(...cells.map(c => c.c));
+        const maxC = Math.max(...cells.map(c => c.c));
+        
+        // Build tab-separated values for Excel compatibility
+        const rows: string[] = [];
+        for (let r = minR; r <= maxR; r++) {
+            const rowValues: string[] = [];
+            for (let c = minC; c <= maxC; c++) {
+                const cellId = getCellId(r, c);
+                if (selectedCells.has(cellId)) {
+                    const row = displayRows[r];
+                    const val = row[c];
+                    // Handle NULL and special values
+                    const strVal = val === null || val === undefined ? '' : String(val);
+                    rowValues.push(strVal);
+                } else {
+                    rowValues.push('');
+                }
+            }
+            rows.push(rowValues.join('\t'));
+        }
+        
+        return rows.join('\n');
+    };
+
+    const handleCopy = async () => {
+        const data = getSelectedCellsData();
+        if (data) {
+            try {
+                await navigator.clipboard.writeText(data);
+            } catch (e) {
+                console.error('Failed to copy:', e);
+            }
+        }
+    };
+
+    const handlePaste = async () => {
+        if (!lastSelected || !onCellEdit) return;
+        
+        try {
+            const text = await navigator.clipboard.readText();
+            if (!text) return;
+            
+            // Parse tab-separated values (Excel format)
+            const rows = text.split('\n').map(row => row.split('\t'));
+            const { r: startR, c: startC } = lastSelected;
+            
+            // Apply pasted values to cells
+            for (let ri = 0; ri < rows.length; ri++) {
+                const targetRow = startR + ri;
+                if (targetRow >= rowCount) break;
+                
+                for (let ci = 0; ci < rows[ri].length; ci++) {
+                    const targetCol = startC + ci;
+                    if (targetCol >= colCount) break;
+                    
+                    const colName = data.columns[targetCol];
+                    const value = rows[ri][ci];
+                    
+                    // Convert empty strings back to NULL if needed
+                    const finalValue = value === '' ? null : value;
+                    onCellEdit(targetRow, colName, finalValue);
+                }
+            }
+        } catch (e) {
+            console.error('Failed to paste:', e);
+        }
+    };
+
     // --- Keyboard Navigation ---
 
     const handleGridKeyDown = (e: React.KeyboardEvent) => {
         if (editingCell) return;
+
+        // Copy: Ctrl+C
+        if (e.ctrlKey && e.key === 'c') {
+            e.preventDefault();
+            handleCopy();
+            return;
+        }
+
+        // Paste: Ctrl+V
+        if (e.ctrlKey && e.key === 'v') {
+            e.preventDefault();
+            handlePaste();
+            return;
+        }
 
         if (e.key === 'Escape') {
             setSelectedCells(new Set());

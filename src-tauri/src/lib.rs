@@ -11,6 +11,7 @@ pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_shell::init())
+        .plugin(tauri_plugin_dialog::init())
         .invoke_handler(tauri::generate_handler![
             // Connection
             commands::connection::save_connection,
@@ -26,6 +27,12 @@ pub fn run() {
             commands::db_ops::truncate_table,
             commands::db_ops::drop_table,
             commands::db_ops::duplicate_table,
+            commands::db_ops::get_databases,
+            commands::db_ops::export_schema,
+            commands::db_ops::import_schema,
+            commands::db_ops::create_database,
+            commands::db_ops::duplicate_database,
+            commands::db_ops::delete_database,
             // Tags
             commands::tag::create_tag,
             commands::tag::update_tag,

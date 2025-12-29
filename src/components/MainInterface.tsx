@@ -11,7 +11,66 @@ interface MainInterfaceProps {
     onSwitchConnection: (conn: Connection) => void;
 }
 
-export const MainInterface: React.FC<MainInterfaceProps> = ({ connection, onSwitchConnection }) => {
+export const MainInterface: React.FC<MainInterfaceProps> = ({ connection: initialConnection, onSwitchConnection }) => {
+    // --- Connection State Management (Database Switching) ---
+    // We maintain a local connection object that can change its connection string when switching databases
+    const [connection, setConnection] = useState<Connection>(initialConnection);
+
+    useEffect(() => {
+        setConnection(initialConnection);
+    }, [initialConnection]);
+
+    const handleSwitchDatabase = (dbName: string) => {
+        // Update connection string with new database
+        // Assuming connection string format: protocol://user:pass@host:port/dbname
+        // We need robust replacement.
+        try {
+            const url = new URL(connection.connection_string);
+            // URL object might act weird with some protocols, but usually 'postgres:', 'mysql:' work enough to parse.
+            // SQLite is 'sqlite://path', pathname is path.
+            // If postgres/mysql:
+            if (url.protocol.includes('postgres') || url.protocol.includes('mysql')) {
+                url.pathname = `/${dbName}`;
+                // Keep the rest
+                let newStr = url.toString();
+                // URL.toString() might add execution slashes or encode things.
+                // Reconstruct manually if needed to be safe and clean.
+                // But for now let's try standard replacement if simple.
+
+                // Fallback manual replacement if URL fails or we want to be sure about format
+                const parts = connection.connection_string.split('://');
+                if (parts.length === 2) {
+                    const protocol = parts[0];
+                    const rest = parts[1];
+                    const atSplit = rest.split('@');
+                    if (atSplit.length === 2) {
+                        const credentials = atSplit[0];
+                        const hostPart = atSplit[1];
+                        const slashIdx = hostPart.indexOf('/');
+                        if (slashIdx !== -1) {
+                            newStr = `${protocol}://${credentials}@${hostPart.substring(0, slashIdx)}/${dbName}`;
+                        } else {
+                            newStr = `${protocol}://${credentials}@${hostPart}/${dbName}`;
+                        }
+                    } else {
+                        // No auth
+                        const slashIdx = rest.indexOf('/');
+                        if (slashIdx !== -1) {
+                            newStr = `${protocol}://${rest.substring(0, slashIdx)}/${dbName}`;
+                        } else {
+                            newStr = `${protocol}://${rest}/${dbName}`;
+                        }
+                    }
+                }
+
+                setConnection({ ...connection, connection_string: newStr });
+            }
+        } catch (e) {
+            console.error("Failed to switch database string", e);
+        }
+    };
+
+
     // --- System UI (Theme, Zoom, Sidebar, Dropdowns) ---
     const {
         sidebarOpen, setSidebarOpen,
@@ -502,6 +561,7 @@ export const MainInterface: React.FC<MainInterfaceProps> = ({ connection, onSwit
             tags={tags}
             tableTags={tableTags}
             onSwitchConnection={handleSwitchConnectionWrapper}
+            onSwitchDatabase={handleSwitchDatabase}
             onTableClick={handleTableClick}
             onAddConnection={() => setShowNewConnModal(true)}
             onGetTableSchema={handleGetTableSchema}

@@ -5,6 +5,7 @@ import { Icons } from '../../assets/icons';
 import { invoke } from '@tauri-apps/api/core';
 import { TagManager } from './TagManager';
 import { ConfirmModal } from '../modals/ConfirmModal';
+import { DatabaseManagementModal } from '../modals/DatabaseManagementModal';
 import { DndContext, useDraggable, useDroppable, DragEndEvent, useSensor, useSensors, PointerSensor, KeyboardSensor } from '@dnd-kit/core';
 
 interface SidebarProps {
@@ -13,6 +14,7 @@ interface SidebarProps {
     tables: string[];
     savedConnections: Connection[];
     onSwitchConnection: (conn: Connection) => void;
+    onSwitchDatabase: (dbName: string) => void;
     onTableClick: (tableName: string) => void;
     onAddConnection: () => void;
     refreshTrigger?: number;
@@ -31,6 +33,8 @@ interface SidebarProps {
     onDeleteQuery?: (id: number) => void;
     onDeleteFunction?: (id: number) => void;
     onEditFunction?: (func: SavedFunction) => void;
+    // Search
+    searchQuery?: string;
 }
 
 // Draggable Table Item with Context Menu
@@ -474,14 +478,141 @@ const TagGroup = ({
 
 
 
+// Wrapper for Import/Export Modal with mode selection
+const SchemaImportExportModalWrapper: React.FC<{
+    isOpen: boolean;
+    onClose: () => void;
+    connection: Connection;
+}> = ({ isOpen, onClose, connection }) => {
+    const [mode, setMode] = useState<'import' | 'export' | null>(null);
+
+    if (!isOpen) return null;
+
+    // If mode not selected, show selection
+    if (!mode) {
+        return (
+            <div style={{
+                position: 'fixed', inset: 0, zIndex: 2000,
+                backgroundColor: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(2px)',
+                display: 'flex', alignItems: 'center', justifyContent: 'center'
+            }} onClick={onClose}>
+                <div style={{
+                    width: '400px',
+                    backgroundColor: 'var(--bg-secondary)',
+                    borderRadius: '8px', border: '1px solid var(--border-color)',
+                    padding: '2rem',
+                    boxShadow: 'var(--shadow-xl)'
+                }} onClick={e => e.stopPropagation()}>
+                    <h3 style={{ margin: '0 0 1.5rem 0', fontSize: '1.25rem' }}>Import/Export Schemas</h3>
+                    
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                        <button
+                            onClick={() => setMode('import')}
+                            style={{
+                                padding: '1rem',
+                                backgroundColor: 'var(--bg-tertiary)',
+                                border: '1px solid var(--border-color)',
+                                borderRadius: '6px',
+                                color: 'var(--text-primary)',
+                                cursor: 'pointer',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '0.75rem',
+                                fontSize: '1rem',
+                                transition: 'all 0.2s'
+                            }}
+                            onMouseEnter={(e) => {
+                                e.currentTarget.style.backgroundColor = 'var(--accent-primary)';
+                                e.currentTarget.style.transform = 'translateY(-2px)';
+                            }}
+                            onMouseLeave={(e) => {
+                                e.currentTarget.style.backgroundColor = 'var(--bg-tertiary)';
+                                e.currentTarget.style.transform = 'translateY(0)';
+                            }}
+                        >
+                            <Icons.Upload size={20} />
+                            <div style={{ textAlign: 'left' }}>
+                                <div style={{ fontWeight: 600 }}>Import Schema</div>
+                                <div style={{ fontSize: '0.85rem', opacity: 0.8 }}>Import .sql files into database</div>
+                            </div>
+                        </button>
+
+                        <button
+                            onClick={() => setMode('export')}
+                            style={{
+                                padding: '1rem',
+                                backgroundColor: 'var(--bg-tertiary)',
+                                border: '1px solid var(--border-color)',
+                                borderRadius: '6px',
+                                color: 'var(--text-primary)',
+                                cursor: 'pointer',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '0.75rem',
+                                fontSize: '1rem',
+                                transition: 'all 0.2s'
+                            }}
+                            onMouseEnter={(e) => {
+                                e.currentTarget.style.backgroundColor = 'var(--accent-primary)';
+                                e.currentTarget.style.transform = 'translateY(-2px)';
+                            }}
+                            onMouseLeave={(e) => {
+                                e.currentTarget.style.backgroundColor = 'var(--bg-tertiary)';
+                                e.currentTarget.style.transform = 'translateY(0)';
+                            }}
+                        >
+                            <Icons.Download size={20} />
+                            <div style={{ textAlign: 'left' }}>
+                                <div style={{ fontWeight: 600 }}>Export Schema</div>
+                                <div style={{ fontSize: '0.85rem', opacity: 0.8 }}>Export database to .sql files</div>
+                            </div>
+                        </button>
+
+                        <button
+                            onClick={onClose}
+                            style={{
+                                marginTop: '0.5rem',
+                                padding: '0.5rem 1rem',
+                                backgroundColor: 'transparent',
+                                border: '1px solid var(--border-color)',
+                                borderRadius: '4px',
+                                color: 'var(--text-primary)',
+                                cursor: 'pointer'
+                            }}
+                        >
+                            Cancel
+                        </button>
+                    </div>
+                </div>
+            </div>
+        );
+    }
+
+    // If mode selected, show the import/export modal
+    return (
+        <SchemaImportExportModal
+            isOpen={true}
+            onClose={() => {
+                setMode(null);
+                onClose();
+            }}
+            mode={mode}
+            connection={connection}
+        />
+    );
+};
+
 export const Sidebar: React.FC<SidebarProps> = ({
     sidebarOpen, connection, tables, savedConnections,
-    onSwitchConnection, onTableClick, onAddConnection, refreshTrigger,
+    onSwitchConnection, onSwitchDatabase, onTableClick, onAddConnection, refreshTrigger,
     onGetTableSchema, onEditTableSchema, onDuplicateTable, onTruncateTable, onDropTable,
-    savedQueries = [], savedFunctions = [], onQueryClick, onFunctionClick, onDeleteQuery, onDeleteFunction, onEditFunction
+    savedQueries = [], savedFunctions = [], onQueryClick, onFunctionClick, onDeleteQuery, onDeleteFunction, onEditFunction,
+    searchQuery = ''
 }) => {
     const [viewMode, setViewMode] = useState<'az' | 'tags'>('az');
     const [showConnDropdown, setShowConnDropdown] = useState(false);
+    const [availableDatabases, setAvailableDatabases] = useState<string[]>([]);
+    const [showDatabaseManager, setShowDatabaseManager] = useState(false);
 
     // Close on outside click
     useEffect(() => {
@@ -550,6 +681,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
         // Always fetch tags so colors are available even in AZ mode
         fetchTags();
         fetchTableTags();
+        fetchDatabases();
     }, [connection, refreshTrigger]);
 
     const fetchTags = async () => {
@@ -564,6 +696,16 @@ export const Sidebar: React.FC<SidebarProps> = ({
             const tt = await invoke<TableTag[]>('get_table_tags', { connectionId: connection.id });
             setTableTags(tt);
         } catch (e) { console.error(e); }
+    };
+
+    const fetchDatabases = async () => {
+        try {
+            const dbs = await invoke<string[]>('get_databases', { connectionString: connection.connection_string });
+            // Filter out system schemas
+            const systemSchemas = ['sys', 'information_schema', 'mysql', 'performance_schema'];
+            const filteredDbs = dbs.filter(db => !systemSchemas.includes(db.toLowerCase()));
+            setAvailableDatabases(filteredDbs);
+        } catch (e) { console.error("Failed to fetch databases", e); }
     };
 
     const handleDragEnd = async (event: DragEndEvent) => {
@@ -622,6 +764,38 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
     const { groups, untagged } = getGroupedTables();
 
+    // Filter items based on search query
+    const filteredTables = searchQuery
+        ? tables.filter(t => t.toLowerCase().includes(searchQuery.toLowerCase()))
+        : tables;
+    
+    const filteredQueries = searchQuery
+        ? savedQueries.filter(q => q.name.toLowerCase().includes(searchQuery.toLowerCase()))
+        : savedQueries;
+    
+    const filteredFunctions = searchQuery
+        ? savedFunctions.filter(f => f.name.toLowerCase().includes(searchQuery.toLowerCase()))
+        : savedFunctions;
+
+    const isSearching = searchQuery.length > 0;
+
+    // Extract current database name from connection string
+    const getCurrentDatabase = () => {
+        try {
+            const url = new URL(connection.connection_string);
+            const dbName = url.pathname.slice(1); // Remove leading '/'
+            return dbName || connection.name;
+        } catch (e) {
+            // If it's not a valid URL, try to extract from connection string manually
+            const parts = connection.connection_string.split('/');
+            if (parts.length > 1) {
+                const lastPart = parts[parts.length - 1];
+                return lastPart || connection.name;
+            }
+            return connection.name;
+        }
+    };
+
     return (
         <div className={`${styles.sidebar} ${!sidebarOpen ? styles.closed : ''}`}>
             <div
@@ -630,10 +804,12 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 data-conn-trigger="true" // Ensure trigger is marked
                 style={{ position: 'relative' }}
             >
-                <span style={{ fontWeight: 600, fontSize: '1rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginRight: '0.5rem' }}>
-                    {connection.name}
-                </span>
-                <Icons.ChevronDown size={14} style={{ opacity: 0.5 }} />
+                <div style={{ display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+                    <span style={{ fontWeight: 600, fontSize: '1rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginRight: '0.5rem' }}>
+                        {getCurrentDatabase()}
+                    </span>
+                </div>
+                <Icons.ChevronDown size={14} style={{ opacity: 0.5, marginLeft: 'auto' }} />
 
                 {/* Connection Dropdown */}
                 {showConnDropdown && (
@@ -648,70 +824,157 @@ export const Sidebar: React.FC<SidebarProps> = ({
                         boxShadow: 'var(--shadow-lg)',
                         zIndex: 100,
                         marginTop: '4px',
-                        maxHeight: '300px',
+                        maxHeight: '400px',
                         overflowY: 'auto',
                         userSelect: 'none'
-                    }}>
-                        <div style={{
-                            padding: '0.5rem',
-                            fontSize: '0.8rem',
-                            color: 'var(--text-secondary)',
-                            borderBottom: '1px solid var(--border-color)'
-                        }}>
-                            Switch Connection
-                        </div>
-                        {savedConnections.map(conn => (
-                            <div
-                                key={conn.id}
-                                style={{
-                                    padding: '0.5rem 0.75rem',
-                                    cursor: 'pointer',
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    justifyContent: 'space-between',
-                                    fontSize: '0.9rem',
-                                    backgroundColor: conn.id === connection.id ? 'var(--bg-tertiary)' : 'transparent',
-                                    color: 'var(--text-primary)'
-                                }}
-                                onClick={(e) => { e.stopPropagation(); onSwitchConnection(conn); setShowConnDropdown(false); }}
-                            >
-                                {conn.name}
-                                {conn.id === connection.id && <Icons.Check size={14} />}
-                            </div>
-                        ))}
+                    }} data-conn-dropdown="true">
+
+                        {/* Database Selection Section */}
+                        {availableDatabases.length > 0 && (
+                            <>
+                                <div style={{
+                                    padding: '0.5rem',
+                                    fontSize: '0.75rem',
+                                    fontWeight: 600,
+                                    textTransform: 'uppercase',
+                                    color: 'var(--text-muted)',
+                                    backgroundColor: 'var(--bg-tertiary)',
+                                    letterSpacing: '0.05em'
+                                }}>
+                                    Databases
+                                </div>
+                                <div style={{ maxHeight: '150px', overflowY: 'auto' }}>
+                                    {availableDatabases.map(db => (
+                                        <div
+                                            key={db}
+                                            style={{
+                                                padding: '0.5rem 1rem',
+                                                cursor: 'pointer',
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                gap: '0.5rem',
+                                                fontSize: '0.9rem',
+                                                color: connection.connection_string.includes(`/${db}`)
+                                                    || (connection.connection_string.endsWith('/') && db === 'postgres') // weak check
+                                                    ? 'var(--accent-primary)' : 'var(--text-primary)',
+                                                // Check active logic is naive, but works if we switched using handleSwitchDatabase
+                                            }}
+                                            onClick={(e) => { e.stopPropagation(); onSwitchDatabase(db); setShowConnDropdown(false); }}
+                                        >
+                                            <Icons.Database size={14} />
+                                            {db}
+                                        </div>
+                                    ))}
+                                </div>
+                                <div style={{ height: '1px', backgroundColor: 'var(--border-color)', margin: '0.25rem 0' }}></div>
+                            </>
+                        )}
+
+                        {/* Database Manager */}
                         <div
                             style={{
                                 padding: '0.5rem 0.75rem',
                                 cursor: 'pointer',
-                                color: 'var(--accent-primary)',
-                                borderTop: '1px solid var(--border-color)',
+                                color: 'var(--text-primary)',
                                 display: 'flex',
                                 alignItems: 'center',
                                 gap: '0.5rem',
-                                fontWeight: 500
+                                fontSize: '0.9rem',
+                                borderRadius: '4px'
                             }}
-                            onClick={(e) => { e.stopPropagation(); onAddConnection(); setShowConnDropdown(false); }}
+                            onClick={(e) => { e.stopPropagation(); setShowDatabaseManager(true); setShowConnDropdown(false); }}
+                            onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--bg-tertiary)'}
+                            onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
                         >
-                            <Icons.Plus size={14} /> New Connection
+                            <Icons.Settings size={14} /> Database Manager
                         </div>
                     </div>
                 )}
             </div>
 
             <div className={styles.sidebarControls}>
-                <div className={styles.filterToggle}>
-                    <button className={viewMode === 'az' ? styles.filterBtnActive : styles.filterBtn} onClick={() => setViewMode('az')}>A-Z</button>
-                    <button className={viewMode === 'tags' ? styles.filterBtnActive : styles.filterBtn} onClick={() => setViewMode('tags')}>Tags</button>
-                </div>
-                {viewMode === 'tags' && (
-                    <button className={styles.newTagBtn} onClick={() => setShowTagManager(true)}>
-                        + New Tag
-                    </button>
+                {!isSearching && (
+                    <>
+                        <div className={styles.filterToggle}>
+                            <button className={viewMode === 'az' ? styles.filterBtnActive : styles.filterBtn} onClick={() => setViewMode('az')}>A-Z</button>
+                            <button className={viewMode === 'tags' ? styles.filterBtnActive : styles.filterBtn} onClick={() => setViewMode('tags')}>Tags</button>
+                        </div>
+                        {viewMode === 'tags' && (
+                            <button className={styles.newTagBtn} onClick={() => setShowTagManager(true)}>
+                                + New Tag
+                            </button>
+                        )}
+                    </>
                 )}
             </div>
 
             <div className={styles.tableList}>
-                {viewMode === 'az' ? (
+                {/* Search Results View - flat list without groupings */}
+                {isSearching ? (
+                    <div style={{ padding: '0.5rem 0' }}>
+                        {/* Tables */}
+                        {filteredTables.length > 0 && (
+                            <div style={{ marginBottom: '0.5rem' }}>
+                                <div style={{ padding: '0.25rem 0.5rem', fontSize: '0.7rem', textTransform: 'uppercase', color: 'var(--text-muted)', fontWeight: 600 }}>Tables</div>
+                                {filteredTables.map(table => {
+                                    const tt = tableTags.find(t => t.table_name === table);
+                                    const tag = tt ? tags.find(t => t.id === tt.tag_id) : undefined;
+                                    return (
+                                        <DraggableTableItem
+                                            key={table}
+                                            table={table}
+                                            onClick={() => onTableClick(table)}
+                                            fromTagId={tag ? tag.id : null}
+                                            onGetSchema={onGetTableSchema}
+                                            onEditSchema={onEditTableSchema}
+                                            onDuplicate={onDuplicateTable}
+                                            onTruncate={onTruncateTable}
+                                            onDrop={onDropTable}
+                                            style={{ color: 'var(--text-primary)' }}
+                                        />
+                                    );
+                                })}
+                            </div>
+                        )}
+                        {/* Queries */}
+                        {filteredQueries.length > 0 && (
+                            <div style={{ marginBottom: '0.5rem' }}>
+                                <div style={{ padding: '0.25rem 0.5rem', fontSize: '0.7rem', textTransform: 'uppercase', color: 'var(--text-muted)', fontWeight: 600 }}>Queries</div>
+                                {filteredQueries.map(query => (
+                                    <SavedItemWithContextMenu
+                                        key={query.id}
+                                        name={query.name}
+                                        icon={<Icons.Code2 size={14} color="#8b5cf6" />}
+                                        onClick={() => onQueryClick?.(query)}
+                                        onDelete={() => onDeleteQuery?.(query.id)}
+                                    />
+                                ))}
+                            </div>
+                        )}
+                        {/* Functions */}
+                        {filteredFunctions.length > 0 && (
+                            <div style={{ marginBottom: '0.5rem' }}>
+                                <div style={{ padding: '0.25rem 0.5rem', fontSize: '0.7rem', textTransform: 'uppercase', color: 'var(--text-muted)', fontWeight: 600 }}>Functions</div>
+                                {filteredFunctions.map(func => (
+                                    <SavedItemWithContextMenu
+                                        key={func.id}
+                                        name={func.name}
+                                        icon={<Icons.MathFunction size={14} color="#f59e0b" />}
+                                        onClick={() => onFunctionClick?.(func)}
+                                        onDelete={() => onDeleteFunction?.(func.id)}
+                                        onEdit={() => onEditFunction?.(func)}
+                                    />
+                                ))}
+                            </div>
+                        )}
+                        {/* No results */}
+                        {filteredTables.length === 0 && filteredQueries.length === 0 && filteredFunctions.length === 0 && (
+                            <div style={{ padding: '1rem', textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.85rem' }}>
+                                No results found for "{searchQuery}"
+                            </div>
+                        )}
+                    </div>
+                ) : viewMode === 'az' ? (
                     <>
                         <CollapsibleSection
                             title="Tables"
@@ -723,7 +986,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
                             {tables.map(table => {
                                 const tt = tableTags.find(t => t.table_name === table);
                                 const tag = tt ? tags.find(t => t.id === tt.tag_id) : undefined;
-                                const color = tag ? tag.color : undefined;
                                 return (
                                     <DraggableTableItem
                                         key={table}
@@ -851,6 +1113,20 @@ export const Sidebar: React.FC<SidebarProps> = ({
                     confirmText="Delete"
                     onConfirm={confirmDeleteTag}
                     onCancel={() => setConfirmModal(null)}
+                />
+            )}
+
+            {/* Database Manager Modal */}
+            {showDatabaseManager && (
+                <DatabaseManagementModal
+                    isOpen={showDatabaseManager}
+                    onClose={() => setShowDatabaseManager(false)}
+                    connection={connection}
+                    onSuccess={() => {
+                        // Refresh databases
+                        fetchDatabases();
+                    }}
+                    onDatabaseChange={onSwitchDatabase}
                 />
             )}
         </div>

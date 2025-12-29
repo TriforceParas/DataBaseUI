@@ -91,7 +91,22 @@ export const ConnectionForm: React.FC<ConnectionFormProps> = ({ connectionToEdit
             if (username || password) {
                 str += `${username}${password ? `:${password}` : ''}@`;
             }
-            str += `${host}:${port}/${database}`;
+            str += `${host}:${port}`;
+            // If database is specified (e.g. for sqlite), add it. For others, we might append /db if we want to support it, 
+            // but the form field is gone. However, sqlite handles it differently below.
+            // For standard server connections, we append /database if present in state (legacy) or leave validation to backend.
+            if (database) {
+                str += `/${database}`;
+            } else if (protocol === 'postgres') {
+                // Postgres usually requires a DB. Default to 'postgres' if not present?
+                // Or leave it empty and let users handle it? 
+                // The requirement says "no longer be saving the database name". 
+                // If I append /postgres, I am saving a database name.
+                // So I will just append /
+                str += `/`;
+            } else {
+                str += `/`;
+            }
 
             // Should valid sqlite be handled differently?
             if (protocol === 'sqlite') {
@@ -187,9 +202,10 @@ export const ConnectionForm: React.FC<ConnectionFormProps> = ({ connectionToEdit
                     />
                     <input
                         className={styles.input}
-                        placeholder="Database"
+                        placeholder="Database (optional)"
                         value={newConnProp.database}
                         onChange={e => setNewConnProp({ ...newConnProp, database: e.target.value })}
+                        disabled={newConnProp.protocol === 'sqlite'}
                     />
                     <input
                         className={styles.input}

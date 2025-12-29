@@ -115,7 +115,7 @@ export const useChangeManager = (
         setChangelogConfirm(null);
     }, []);
 
-    const handleNavigateToChange = useCallback((tabId: string, rowIndex: number) => {
+    const handleNavigateToChange = useCallback((_tabId: string, rowIndex: number) => {
         setHighlightRowIndex(rowIndex);
         setTimeout(() => setHighlightRowIndex(null), 2000);
     }, []);

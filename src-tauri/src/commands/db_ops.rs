@@ -400,3 +400,248 @@ pub async fn duplicate_table(
 
     Ok(())
 }
+
+#[tauri::command]
+pub async fn get_databases(connection_string: String) -> Result<Vec<String>, String> {
+    let db_type = detect_db_type(&connection_string)?;
+    let mut conn = connect_to_db(&connection_string).await?;
+
+    let query = match db_type {
+        "postgres" => "SELECT datname FROM pg_database WHERE datistemplate = false AND datallowconn = true",
+        "mysql" => "SHOW DATABASES",
+        "sqlite" => "SELECT file FROM pragma_database_list WHERE name='main'", 
+        _ => return Ok(vec![]), 
+    };
+
+    let rows = sqlx::query(query)
+        .fetch_all(&mut conn)
+        .await
+        .map_err(|e| format!("Failed to fetch databases: {}", e))?;
+
+    let dbs: Vec<String> = rows
+        .iter()
+        .map(|row| row.try_get(0).unwrap_or_default())
+        .collect();
+
+    Ok(dbs)
+}
+
+fn generate_create_table_sql(table_name: &str, columns: &[ColumnSchema], db_type: &str) -> String {
+    let cols_sql: Vec<String> = columns.iter().map(|col| {
+        let mut line = format!("\"{}\" {}", col.name, col.type_name);
+        if db_type == "mysql" {
+            line = format!("`{}` {}", col.name, col.type_name);
+        }
+
+        if !col.is_nullable {
+            line.push_str(" NOT NULL");
+        }
+        
+        if let Some(def) = &col.default_value {
+            if !def.starts_with("nextval") && !def.contains("::") { 
+                 line.push_str(&format!(" DEFAULT {}", def));
+            }
+        }
+        
+        if col.is_primary_key {
+            line.push_str(" PRIMARY KEY");
+        }
+        
+        if col.is_auto_increment && db_type == "mysql" {
+             line.push_str(" AUTO_INCREMENT");
+        }
+        
+        line
+    }).collect();
+
+    let q_table_name = if db_type == "mysql" { format!("`{}`", table_name) } else { format!("\"{}\"", table_name) };
+    format!("CREATE TABLE IF NOT EXISTS {} (\n    {}\n);", q_table_name, cols_sql.join(",\n    "))
+}
+
+#[tauri::command]
+pub async fn export_schema(connection_string: String, directory_path: String) -> Result<String, String> {
+    use std::fs;
+    use std::path::Path;
+
+    let db_type = detect_db_type(&connection_string)?;
+    let tables = get_tables(connection_string.clone()).await?;
+    
+    let dir = Path::new(&directory_path);
+    if !dir.exists() {
+        return Err("Directory does not exist".to_string());
+    }
+
+    let mut log = String::new();
+    let mut success_count = 0;
+
+    for table in tables {
+        match get_table_schema(connection_string.clone(), table.clone()).await {
+            Ok(cols) => {
+                let sql = generate_create_table_sql(&table, &cols, db_type);
+                let file_path = dir.join(format!("{}.sql", table));
+                match fs::write(&file_path, sql) {
+                    Ok(_) => {
+                        success_count += 1;
+                        log.push_str(&format!("Exported {}\n", table));
+                    },
+                    Err(e) => log.push_str(&format!("Failed to write {}: {}\n", table, e)),
+                }
+            },
+            Err(e) => log.push_str(&format!("Failed to get schema for {}: {}\n", table, e)),
+        }
+    }
+
+    log.push_str(&format!("Export compeleted. {} tables exported.", success_count));
+    Ok(log)
+}
+
+#[tauri::command]
+pub async fn import_schema(connection_string: String, directory_path: String) -> Result<String, String> {
+    use std::fs;
+    use std::path::Path;
+
+    let dir = Path::new(&directory_path);
+    if !dir.exists() {
+        return Err("Directory does not exist".to_string());
+    }
+
+    let mut conn = connect_to_db(&connection_string).await?;
+
+    let entries = fs::read_dir(dir).map_err(|e| format!("Failed to read directory: {}", e))?;
+    let mut log = String::new();
+    let mut success_count = 0;
+    let mut error_count = 0;
+
+    for entry in entries {
+        if let Ok(entry) = entry {
+            let path = entry.path();
+            if path.extension().map_or(false, |ext| ext == "sql") {
+                let filename = path.file_name().unwrap_or_default().to_string_lossy();
+                match fs::read_to_string(&path) {
+                    Ok(sql) => {
+                         let is_mysql = connection_string.starts_with("mysql:");
+                         let stmts = split_sql_statements(&sql, is_mysql);
+                         
+                         let mut file_error = false;
+                         for stmt in stmts {
+                             if stmt.trim().is_empty() { continue; }
+                             if let Err(e) = sqlx::query(&stmt).execute(&mut conn).await {
+                                 log.push_str(&format!("Error in {}: {}\n", filename, e));
+                                 file_error = true;
+                                 break; 
+                             }
+                         }
+                         
+                         if !file_error {
+                             success_count += 1;
+                             log.push_str(&format!("Imported {}\n", filename));
+                         } else {
+                             error_count += 1;
+                         }
+                    },
+                    Err(e) => {
+                        log.push_str(&format!("Failed to read {}: {}\n", filename, e));
+                        error_count += 1;
+                    }
+                }
+            }
+        }
+    }
+    
+    log.push_str(&format!("Import completed. {} success, {} errors.", success_count, error_count));
+    Ok(log)
+}
+
+#[tauri::command]
+pub async fn create_database(connection_string: String, database_name: String) -> Result<(), String> {
+    let db_type = detect_db_type(&connection_string)?;
+    let mut conn = connect_to_db(&connection_string).await?;
+
+    let query = match db_type {
+        "mysql" => format!("CREATE DATABASE `{}`", database_name),
+        "postgres" => format!("CREATE DATABASE \"{}\"", database_name),
+        "sqlite" => return Err("SQLite does not support creating databases via SQL".to_string()),
+        _ => return Err("Unsupported database type".to_string()),
+    };
+
+    sqlx::query(&query)
+        .execute(&mut conn)
+        .await
+        .map_err(|e| format!("Failed to create database: {}", e))?;
+
+    Ok(())
+}
+
+#[tauri::command]
+pub async fn duplicate_database(
+    connection_string: String,
+    source_database: String,
+    target_database: String,
+) -> Result<(), String> {
+    let db_type = detect_db_type(&connection_string)?;
+    let mut conn = connect_to_db(&connection_string).await?;
+
+    match db_type {
+        "mysql" => {
+            // MySQL: Create new DB, then copy tables
+            sqlx::query(&format!("CREATE DATABASE `{}`", target_database))
+                .execute(&mut conn)
+                .await
+                .map_err(|e| format!("Failed to create target database: {}", e))?;
+
+            // Get tables from source
+            let rows = sqlx::query(&format!("SHOW TABLES FROM `{}`", source_database))
+                .fetch_all(&mut conn)
+                .await
+                .map_err(|e| format!("Failed to get tables: {}", e))?;
+
+            for row in rows {
+                let table: String = row.try_get(0).unwrap_or_default();
+                let copy_query = format!(
+                    "CREATE TABLE `{}`.`{}` AS SELECT * FROM `{}`.`{}`",
+                    target_database, table, source_database, table
+                );
+                if let Err(e) = sqlx::query(&copy_query).execute(&mut conn).await {
+                    log::warn!("Failed to copy table {}: {}", table, e);
+                }
+            }
+        }
+        "postgres" => {
+            // PostgreSQL: Use template
+            let query = format!(
+                "CREATE DATABASE \"{}\" WITH TEMPLATE \"{}\"",
+                target_database, source_database
+            );
+            sqlx::query(&query)
+                .execute(&mut conn)
+                .await
+                .map_err(|e| format!("Failed to duplicate database: {}", e))?;
+        }
+        "sqlite" => {
+            return Err("SQLite does not support duplicating databases via SQL".to_string());
+        }
+        _ => return Err("Unsupported database type".to_string()),
+    }
+
+    Ok(())
+}
+
+#[tauri::command]
+pub async fn delete_database(connection_string: String, database_name: String) -> Result<(), String> {
+    let db_type = detect_db_type(&connection_string)?;
+    let mut conn = connect_to_db(&connection_string).await?;
+
+    let query = match db_type {
+        "mysql" => format!("DROP DATABASE `{}`", database_name),
+        "postgres" => format!("DROP DATABASE \"{}\"", database_name),
+        "sqlite" => return Err("SQLite does not support deleting databases via SQL".to_string()),
+        _ => return Err("Unsupported database type".to_string()),
+    };
+
+    sqlx::query(&query)
+        .execute(&mut conn)
+        .await
+        .map_err(|e| format!("Failed to delete database: {}", e))?;
+
+    Ok(())
+}

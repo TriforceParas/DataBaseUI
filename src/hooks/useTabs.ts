@@ -4,10 +4,8 @@ import { DragEndEvent } from '@dnd-kit/core';
 import { arrayMove } from '@dnd-kit/sortable';
 
 export const useTabs = () => {
-    const [tabs, setTabs] = useState<TabItem[]>([
-        { id: '1', title: 'Welcome', type: 'welcome' }
-    ]);
-    const [activeTabId, setActiveTabId] = useState<string>('1');
+    const [tabs, setTabs] = useState<TabItem[]>([]);
+    const [activeTabId, setActiveTabId] = useState<string>('');
     const [tabQueries, setTabQueries] = useState<Record<string, string>>({});
 
     const activeTab = tabs.find(t => t.id === activeTabId);

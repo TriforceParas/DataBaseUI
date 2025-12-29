@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import { ToastContainer, ToastMessage } from '../common/Toast';
 import { TableConfirmModal, DuplicateTableModal, ModalManager } from '../modals';
 import { Navbar, TabBar, Sidebar, ChangelogSidebar, EditPaneSidebar } from '.';
@@ -43,6 +43,7 @@ interface MainLayoutProps {
     tags: Tag[];
     tableTags: TableTag[];
     onSwitchConnection: (conn: Connection) => void;
+    onSwitchDatabase: (dbName: string) => void;
     onTableClick: (tableName: string) => void;
     onAddConnection: () => void;
     onGetTableSchema: (tableName: string) => void;
@@ -147,6 +148,8 @@ export const MainLayout: React.FC<MainLayoutProps> = (props) => {
         [props.pendingChanges]
     );
 
+    // Search state for filtering sidebar items
+    const [searchQuery, setSearchQuery] = useState('');
 
 
     // NOTE: For handleOpenEditWindow, we should ideally rely on the prop passed from parent
@@ -264,6 +267,11 @@ export const MainLayout: React.FC<MainLayoutProps> = (props) => {
                         handleOpenEditWindow={props.handleOpenEditWindow}
                         showEditWindow={props.showEditWindow}
                         handleOpenSchema={props.handleOpenSchema}
+                        connection={props.connection}
+                        savedConnections={props.savedConnections}
+                        onSwitchConnection={props.onSwitchConnection}
+                        searchQuery={searchQuery}
+                        onSearchChange={setSearchQuery}
                     />
                 )}
 
@@ -272,6 +280,7 @@ export const MainLayout: React.FC<MainLayoutProps> = (props) => {
                         sidebarOpen={props.sidebarOpen}
                         tables={props.tables}
                         onSwitchConnection={props.onSwitchConnection}
+                        onSwitchDatabase={props.onSwitchDatabase}
                         onTableClick={props.onTableClick}
                         onAddConnection={props.onAddConnection}
                         onGetTableSchema={props.onGetTableSchema}
@@ -288,6 +297,7 @@ export const MainLayout: React.FC<MainLayoutProps> = (props) => {
                         onEditFunction={props.onEditFunction}
                         connection={props.connection}
                         savedConnections={props.savedConnections}
+                        searchQuery={searchQuery}
                     />
 
                     <div className={styles.content}>

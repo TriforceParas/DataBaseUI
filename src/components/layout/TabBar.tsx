@@ -44,7 +44,8 @@ const restrictToHorizontalAxis: Modifier = ({ transform }) => {
 
 const TabIcon = ({ tab, color }: { tab: TabItem; color?: string }) => {
     // Icons follow the theme-aware colors (white in dark, black in light)
-    const iconColor = 'var(--text-primary)';
+    // Use passed color if available (e.g. from tag)
+    const iconColor = color || 'var(--text-primary)';
 
     if (tab.type === 'query') return <Icons.Code2 size={14} style={{ flexShrink: 0, color: iconColor }} />;
     if (tab.type === 'function' || tab.type === 'function-output') return <Icons.MathFunction size={14} style={{ flexShrink: 0, color: iconColor }} />;

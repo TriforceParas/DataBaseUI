@@ -103,7 +103,6 @@ export const ChangelogSidebar: React.FC<ChangelogSidebarProps> = ({
                                     const updateColor = '#f59e0b'; // Orange
                                     const insertColor = '#22c55e'; // Green
                                     const deleteColor = '#ff4d4d'; // Red
-                                    const schemaColor = '#8b5cf6'; // Purple for schema changes
 
                                     const getColor = () => {
                                         if (isUpdate) return updateColor;

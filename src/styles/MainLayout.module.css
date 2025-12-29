@@ -16,6 +16,8 @@
     padding: 0 0 0 1rem;
     /* Right padding 0 for edge controls */
     background-color: var(--bg-secondary);
+    position: relative;
+    z-index: 1000;
 }
 
 .navGroup {
@@ -25,8 +27,8 @@
 }
 
 .iconBtn {
-    width: 28px;
-    height: 28px;
+    width: 26px;
+    height: 26px;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -76,7 +78,7 @@
 
 /* Sidebar Styles */
 .sidebarConnection {
-    padding: 0.5rem 1rem;
+    padding: 0.5rem 1rem 0.5rem 1rem;
     height: 40px;
     display: flex;
     align-items: center;
@@ -91,7 +93,7 @@
 }
 
 .sidebarControls {
-    padding: 1rem;
+    padding: 1rem 1rem;
     display: flex;
     justify-content: space-between;
     align-items: center;
@@ -352,6 +354,8 @@
     flex: 1;
     display: flex;
     overflow: hidden;
+    position: relative;
+    z-index: 1;
 }
 
 @keyframes highlightFade {
@@ -369,7 +373,7 @@
 }
 
 .sidebar {
-    width: 250px;
+    width: 275px;
     border-right: 1px solid var(--border-color);
     background-color: var(--bg-secondary);
     display: flex;
@@ -382,7 +386,7 @@
 }
 
 .sidebar>* {
-    min-width: 250px;
+    min-width: 275px;
 }
 
 .sidebar.closed {

@@ -1,40 +1,61 @@
 # DB+ SQL Manager
 
-A modern, high-performance desktop SQL client built with Tauri, React, and Rust. Designed for safety and ease of use, featuring a unique "Changelog" system for pending edits.
+A modern, high-performance desktop SQL client built with Tauri, React, and Rust. Designed for safety, speed, and intuitive organization, featuring a unique "Changelog" system for pending edits and a powerful visual tagging system.
 
-## Features
+## ✨ Key Features
 
-### 🛡️ Connection Isolation & Safety
+### 🎨 Visual Organization & Navigation
+- **Smart Tagging System**: Organize your tables not just alphabetically, but logically. Create custom colored tags and use **Drag & Drop** to assign tables to them.
+- **Dual Sidebar Modes**: Toggle between a standard **A-Z** list and a **Tags** view to focus on relevant groups of tables.
+- **Database-Aware Tabs**: Open multiple tables, queries, and functions simultaneously. Tabs are intelligently scoped to their specific database, ensuring no confusion between identical table names across different environments.
+- **Preview & Pin**: Single-click to preview a table, double-click to pin it to your workspace.
 
-- **Safe Switching**: Automatically clears workspace state when switching databases to prevent cross-contamination.
-- **Unsaved Warning**: Prompts you before switching if you have pending changes.
-
-### 📝 Changelog System
-
-- **Pending Edits**: Updates and Deletes are not applied immediately. They are queued as "Pending Changes".
-- **Visual Feedback**:
+### �️ Safe Data Editing (The Changelog System)
+Never accidentally break production data again.
+- **Pending Edits Queue**: Updates, Insertions, and Deletions are not applied immediately. They are queued as "Pending Changes".
+- **Visual Diff**: 
   - 🟥 **Deletes**: Rows marked for deletion are highlighted in red.
-  - 🟨 **Updates**: Edited cells are highlighted in yellow.
-- **Review & Commit**: Review all pending changes in the dedicated Changelog sidebar before confirming them to the database.
+  - 🟨 **Updates**: Individual modified cells are highlighted in yellow.
+  - 🟩 **Inserts**: New rows are clearly distinct.
+- **Review & Commit**: Review every granular change in the dedicated **Changelog Sidebar** before confirming the transaction.
 
-### 🔌 Connectivity
+### � Saved Resources
+- **Saved Queries**: Write complex SQL once and save it for repeated use. Accessible directly from the sidebar.
+- **Saved Functions**: Manage and execute stored database functions with a dedicated runner interface.
 
-- Support for multiple database types (PostgreSQL, MySQL, SQLite) via SQLx.
-- Manage locally saved connections.
+### 📊 Powerful Data Grid
+- **Interactive Grid**: Sort, filter, and resize columns with ease.
+- **Context Menu**: Right-click for quick actions like Copy, Export (CSV/JSON), or specialized table operations.
+- **Pagination**: Efficiently handle large datasets with server-side pagination.
 
-### 📊 Data Management
+### 🔌 Connectivity & Multi-Database
+- **Seamless Switching**: Switch between different databases within the same connection instantly via the sidebar dropdown.
+- **Connection Isolation**: Workspace state is strictly scoped to the active database to prevent cross-contamination.
+- **Broad Support**: Connect to PostgreSQL, MySQL, and SQLite databases.
 
-- **Interactive Grid**: Sort, select, and copy/export data (JSON/CSV).
-- **Tagging**: Organize your tables with custom colored tags for easy navigation.
-- **Query Editor**: Execute raw SQL queries with a responsive editor.
+### 🛠️ Developer Tools
+- **System Logs**: A dedicated log tab tracks every action, query execution, and error, with status filtering (e.g., "Hide Success") for easy debugging.
+- **Schema Diagram & Management**: visual schema exploration (in progress) and table structure management.
+- **SQL Editor**: Full-featured editor for running raw SQL commands.
 
-## Tech Stack
+---
 
-- **Frontend**: React, TypeScript, Vite, CSS Modules, Lucide React (Icons), DnD Kit.
-- **Backend (Desktop)**: Tauri (Rust), SQLx.
-- **Local Storage**: SQLite (for app configuration and connections).
+## 💻 Tech Stack
 
-## Getting Started
+- **Frontend**: 
+  - **Framework**: React 18 + TypeScript
+  - **Build Tool**: Vite
+  - **Styling**: CSS Modules (scoped & performant)
+  - **UI Components**: Custom-built with `lucide-react` icons and `@dnd-kit` for complex drag-and-drop interactions.
+
+- **Backend (Desktop)**: 
+  - **Core**: Tauri (Rust)
+  - **Database Driver**: `sqlx` (Async, type-safe SQL)
+  - **Local Store**: SQLite (for app configuration, tags, and saved changes).
+
+---
+
+## 🚀 Getting Started
 
 ### Prerequisites
 
@@ -45,30 +66,26 @@ A modern, high-performance desktop SQL client built with Tauri, React, and Rust.
 ### Installation
 
 1. Clone the repository:
-
    ```bash
    git clone https://github.com/TriforceParas/DataBaseUI.git
    cd SQL-UI
    ```
 
 2. Install frontend dependencies:
-
    ```bash
    npm install
    ```
 
 3. Run the development server:
-
    ```bash
    npm run tauri dev
    ```
 
 4. Build for production:
-
    ```bash
    npm run tauri build
    ```
 
-## License
+## 📄 License
 
 [MIT](LICENSE)

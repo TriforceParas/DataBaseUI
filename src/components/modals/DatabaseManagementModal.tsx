@@ -17,28 +17,28 @@ type TabType = 'create' | 'import' | 'export' | 'duplicate' | 'delete';
 const SYSTEM_DATABASES = ['sys', 'information_schema', 'mysql', 'performance_schema'];
 
 export const DatabaseManagementModal: React.FC<DatabaseManagementModalProps> = ({
-    isOpen, onClose, connection, onSuccess, onDatabaseChange
+    isOpen, onClose, connection, onSuccess, /* onDatabaseChange */
 }) => {
     const [activeTab, setActiveTab] = useState<TabType>('create');
     const [databases, setDatabases] = useState<string[]>([]);
-    const [isLoading, setIsLoading] = useState(false);
+    const [, setIsLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [logs, setLogs] = useState<string[]>([]);
-    
+
     // Create Database
     const [newDbName, setNewDbName] = useState('');
     const [isCreating, setIsCreating] = useState(false);
-    
+
     // Duplicate Database
     const [selectedDbToDuplicate, setSelectedDbToDuplicate] = useState('');
     const [duplicateNewName, setDuplicateNewName] = useState('');
     const [isDuplicating, setIsDuplicating] = useState(false);
-    
+
     // Delete Database
     const [selectedDbToDelete, setSelectedDbToDelete] = useState('');
     const [confirmDeleteName, setConfirmDeleteName] = useState('');
     const [isDeleting, setIsDeleting] = useState(false);
-    
+
     // Import/Export
     const [directoryPath, setDirectoryPath] = useState('');
     const [isExecuting, setIsExecuting] = useState(false);
@@ -78,19 +78,19 @@ export const DatabaseManagementModal: React.FC<DatabaseManagementModalProps> = (
 
     const handleCreateDatabase = async () => {
         if (!newDbName.trim()) return;
-        
+
         if (SYSTEM_DATABASES.includes(newDbName.toLowerCase())) {
             setError('Cannot create a database with a system database name');
             return;
         }
-        
+
         setIsCreating(true);
         setError(null);
         try {
             addLog(`Creating database "${newDbName}"...`);
-            await invoke('create_database', { 
+            await invoke('create_database', {
                 connectionString: connection.connection_string,
-                databaseName: newDbName 
+                databaseName: newDbName
             });
             addLog(`Database "${newDbName}" created successfully!`);
             setNewDbName('');
@@ -106,12 +106,12 @@ export const DatabaseManagementModal: React.FC<DatabaseManagementModalProps> = (
 
     const handleDuplicateDatabase = async () => {
         if (!selectedDbToDuplicate || !duplicateNewName.trim()) return;
-        
+
         if (SYSTEM_DATABASES.includes(duplicateNewName.toLowerCase())) {
             setError('Cannot create a database with a system database name');
             return;
         }
-        
+
         setIsDuplicating(true);
         setError(null);
         try {
@@ -136,7 +136,7 @@ export const DatabaseManagementModal: React.FC<DatabaseManagementModalProps> = (
 
     const handleDeleteDatabase = async () => {
         if (!selectedDbToDelete || confirmDeleteName !== selectedDbToDelete) return;
-        
+
         setIsDeleting(true);
         setError(null);
         try {
@@ -165,7 +165,7 @@ export const DatabaseManagementModal: React.FC<DatabaseManagementModalProps> = (
                 multiple: false,
                 title: activeTab === 'export' ? 'Select Export Directory' : 'Select Import Directory'
             });
-            
+
             if (selected && typeof selected === 'string') {
                 setDirectoryPath(selected);
             }
@@ -176,7 +176,7 @@ export const DatabaseManagementModal: React.FC<DatabaseManagementModalProps> = (
 
     const handleImportExport = async () => {
         if (!directoryPath.trim()) return;
-        
+
         setIsExecuting(true);
         setError(null);
         try {
@@ -322,8 +322,8 @@ export const DatabaseManagementModal: React.FC<DatabaseManagementModalProps> = (
         display: 'flex',
         alignItems: 'center',
         gap: '0.5rem',
-        backgroundColor: variant === 'primary' ? 'var(--accent-primary)' : 
-                         variant === 'danger' ? '#dc2626' : 'var(--bg-tertiary)',
+        backgroundColor: variant === 'primary' ? 'var(--accent-primary)' :
+            variant === 'danger' ? '#dc2626' : 'var(--bg-tertiary)',
         color: variant === 'secondary' ? 'var(--text-primary)' : '#fff',
         transition: 'all 0.2s ease'
     });
@@ -370,9 +370,9 @@ export const DatabaseManagementModal: React.FC<DatabaseManagementModalProps> = (
                 {/* Tabs */}
                 <div style={tabsStyle}>
                     {tabData.map(tab => (
-                        <button 
+                        <button
                             key={tab.id}
-                            style={tabStyle(activeTab === tab.id)} 
+                            style={tabStyle(activeTab === tab.id)}
                             onClick={() => {
                                 setActiveTab(tab.id);
                                 setError(null);
@@ -422,8 +422,8 @@ export const DatabaseManagementModal: React.FC<DatabaseManagementModalProps> = (
                                     style={{ ...inputStyle, flex: 1 }}
                                     onKeyDown={(e) => e.key === 'Enter' && handleCreateDatabase()}
                                 />
-                                <button 
-                                    style={buttonStyle('primary')} 
+                                <button
+                                    style={buttonStyle('primary')}
                                     onClick={handleCreateDatabase}
                                     disabled={!newDbName.trim() || isCreating}
                                 >
@@ -458,8 +458,8 @@ export const DatabaseManagementModal: React.FC<DatabaseManagementModalProps> = (
                                         Browse
                                     </button>
                                 </div>
-                                <button 
-                                    style={{ ...buttonStyle('primary'), alignSelf: 'flex-end' }} 
+                                <button
+                                    style={{ ...buttonStyle('primary'), alignSelf: 'flex-end' }}
                                     onClick={handleImportExport}
                                     disabled={!directoryPath.trim() || isExecuting}
                                 >
@@ -494,8 +494,8 @@ export const DatabaseManagementModal: React.FC<DatabaseManagementModalProps> = (
                                         Browse
                                     </button>
                                 </div>
-                                <button 
-                                    style={{ ...buttonStyle('primary'), alignSelf: 'flex-end' }} 
+                                <button
+                                    style={{ ...buttonStyle('primary'), alignSelf: 'flex-end' }}
                                     onClick={handleImportExport}
                                     disabled={!directoryPath.trim() || isExecuting}
                                 >
@@ -536,8 +536,8 @@ export const DatabaseManagementModal: React.FC<DatabaseManagementModalProps> = (
                                         style={{ ...inputStyle, flex: 1 }}
                                     />
                                 </div>
-                                <button 
-                                    style={{ ...buttonStyle('primary'), alignSelf: 'flex-end' }} 
+                                <button
+                                    style={{ ...buttonStyle('primary'), alignSelf: 'flex-end' }}
                                     onClick={handleDuplicateDatabase}
                                     disabled={!selectedDbToDuplicate || !duplicateNewName.trim() || isDuplicating}
                                 >
@@ -584,8 +584,8 @@ export const DatabaseManagementModal: React.FC<DatabaseManagementModalProps> = (
                                                 onChange={(e) => setConfirmDeleteName(e.target.value)}
                                                 style={{ ...inputStyle, flex: 1, borderColor: 'rgba(220, 38, 38, 0.3)' }}
                                             />
-                                            <button 
-                                                style={buttonStyle('danger')} 
+                                            <button
+                                                style={buttonStyle('danger')}
                                                 onClick={handleDeleteDatabase}
                                                 disabled={confirmDeleteName !== selectedDbToDelete || isDeleting}
                                             >
@@ -612,9 +612,9 @@ export const DatabaseManagementModal: React.FC<DatabaseManagementModalProps> = (
                             fontSize: '0.8rem'
                         }}>
                             {logs.map((log, idx) => (
-                                <div key={idx} style={{ 
-                                    color: log.includes('Error') ? '#dc2626' : 
-                                           log.includes('successfully') ? '#16a34a' : 'var(--text-secondary)',
+                                <div key={idx} style={{
+                                    color: log.includes('Error') ? '#dc2626' :
+                                        log.includes('successfully') ? '#16a34a' : 'var(--text-secondary)',
                                     marginBottom: '0.25rem'
                                 }}>
                                     {log}

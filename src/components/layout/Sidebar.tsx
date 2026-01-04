@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import styles from '../../styles/MainLayout.module.css';
 import { Connection, Tag, TableTag, SavedQuery, SavedFunction } from '../../types/index';
 import { Icons } from '../../assets/icons';
@@ -6,7 +6,10 @@ import { invoke } from '@tauri-apps/api/core';
 import { TagManager } from './TagManager';
 import { ConfirmModal } from '../modals/ConfirmModal';
 import { DatabaseManagementModal } from '../modals/DatabaseManagementModal';
-import { DndContext, useDraggable, useDroppable, DragEndEvent, useSensor, useSensors, PointerSensor, KeyboardSensor } from '@dnd-kit/core';
+import { DndContext, useDraggable, useDroppable, DragEndEvent, DragStartEvent, DragOverlay, useSensor, useSensors, PointerSensor, KeyboardSensor, pointerWithin } from '@dnd-kit/core';
+import { Portal } from '../common/Portal';
+import { ContextMenu } from '../common/ContextMenu';
+
 
 interface SidebarProps {
     sidebarOpen: boolean;
@@ -38,236 +41,75 @@ interface SidebarProps {
 }
 
 // Draggable Table Item with Context Menu
+// Draggable Table Item with Context Menu
 const DraggableTableItem = ({
     table,
     onClick,
     fromTagId,
-    onGetSchema,
-    onEditSchema,
-    onDuplicate,
-    onTruncate,
-    onDrop,
-    style
+    onContextMenu,
+    style,
+    tagColor,
+    tagName
 }: {
     table: string;
     onClick: () => void;
     fromTagId?: number | null;
-    onGetSchema?: (t: string) => void;
-    onEditSchema?: (t: string) => void;
-    onDuplicate?: (t: string) => void;
-    onTruncate?: (t: string) => void;
-    onDrop?: (t: string) => void;
+    onContextMenu: (e: React.MouseEvent) => void;
     style?: React.CSSProperties;
+    tagColor?: string;
+    tagName?: string;
 }) => {
-    const { attributes, listeners, setNodeRef, transform } = useDraggable({
+    const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
         id: `table-${table}`,
         data: { tableName: table, fromTagId }
     });
 
-    const [contextMenu, setContextMenu] = useState<{ x: number, y: number } | null>(null);
-    const [isHovered, setIsHovered] = useState(false);
-
-    const handleContextMenu = (e: React.MouseEvent) => {
-        e.preventDefault();
-        e.stopPropagation();
-        setContextMenu({ x: e.clientX, y: e.clientY });
+    const itemStyle: React.CSSProperties = {
+        ...style,
+        opacity: isDragging ? 0.3 : 1,
     };
 
-    // Close context menu on click
-    useEffect(() => {
-        const handleClick = () => setContextMenu(null);
-        window.addEventListener('click', handleClick);
-        return () => window.removeEventListener('click', handleClick);
-    }, [contextMenu]);
-
-    const transformStyle = transform ? {
-        transform: `translate3d(${transform.x}px, ${transform.y}px, 0)`,
-        zIndex: 1000,
-        opacity: 0.8
-    } : undefined;
-
-    const menuItems = [
-        { label: 'Get Table Schema', icon: <Icons.FileText size={14} />, action: () => onGetSchema?.(table) },
-        { label: 'Edit Table Schema', icon: <Icons.Pencil size={14} />, action: () => onEditSchema?.(table) },
-        { label: 'Duplicate Table', icon: <Icons.Copy size={14} />, action: () => onDuplicate?.(table) },
-        { label: 'Truncate Table', icon: <Icons.AlertCircle size={14} />, action: () => onTruncate?.(table), danger: true },
-        { label: 'Drop Table', icon: <Icons.Trash2 size={14} />, action: () => onDrop?.(table), danger: true },
-    ];
-
     return (
-        <>
-            <div
-                ref={setNodeRef}
-                style={{
-                    ...style,
-                    ...transformStyle,
-                    marginBottom: '2px', // Add slight gap
-                    cursor: 'pointer', // Force pointer cursor
-                    backgroundColor: isHovered ? 'var(--bg-tertiary)' : 'transparent', // Hover highlight
-                    transition: 'background-color 0.2s',
-                    borderRadius: '4px', // Rounded corners
-                    padding: '4px 8px' // Increase touch area
-                }}
-                {...listeners}
-                {...attributes}
-                className={styles.sidebarItem}
-                onClick={onClick}
-                onContextMenu={handleContextMenu}
-                onMouseEnter={() => setIsHovered(true)}
-                onMouseLeave={() => setIsHovered(false)}
-            >
-                <Icons.Table size={14} style={{ marginRight: '0.5rem', opacity: 0.7 }} />
-                {table}
+        <div
+            ref={setNodeRef}
+            style={itemStyle}
+            {...listeners}
+            {...attributes}
+            className={`${styles.sidebarItem} ${isDragging ? styles.sidebarItemActive : ''}`}
+            onClick={onClick}
+            onContextMenu={onContextMenu}
+        >
+            <div title={tagName} style={{ display: 'flex', alignItems: 'center' }}>
+                <Icons.Table size={14} color={tagColor} style={{ marginRight: '0.5rem', opacity: tagColor ? 1 : 0.7 }} />
             </div>
-
-            {/* Table Context Menu */}
-            {contextMenu && (
-                <div
-                    style={{
-                        position: 'fixed',
-                        top: contextMenu.y,
-                        left: contextMenu.x,
-                        backgroundColor: 'var(--bg-secondary)',
-                        border: '1px solid var(--border-color)',
-                        borderRadius: '6px',
-                        boxShadow: '0 4px 12px rgba(0,0,0,0.3)',
-                        zIndex: 9999,
-                        minWidth: '180px',
-                        overflow: 'hidden'
-                    }}
-                    onClick={e => e.stopPropagation()}
-                >
-                    {menuItems.map((item, idx) => (
-                        <div
-                            key={idx}
-                            onClick={() => { item.action(); setContextMenu(null); }}
-                            style={{
-                                padding: '0.6rem 0.8rem',
-                                cursor: 'pointer',
-                                display: 'flex',
-                                alignItems: 'center',
-                                gap: '0.5rem',
-                                fontSize: '0.9rem',
-                                color: item.danger ? '#ef4444' : 'var(--text-primary)',
-                                borderTop: idx === 3 ? '1px solid var(--border-color)' : 'none'
-                            }}
-                            onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--bg-tertiary)'}
-                            onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
-                        >
-                            {item.icon} {item.label}
-                        </div>
-                    ))}
-                </div>
-            )}
-        </>
+            {table}
+        </div>
     );
 };
 
 // Saved Item with Context Menu (for Queries/Functions)
+// Saved Item (for Queries/Functions)
 const SavedItemWithContextMenu = ({
     name,
     icon,
     onClick,
-    onDelete,
-    onEdit
+    onContextMenu
 }: {
     name: string;
     icon: React.ReactNode;
     onClick: () => void;
-    onDelete: () => void;
-    onEdit?: () => void;
+    onContextMenu: (e: React.MouseEvent) => void;
 }) => {
-    const [contextMenu, setContextMenu] = useState<{ x: number, y: number } | null>(null);
-    const [isHovered, setIsHovered] = useState(false);
-
-    const handleContextMenu = (e: React.MouseEvent) => {
-        e.preventDefault();
-        e.stopPropagation();
-        setContextMenu({ x: e.clientX, y: e.clientY });
-    };
-
-    useEffect(() => {
-        const handleClick = () => setContextMenu(null);
-        window.addEventListener('click', handleClick);
-        return () => window.removeEventListener('click', handleClick);
-    }, [contextMenu]);
-
     return (
-        <>
-            <div
-                onClick={onClick}
-                onContextMenu={handleContextMenu}
-                onMouseEnter={() => setIsHovered(true)}
-                onMouseLeave={() => setIsHovered(false)}
-                style={{
-                    padding: '0.35rem 0.5rem',
-                    fontSize: '0.85rem',
-                    color: 'var(--text-primary)',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '0.5rem',
-                    cursor: 'pointer',
-                    borderRadius: '4px',
-                    backgroundColor: isHovered ? 'var(--bg-tertiary)' : 'transparent'
-                }}
-            >
-                {icon}
-                <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{name}</span>
-            </div>
-            {contextMenu && (
-                <div
-                    style={{
-                        position: 'fixed',
-                        top: contextMenu.y,
-                        left: contextMenu.x,
-                        backgroundColor: 'var(--bg-secondary)',
-                        border: '1px solid var(--border-color)',
-                        borderRadius: '6px',
-                        padding: '0.25rem',
-                        zIndex: 1000,
-                        boxShadow: 'var(--shadow-lg)'
-                    }}
-                    onClick={e => e.stopPropagation()}
-                >
-                    {onEdit && (
-                        <div
-                            onClick={() => { onEdit(); setContextMenu(null); }}
-                            style={{
-                                padding: '0.5rem 0.75rem',
-                                cursor: 'pointer',
-                                borderRadius: '4px',
-                                display: 'flex',
-                                alignItems: 'center',
-                                gap: '0.5rem',
-                                fontSize: '0.9rem',
-                                color: 'var(--text-primary)'
-                            }}
-                            onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--bg-tertiary)'}
-                            onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
-                        >
-                            <Icons.Pencil size={14} /> Edit
-                        </div>
-                    )}
-                    <div
-                        onClick={() => { onDelete(); setContextMenu(null); }}
-                        style={{
-                            padding: '0.5rem 0.75rem',
-                            cursor: 'pointer',
-                            borderRadius: '4px',
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: '0.5rem',
-                            fontSize: '0.9rem',
-                            color: '#ef4444'
-                        }}
-                        onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--bg-tertiary)'}
-                        onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
-                    >
-                        <Icons.Trash2 size={14} /> Delete
-                    </div>
-                </div>
-            )}
-        </>
+        <div
+            onClick={onClick}
+            onContextMenu={onContextMenu}
+            className={styles.sidebarItem}
+            style={{ paddingLeft: '0.8rem' }}
+        >
+            {icon}
+            <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{name}</span>
+        </div>
     );
 };
 
@@ -329,6 +171,7 @@ const CollapsibleSection = ({
 };
 
 // Droppable Tag Group - controlled component with context menu
+// Droppable Tag Group - controlled component with context menu
 const TagGroup = ({
     tag,
     tables,
@@ -336,13 +179,8 @@ const TagGroup = ({
     color,
     isOpen,
     onToggle,
-    onEditTag,
-    onDeleteTag,
-    onGetSchema,
-    onEditSchema,
-    onDuplicate,
-    onTruncate,
-    onDrop
+    onTagContextMenu,
+    onTableContextMenu,
 }: {
     tag: Tag | null,
     tables: string[],
@@ -350,41 +188,19 @@ const TagGroup = ({
     color?: string,
     isOpen: boolean,
     onToggle: () => void,
-    onEditTag?: (tag: Tag) => void,
-    onDeleteTag?: (tag: Tag) => void,
-    onGetSchema?: (t: string) => void,
-    onEditSchema?: (t: string) => void,
-    onDuplicate?: (t: string) => void,
-    onTruncate?: (t: string) => void,
-    onDrop?: (t: string) => void
+    onTagContextMenu?: (e: React.MouseEvent, tag: Tag) => void,
+    onTableContextMenu: (e: React.MouseEvent, table: string, tagId?: number) => void
 }) => {
     const { setNodeRef, isOver } = useDroppable({
         id: tag ? `tag-${tag.id}` : 'tag-untagged',
         data: { tagId: tag ? tag.id : null }
     });
 
-    const [contextMenu, setContextMenu] = useState<{ x: number, y: number } | null>(null);
-
-    const handleContextMenu = (e: React.MouseEvent) => {
-        if (!tag) return; // No context menu for untagged
-        e.preventDefault();
-        setContextMenu({ x: e.clientX, y: e.clientY });
-    };
-
-    // Close context menu when clicking outside
-    useEffect(() => {
-        const handleClick = () => setContextMenu(null);
-        if (contextMenu) {
-            window.addEventListener('click', handleClick);
-            return () => window.removeEventListener('click', handleClick);
-        }
-    }, [contextMenu]);
-
     return (
-        <div ref={setNodeRef} style={{ marginBottom: '0.5rem', backgroundColor: isOver ? 'rgba(255,255,255,0.05)' : 'transparent', borderRadius: '4px' }}>
+        <div ref={setNodeRef} style={{ marginBottom: '0.5rem', backgroundColor: isOver ? 'var(--bg-tertiary)' : 'transparent', borderRadius: '4px', border: isOver ? '1px solid var(--border-color)' : '1px solid transparent' }}>
             <div
                 onClick={onToggle}
-                onContextMenu={handleContextMenu}
+                onContextMenu={(e) => tag && onTagContextMenu?.(e, tag)}
                 style={{
                     padding: '0.4rem 0.5rem',
                     fontSize: '0.85rem',
@@ -402,58 +218,6 @@ const TagGroup = ({
                 <span style={{ marginLeft: 'auto', opacity: 0.5, fontSize: '0.75rem' }}>{tables.length}</span>
             </div>
 
-            {/* Context Menu */}
-            {contextMenu && tag && (
-                <div
-                    style={{
-                        position: 'fixed',
-                        top: contextMenu.y,
-                        left: contextMenu.x,
-                        backgroundColor: 'var(--bg-secondary)',
-                        border: '1px solid var(--border-color)',
-                        borderRadius: '6px',
-                        boxShadow: '0 4px 12px rgba(0,0,0,0.3)',
-                        zIndex: 9999,
-                        minWidth: '140px',
-                        overflow: 'hidden'
-                    }}
-                    onClick={e => e.stopPropagation()}
-                >
-                    <div
-                        onClick={() => { onEditTag?.(tag); setContextMenu(null); }}
-                        style={{
-                            padding: '0.6rem 0.8rem',
-                            cursor: 'pointer',
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: '0.5rem',
-                            fontSize: '0.9rem',
-                            color: 'var(--text-primary)'
-                        }}
-                        onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--bg-tertiary)'}
-                        onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
-                    >
-                        <Icons.Pencil size={14} /> Edit
-                    </div>
-                    <div
-                        onClick={() => { onDeleteTag?.(tag); setContextMenu(null); }}
-                        style={{
-                            padding: '0.6rem 0.8rem',
-                            cursor: 'pointer',
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: '0.5rem',
-                            fontSize: '0.9rem',
-                            color: '#ef4444'
-                        }}
-                        onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--bg-tertiary)'}
-                        onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
-                    >
-                        <Icons.Trash2 size={14} /> Delete
-                    </div>
-                </div>
-            )}
-
             {isOpen && (
                 <div style={{ paddingLeft: '0.5rem' }}>
                     {tables.map(table => (
@@ -462,11 +226,7 @@ const TagGroup = ({
                             table={table}
                             onClick={() => onTableClick(table)}
                             fromTagId={tag ? tag.id : null}
-                            onGetSchema={onGetSchema}
-                            onEditSchema={onEditSchema}
-                            onDuplicate={onDuplicate}
-                            onTruncate={onTruncate}
-                            onDrop={onDrop}
+                            onContextMenu={(e) => onTableContextMenu(e, table, tag?.id)}
                         />
                     ))}
                     {tables.length === 0 && <div style={{ padding: '0.5rem', color: 'var(--text-muted)', fontSize: '0.8rem', fontStyle: 'italic' }}>Empty</div>}
@@ -479,132 +239,11 @@ const TagGroup = ({
 
 
 // Wrapper for Import/Export Modal with mode selection
-const SchemaImportExportModalWrapper: React.FC<{
-    isOpen: boolean;
-    onClose: () => void;
-    connection: Connection;
-}> = ({ isOpen, onClose, connection }) => {
-    const [mode, setMode] = useState<'import' | 'export' | null>(null);
 
-    if (!isOpen) return null;
-
-    // If mode not selected, show selection
-    if (!mode) {
-        return (
-            <div style={{
-                position: 'fixed', inset: 0, zIndex: 2000,
-                backgroundColor: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(2px)',
-                display: 'flex', alignItems: 'center', justifyContent: 'center'
-            }} onClick={onClose}>
-                <div style={{
-                    width: '400px',
-                    backgroundColor: 'var(--bg-secondary)',
-                    borderRadius: '8px', border: '1px solid var(--border-color)',
-                    padding: '2rem',
-                    boxShadow: 'var(--shadow-xl)'
-                }} onClick={e => e.stopPropagation()}>
-                    <h3 style={{ margin: '0 0 1.5rem 0', fontSize: '1.25rem' }}>Import/Export Schemas</h3>
-                    
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-                        <button
-                            onClick={() => setMode('import')}
-                            style={{
-                                padding: '1rem',
-                                backgroundColor: 'var(--bg-tertiary)',
-                                border: '1px solid var(--border-color)',
-                                borderRadius: '6px',
-                                color: 'var(--text-primary)',
-                                cursor: 'pointer',
-                                display: 'flex',
-                                alignItems: 'center',
-                                gap: '0.75rem',
-                                fontSize: '1rem',
-                                transition: 'all 0.2s'
-                            }}
-                            onMouseEnter={(e) => {
-                                e.currentTarget.style.backgroundColor = 'var(--accent-primary)';
-                                e.currentTarget.style.transform = 'translateY(-2px)';
-                            }}
-                            onMouseLeave={(e) => {
-                                e.currentTarget.style.backgroundColor = 'var(--bg-tertiary)';
-                                e.currentTarget.style.transform = 'translateY(0)';
-                            }}
-                        >
-                            <Icons.Upload size={20} />
-                            <div style={{ textAlign: 'left' }}>
-                                <div style={{ fontWeight: 600 }}>Import Schema</div>
-                                <div style={{ fontSize: '0.85rem', opacity: 0.8 }}>Import .sql files into database</div>
-                            </div>
-                        </button>
-
-                        <button
-                            onClick={() => setMode('export')}
-                            style={{
-                                padding: '1rem',
-                                backgroundColor: 'var(--bg-tertiary)',
-                                border: '1px solid var(--border-color)',
-                                borderRadius: '6px',
-                                color: 'var(--text-primary)',
-                                cursor: 'pointer',
-                                display: 'flex',
-                                alignItems: 'center',
-                                gap: '0.75rem',
-                                fontSize: '1rem',
-                                transition: 'all 0.2s'
-                            }}
-                            onMouseEnter={(e) => {
-                                e.currentTarget.style.backgroundColor = 'var(--accent-primary)';
-                                e.currentTarget.style.transform = 'translateY(-2px)';
-                            }}
-                            onMouseLeave={(e) => {
-                                e.currentTarget.style.backgroundColor = 'var(--bg-tertiary)';
-                                e.currentTarget.style.transform = 'translateY(0)';
-                            }}
-                        >
-                            <Icons.Download size={20} />
-                            <div style={{ textAlign: 'left' }}>
-                                <div style={{ fontWeight: 600 }}>Export Schema</div>
-                                <div style={{ fontSize: '0.85rem', opacity: 0.8 }}>Export database to .sql files</div>
-                            </div>
-                        </button>
-
-                        <button
-                            onClick={onClose}
-                            style={{
-                                marginTop: '0.5rem',
-                                padding: '0.5rem 1rem',
-                                backgroundColor: 'transparent',
-                                border: '1px solid var(--border-color)',
-                                borderRadius: '4px',
-                                color: 'var(--text-primary)',
-                                cursor: 'pointer'
-                            }}
-                        >
-                            Cancel
-                        </button>
-                    </div>
-                </div>
-            </div>
-        );
-    }
-
-    // If mode selected, show the import/export modal
-    return (
-        <SchemaImportExportModal
-            isOpen={true}
-            onClose={() => {
-                setMode(null);
-                onClose();
-            }}
-            mode={mode}
-            connection={connection}
-        />
-    );
-};
 
 export const Sidebar: React.FC<SidebarProps> = ({
-    sidebarOpen, connection, tables, savedConnections,
-    onSwitchConnection, onSwitchDatabase, onTableClick, onAddConnection, refreshTrigger,
+    sidebarOpen, connection, tables, /* savedConnections, */
+    /* onSwitchConnection, */ onSwitchDatabase, onTableClick, /* onAddConnection, */ refreshTrigger,
     onGetTableSchema, onEditTableSchema, onDuplicateTable, onTruncateTable, onDropTable,
     savedQueries = [], savedFunctions = [], onQueryClick, onFunctionClick, onDeleteQuery, onDeleteFunction, onEditFunction,
     searchQuery = ''
@@ -614,6 +253,14 @@ export const Sidebar: React.FC<SidebarProps> = ({
     const [availableDatabases, setAvailableDatabases] = useState<string[]>([]);
     const [showDatabaseManager, setShowDatabaseManager] = useState(false);
 
+    // Global Context Menu State
+    const [contextMenu, setContextMenu] = useState<{
+        x: number;
+        y: number;
+        type: 'table' | 'tag' | 'query' | 'function';
+        data: any;
+    } | null>(null);
+
     // Close on outside click
     useEffect(() => {
         const handleClickOutside = (event: MouseEvent) => {
@@ -621,16 +268,31 @@ export const Sidebar: React.FC<SidebarProps> = ({
             if (showConnDropdown && !target.closest('[data-conn-dropdown="true"]') && !target.closest('[data-conn-trigger="true"]')) {
                 setShowConnDropdown(false);
             }
+            if (contextMenu && !target.closest('[data-context-menu="true"]')) {
+                setContextMenu(null);
+            }
         };
         document.addEventListener('mousedown', handleClickOutside);
         return () => document.removeEventListener('mousedown', handleClickOutside);
-    }, [showConnDropdown]);
+    }, [showConnDropdown, contextMenu]);
+
+    const handleContextMenu = (e: React.MouseEvent, type: 'table' | 'tag' | 'query' | 'function', data: any) => {
+        e.preventDefault();
+        e.stopPropagation();
+        setContextMenu({
+            x: e.clientX,
+            y: e.clientY,
+            type,
+            data
+        });
+    };
 
     const [tags, setTags] = useState<Tag[]>([]);
     const [tableTags, setTableTags] = useState<TableTag[]>([]);
     const [showTagManager, setShowTagManager] = useState(false);
     const [editingTag, setEditingTag] = useState<Tag | undefined>(undefined);
     const [confirmModal, setConfirmModal] = useState<{ tag: Tag } | null>(null);
+    const [activeDragItem, setActiveDragItem] = useState<string | null>(null);
 
     // Expansion State - persists during session
     const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set(['az-tables', 'tag-untagged']));
@@ -670,7 +332,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
         setConfirmModal(null);
     };
 
-    // DnD Sensors for Sidebar
+    // DnD Sensors
     const sensors = useSensors(
         useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
         useSensor(KeyboardSensor, {} as any)
@@ -686,14 +348,16 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
     const fetchTags = async () => {
         try {
-            const t = await invoke<Tag[]>('get_tags');
+            const dbName = getCurrentDatabase();
+            const t = await invoke<Tag[]>('get_tags', { connectionId: connection.id, databaseName: dbName });
             setTags(t);
         } catch (e) { console.error(e); }
     };
 
     const fetchTableTags = async () => {
         try {
-            const tt = await invoke<TableTag[]>('get_table_tags', { connectionId: connection.id });
+            const dbName = getCurrentDatabase();
+            const tt = await invoke<TableTag[]>('get_table_tags', { connectionId: connection.id, databaseName: dbName });
             setTableTags(tt);
         } catch (e) { console.error(e); }
     };
@@ -708,44 +372,63 @@ export const Sidebar: React.FC<SidebarProps> = ({
         } catch (e) { console.error("Failed to fetch databases", e); }
     };
 
+    const handleDragStart = (event: DragStartEvent) => {
+        setActiveDragItem(event.active.id as string);
+    };
+
     const handleDragEnd = async (event: DragEndEvent) => {
+        setActiveDragItem(null);
         const { active, over } = event;
         if (!over) return;
 
         const tableName = active.data.current?.tableName;
-        const fromTagId = active.data.current?.fromTagId;
+        const fromTagId = active.data.current?.fromTagId; // Draggable always uses fromTagId
         const toTagId = over.data.current?.tagId;
 
+        // Moving between tags (Assign/Re-assign)
         if (tableName && toTagId !== undefined) {
+            // If dropping on same tag, do nothing (no reordering)
             if (fromTagId === toTagId) return;
 
+            const dbName = getCurrentDatabase();
+
+            // Optimistic Update
+            setTableTags(prev => {
+                let next = [...prev];
+                // Remove from old
+                if (fromTagId) next = next.filter(t => !(t.table_name === tableName && t.tag_id === fromTagId));
+                // Add to new (Sort will happen automatically via rendering)
+                if (toTagId) next.push({ table_name: tableName, tag_id: toTagId, connection_id: connection.id, database_name: dbName || '', order_index: 0 });
+                return next;
+            });
+
             try {
-                // Remove from old tag if exists
-                if (fromTagId !== null && fromTagId !== undefined) {
+                if (fromTagId) {
                     await invoke('remove_tag_from_table', {
                         connectionId: connection.id,
                         tableName: tableName,
+                        databaseName: dbName,
                         tagId: fromTagId
                     });
                 }
-
-                // Add to new tag if target is not Untagged
-                if (toTagId !== null) {
+                if (toTagId) {
                     await invoke('assign_tag', {
                         connectionId: connection.id,
                         tableName: tableName,
+                        databaseName: dbName,
                         tagId: toTagId
                     });
                 }
                 fetchTableTags();
             } catch (e) {
-                console.error(e);
+                console.error('Error during drag operation:', e);
+                fetchTableTags();
             }
         }
     };
 
     // Grouping Logic
-    const getGroupedTables = () => {
+    const { groups, untagged } = useMemo(() => {
         let assignedTables = new Set<string>();
         const groups = tags.map(tag => {
             const tabs = tableTags
@@ -760,39 +443,33 @@ export const Sidebar: React.FC<SidebarProps> = ({
         const untagged = tables.filter(t => !assignedTables.has(t));
 
         return { groups, untagged };
-    };
-
-    const { groups, untagged } = getGroupedTables();
+    }, [tags, tableTags, tables]);
 
     // Filter items based on search query
-    const filteredTables = searchQuery
+    const filteredTables = useMemo(() => searchQuery
         ? tables.filter(t => t.toLowerCase().includes(searchQuery.toLowerCase()))
-        : tables;
-    
-    const filteredQueries = searchQuery
+        : tables, [searchQuery, tables]);
+
+    const filteredQueries = useMemo(() => searchQuery
         ? savedQueries.filter(q => q.name.toLowerCase().includes(searchQuery.toLowerCase()))
-        : savedQueries;
-    
-    const filteredFunctions = searchQuery
+        : savedQueries, [searchQuery, savedQueries]);
+
+    const filteredFunctions = useMemo(() => searchQuery
         ? savedFunctions.filter(f => f.name.toLowerCase().includes(searchQuery.toLowerCase()))
-        : savedFunctions;
+        : savedFunctions, [searchQuery, savedFunctions]);
 
     const isSearching = searchQuery.length > 0;
 
     // Extract current database name from connection string
     const getCurrentDatabase = () => {
+        if (!connection) return undefined;
         try {
             const url = new URL(connection.connection_string);
-            const dbName = url.pathname.slice(1); // Remove leading '/'
-            return dbName || connection.name;
+            if (url.protocol.includes('sqlite')) return connection.connection_string;
+            return url.pathname.replace('/', '');
         } catch (e) {
-            // If it's not a valid URL, try to extract from connection string manually
             const parts = connection.connection_string.split('/');
-            if (parts.length > 1) {
-                const lastPart = parts[parts.length - 1];
-                return lastPart || connection.name;
-            }
-            return connection.name;
+            return parts.length > 0 ? parts[parts.length - 1] : connection.name;
         }
     };
 
@@ -925,11 +602,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                                             table={table}
                                             onClick={() => onTableClick(table)}
                                             fromTagId={tag ? tag.id : null}
-                                            onGetSchema={onGetTableSchema}
-                                            onEditSchema={onEditTableSchema}
-                                            onDuplicate={onDuplicateTable}
-                                            onTruncate={onTruncateTable}
-                                            onDrop={onDropTable}
+                                            onContextMenu={(e) => handleContextMenu(e, 'table', table)}
                                             style={{ color: 'var(--text-primary)' }}
                                         />
                                     );
@@ -946,7 +619,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                                         name={query.name}
                                         icon={<Icons.Code2 size={14} color="#8b5cf6" />}
                                         onClick={() => onQueryClick?.(query)}
-                                        onDelete={() => onDeleteQuery?.(query.id)}
+                                        onContextMenu={(e) => handleContextMenu(e, 'query', query)}
                                     />
                                 ))}
                             </div>
@@ -961,8 +634,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                                         name={func.name}
                                         icon={<Icons.MathFunction size={14} color="#f59e0b" />}
                                         onClick={() => onFunctionClick?.(func)}
-                                        onDelete={() => onDeleteFunction?.(func.id)}
-                                        onEdit={() => onEditFunction?.(func)}
+                                        onContextMenu={(e) => handleContextMenu(e, 'function', func)}
                                     />
                                 ))}
                             </div>
@@ -992,11 +664,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
                                         table={table}
                                         onClick={() => onTableClick(table)}
                                         fromTagId={tag ? tag.id : null}
-                                        onGetSchema={onGetTableSchema}
-                                        onEditSchema={onEditTableSchema}
-                                        onDuplicate={onDuplicateTable}
-                                        onTruncate={onTruncateTable}
-                                        onDrop={onDropTable}
+                                        tagColor={tag?.color}
+                                        tagName={tag?.name}
+                                        onContextMenu={(e) => handleContextMenu(e, 'table', table)}
                                         style={{ color: 'var(--text-primary)' }} // Tab names follow the dark/white light/black rule
                                     />
                                 );
@@ -1017,7 +687,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                                         name={query.name}
                                         icon={<Icons.Code2 size={14} color="#8b5cf6" />}
                                         onClick={() => onQueryClick?.(query)}
-                                        onDelete={() => onDeleteQuery?.(query.id)}
+                                        onContextMenu={(e) => handleContextMenu(e, 'query', query)}
                                     />
                                 ))
                             ) : (
@@ -1039,8 +709,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                                         name={func.name}
                                         icon={<Icons.MathFunction size={14} color="#f59e0b" />}
                                         onClick={() => onFunctionClick?.(func)}
-                                        onDelete={() => onDeleteFunction?.(func.id)}
-                                        onEdit={() => onEditFunction?.(func)}
+                                        onContextMenu={(e) => handleContextMenu(e, 'function', func)}
                                     />
                                 ))
                             ) : (
@@ -1049,7 +718,12 @@ export const Sidebar: React.FC<SidebarProps> = ({
                         </CollapsibleSection>
                     </>
                 ) : (
-                    <DndContext onDragEnd={handleDragEnd} sensors={sensors}>
+                    <DndContext
+                        onDragStart={handleDragStart}
+                        onDragEnd={handleDragEnd}
+                        sensors={sensors}
+                        collisionDetection={pointerWithin}
+                    >
                         {groups.map(g => (
                             <TagGroup
                                 key={g.tag.id}
@@ -1059,13 +733,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
                                 color={g.tag.color}
                                 isOpen={expandedSections.has(`tag-${g.tag.id}`)}
                                 onToggle={() => toggleSection(`tag-${g.tag.id}`)}
-                                onEditTag={handleEditTag}
-                                onDeleteTag={handleDeleteTag}
-                                onGetSchema={onGetTableSchema}
-                                onEditSchema={onEditTableSchema}
-                                onDuplicate={onDuplicateTable}
-                                onTruncate={onTruncateTable}
-                                onDrop={onDropTable}
+                                onTagContextMenu={(e, tag) => handleContextMenu(e, 'tag', tag)}
+                                onTableContextMenu={(e, table) => handleContextMenu(e, 'table', table)}
                             />
                         ))}
                         {/* Untagged Section */}
@@ -1075,34 +744,55 @@ export const Sidebar: React.FC<SidebarProps> = ({
                             onTableClick={onTableClick}
                             isOpen={expandedSections.has('tag-untagged')}
                             onToggle={() => toggleSection('tag-untagged')}
-                            onGetSchema={onGetTableSchema}
-                            onEditSchema={onEditTableSchema}
-                            onDuplicate={onDuplicateTable}
-                            onTruncate={onTruncateTable}
-                            onDrop={onDropTable}
+                            onTableContextMenu={(e, table) => handleContextMenu(e, 'table', table)}
                         />
+                        <DragOverlay>
+                            {activeDragItem ? (
+                                <div style={{
+                                    padding: '4px 8px',
+                                    backgroundColor: 'var(--bg-tertiary)',
+                                    borderRadius: '4px',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    color: 'var(--text-primary)',
+                                    boxShadow: '0 5px 15px rgba(0,0,0,0.25)',
+                                    opacity: 0.9,
+                                    cursor: 'grabbing'
+                                }}>
+                                    <Icons.Table size={14} style={{ marginRight: '0.5rem', opacity: 0.7 }} />
+                                    {(() => {
+                                        // Parse ID: table-{name} or {tagId}-{name}
+                                        const parts = activeDragItem.split('-');
+                                        return parts.length > 1 ? parts.slice(1).join('-') : activeDragItem;
+                                    })()}
+                                </div>
+                            ) : null}
+                        </DragOverlay>
                     </DndContext>
                 )}
             </div>
 
             {showTagManager && (
-                <div style={{
-                    position: 'fixed',
-                    top: 0, left: 0, right: 0, bottom: 0,
-                    backgroundColor: 'rgba(0,0,0,0.5)',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    zIndex: 2000
-                }}>
-                    <div onClick={e => e.stopPropagation()}>
-                        <TagManager
-                            onSuccess={() => { setShowTagManager(false); setEditingTag(undefined); fetchTags(); }}
-                            onCancel={() => { setShowTagManager(false); setEditingTag(undefined); }}
-                            editTag={editingTag}
-                        />
+                <Portal>
+                    <div style={{
+                        position: 'fixed',
+                        top: 0, left: 0, right: 0, bottom: 0,
+                        backgroundColor: 'rgba(0,0,0,0.5)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        zIndex: 2000
+                    }}>
+                        <div onClick={e => e.stopPropagation()}>
+                            <TagManager
+                                onSuccess={() => { setShowTagManager(false); setEditingTag(undefined); fetchTags(); }}
+                                onCancel={() => { setShowTagManager(false); setEditingTag(undefined); }}
+                                editTag={editingTag}
+                                connection={connection}
+                            />
+                        </div>
                     </div>
-                </div>
+                </Portal>
             )}
 
             {/* Confirm Modal for Delete Tag */}
@@ -1118,16 +808,112 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
             {/* Database Manager Modal */}
             {showDatabaseManager && (
-                <DatabaseManagementModal
-                    isOpen={showDatabaseManager}
-                    onClose={() => setShowDatabaseManager(false)}
-                    connection={connection}
-                    onSuccess={() => {
-                        // Refresh databases
-                        fetchDatabases();
+                <Portal>
+                    <DatabaseManagementModal
+                        isOpen={showDatabaseManager}
+                        onClose={() => setShowDatabaseManager(false)}
+                        connection={connection}
+                        onSuccess={() => {
+                            // Refresh databases
+                            fetchDatabases();
+                        }}
+                        onDatabaseChange={onSwitchDatabase}
+                    />
+                </Portal>
+            )}
+
+            {/* Global Context Menu */}
+            {contextMenu && (
+                <ContextMenu
+                    x={contextMenu.x}
+                    y={contextMenu.y}
+                    onClose={() => setContextMenu(null)}
+                    style={{
+                        backgroundColor: 'var(--bg-secondary)',
+                        border: '1px solid var(--border-color)',
+                        borderRadius: '6px',
+                        boxShadow: '0 4px 12px rgba(0,0,0,0.3)',
+                        minWidth: '160px',
+                        overflow: 'hidden'
                     }}
-                    onDatabaseChange={onSwitchDatabase}
-                />
+                >
+                    {contextMenu.type === 'table' && (
+                        <>
+                            <div className={styles.dropdownItem} onClick={() => { onGetTableSchema?.(contextMenu.data); setContextMenu(null); }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                    <Icons.FileText size={14} /> Get Schema
+                                </div>
+                            </div>
+                            <div className={styles.dropdownItem} onClick={() => { onEditTableSchema?.(contextMenu.data); setContextMenu(null); }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                    <Icons.Pencil size={14} /> Edit Schema
+                                </div>
+                            </div>
+                            <div className={styles.dropdownItem} onClick={() => { onDuplicateTable?.(contextMenu.data); setContextMenu(null); }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                    <Icons.Copy size={14} /> Duplicate Table
+                                </div>
+                            </div>
+                            <div style={{ borderTop: '1px solid var(--border-color)', margin: '4px 0' }}></div>
+                            <div className={styles.dropdownItem} onClick={() => { onTruncateTable?.(contextMenu.data); setContextMenu(null); }} style={{ color: '#ef4444' }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                    <Icons.AlertCircle size={14} /> Truncate Table
+                                </div>
+                            </div>
+                            <div className={styles.dropdownItem} onClick={() => { onDropTable?.(contextMenu.data); setContextMenu(null); }} style={{ color: '#ef4444' }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                    <Icons.Trash2 size={14} /> Drop Table
+                                </div>
+                            </div>
+                        </>
+                    )}
+
+                    {contextMenu.type === 'tag' && (
+                        <>
+                            <div className={styles.dropdownItem} onClick={() => { handleEditTag(contextMenu.data); setContextMenu(null); }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                    <Icons.Pencil size={14} /> Edit Tag
+                                </div>
+                            </div>
+                            <div className={styles.dropdownItem} onClick={() => { handleDeleteTag(contextMenu.data); setContextMenu(null); }} style={{ color: '#ef4444' }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                    <Icons.Trash2 size={14} /> Delete Tag
+                                </div>
+                            </div>
+                        </>
+                    )}
+
+                    {contextMenu.type === 'query' && (
+                        <>
+                            {/* Assuming onQueryClick works as load. Edit logic needed? Typically 'Load' is click. */}
+                            <div className={styles.dropdownItem} onClick={() => { onQueryClick?.(contextMenu.data); setContextMenu(null); }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                    <Icons.Code2 size={14} /> Load Query
+                                </div>
+                            </div>
+                            <div className={styles.dropdownItem} onClick={() => { onDeleteQuery?.(contextMenu.data.id); setContextMenu(null); }} style={{ color: '#ef4444' }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                    <Icons.Trash2 size={14} /> Delete Query
+                                </div>
+                            </div>
+                        </>
+                    )}
+
+                    {contextMenu.type === 'function' && (
+                        <>
+                            <div className={styles.dropdownItem} onClick={() => { onEditFunction?.(contextMenu.data); setContextMenu(null); }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                    <Icons.Pencil size={14} /> Edit Function
+                                </div>
+                            </div>
+                            <div className={styles.dropdownItem} onClick={() => { onDeleteFunction?.(contextMenu.data.id); setContextMenu(null); }} style={{ color: '#ef4444' }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                    <Icons.Trash2 size={14} /> Delete Function
+                                </div>
+                            </div>
+                        </>
+                    )}
+                </ContextMenu>
             )}
         </div>
     );

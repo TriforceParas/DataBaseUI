@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import type { PendingChange } from '../../types/index';
-import { Check, Trash2, Undo2 } from 'lucide-react';
+import { Check, Trash2, Undo2, Square, CheckSquare } from 'lucide-react';
 import styles from '../../styles/MainLayout.module.css';
 
 interface ChangelogSidebarProps {
@@ -10,6 +10,8 @@ interface ChangelogSidebarProps {
     tabs: { id: string; title: string, type: string }[];
     onConfirm: () => void;
     onDiscard: () => void;
+    onConfirmSelected: (selected: { tabId: string; indices: number[] }[]) => void;
+    onDiscardSelected: (selected: { tabId: string; indices: number[] }[]) => void;
     onRevert: (tabId: string, idx: number) => void;
     onNavigate: (tabId: string, rowIndex: number) => void;
 }
@@ -21,12 +23,67 @@ export const ChangelogSidebar: React.FC<ChangelogSidebarProps> = ({
     tabs,
     onConfirm,
     onDiscard,
+    onConfirmSelected,
+    onDiscardSelected,
     onRevert,
     onNavigate
 }) => {
     const [viewMode, setViewMode] = useState<'visual' | 'sql'>('visual');
+    // Track selected changes as "tabId:index" strings
+    const [selectedChanges, setSelectedChanges] = useState<Set<string>>(new Set());
 
     const totalChanges = Object.values(changes).reduce((acc, curr) => acc + curr.length, 0);
+
+    // Helper to create unique key for a change
+    const getChangeKey = (tabId: string, idx: number) => `${tabId}:${idx}`;
+
+    // Parse selected changes into structured format
+    const getSelectedStructured = useMemo(() => {
+        const result: Record<string, number[]> = {};
+        selectedChanges.forEach(key => {
+            const [tabId, idxStr] = key.split(':');
+            const idx = parseInt(idxStr, 10);
+            if (!result[tabId]) result[tabId] = [];
+            result[tabId].push(idx);
+        });
+        return Object.entries(result).map(([tabId, indices]) => ({ tabId, indices: indices.sort((a, b) => b - a) })); // Sort descending for safe removal
+    }, [selectedChanges]);
+
+    const hasSelection = selectedChanges.size > 0;
+
+    // Toggle selection for a single change
+    const toggleSelection = (tabId: string, idx: number) => {
+        const key = getChangeKey(tabId, idx);
+        setSelectedChanges(prev => {
+            const newSet = new Set(prev);
+            if (newSet.has(key)) {
+                newSet.delete(key);
+            } else {
+                newSet.add(key);
+            }
+            return newSet;
+        });
+    };
+
+    // Handle confirm - either selected only or all
+    const handleConfirm = () => {
+        if (hasSelection) {
+            onConfirmSelected(getSelectedStructured);
+            setSelectedChanges(new Set());
+        } else {
+            onConfirm();
+        }
+    };
+
+    // Handle discard - either selected only or all
+    const handleDiscard = () => {
+        if (hasSelection) {
+            onDiscardSelected(getSelectedStructured);
+            setSelectedChanges(new Set());
+        } else {
+            onDiscard();
+        }
+    };
 
     // Close on Escape
     React.useEffect(() => {
@@ -38,6 +95,11 @@ export const ChangelogSidebar: React.FC<ChangelogSidebarProps> = ({
         window.addEventListener('keydown', handleKeyDown);
         return () => window.removeEventListener('keydown', handleKeyDown);
     }, [isOpen, onClose]);
+
+    // Clear selection when changes update (e.g., after apply/discard)
+    React.useEffect(() => {
+        setSelectedChanges(new Set());
+    }, [changes]);
 
     return (
         <div style={{
@@ -144,6 +206,27 @@ export const ChangelogSidebar: React.FC<ChangelogSidebarProps> = ({
                                         >
                                             <div style={{ display: 'flex', alignItems: 'center', marginBottom: '0.5rem', color: 'var(--text-secondary)', fontSize: '0.8rem', justifyContent: 'space-between' }}>
                                                 <div style={{ display: 'flex', alignItems: 'center' }}>
+                                                    {/* Checkbox for selection */}
+                                                    <button
+                                                        onClick={(e) => { e.stopPropagation(); toggleSelection(tabId, idx); }}
+                                                        style={{
+                                                            background: 'none',
+                                                            border: 'none',
+                                                            cursor: 'pointer',
+                                                            padding: 0,
+                                                            marginRight: '0.5rem',
+                                                            display: 'flex',
+                                                            alignItems: 'center',
+                                                            color: selectedChanges.has(getChangeKey(tabId, idx)) ? 'var(--accent-color)' : 'var(--text-secondary)'
+                                                        }}
+                                                        title={selectedChanges.has(getChangeKey(tabId, idx)) ? 'Deselect' : 'Select'}
+                                                    >
+                                                        {selectedChanges.has(getChangeKey(tabId, idx)) ? (
+                                                            <CheckSquare size={16} />
+                                                        ) : (
+                                                            <Square size={16} />
+                                                        )}
+                                                    </button>
                                                     <span style={{
                                                         backgroundColor: getBgColor(),
                                                         color: getColor(),
@@ -241,18 +324,18 @@ export const ChangelogSidebar: React.FC<ChangelogSidebarProps> = ({
                 <button
                     className={styles.secondaryBtn}
                     style={{ flex: 1, justifyContent: 'center', color: '#ff4d4d', borderColor: 'var(--border-color)' }}
-                    onClick={onDiscard}
+                    onClick={handleDiscard}
                     disabled={totalChanges === 0}
                 >
-                    <Trash2 size={14} style={{ marginRight: 6 }} /> Discard
+                    <Trash2 size={14} style={{ marginRight: 6 }} /> {hasSelection ? `Discard (${selectedChanges.size})` : 'Discard'}
                 </button>
                 <button
                     className={styles.primaryBtn}
                     style={{ flex: 1, justifyContent: 'center' }}
-                    onClick={onConfirm}
+                    onClick={handleConfirm}
                     disabled={totalChanges === 0}
                 >
-                    <Check size={14} style={{ marginRight: 6 }} /> Confirm
+                    <Check size={14} style={{ marginRight: 6 }} /> {hasSelection ? `Confirm (${selectedChanges.size})` : 'Confirm'}
                 </button>
             </div>
         </div>

@@ -16,6 +16,7 @@ pub async fn open_connection_window<R: tauri::Runtime>(
     WebviewWindowBuilder::new(&app, &label, WebviewUrl::App(url.into()))
         .title("Connection")
         .inner_size(1200.0, 800.0)
+        .min_inner_size(1000.0, 700.0)
         .decorations(false)
         .build()
         .map_err(|e| e.to_string())?;

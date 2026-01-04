@@ -2,15 +2,16 @@ import React, { useState, useEffect } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import { X, Check, Pencil } from 'lucide-react';
 import styles from '../../styles/ConnectionForm.module.css';
-import { Tag } from '../../types/index';
+import { Tag, Connection } from '../../types/index';
 
 interface TagManagerProps {
     onSuccess: () => void;
     onCancel: () => void;
     editTag?: Tag;
+    connection?: Connection;
 }
 
-export const TagManager: React.FC<TagManagerProps> = ({ onSuccess, onCancel, editTag }) => {
+export const TagManager: React.FC<TagManagerProps> = ({ onSuccess, onCancel, editTag, connection }) => {
     const [name, setName] = useState(editTag?.name || '');
     const [color, setColor] = useState(editTag?.color || '#3b82f6');
     const [error, setError] = useState<string>('');
@@ -29,13 +30,31 @@ export const TagManager: React.FC<TagManagerProps> = ({ onSuccess, onCancel, edi
         }
     }, [editTag]);
 
+    const getDbName = () => {
+        if (!connection) return undefined;
+        try {
+            const url = new URL(connection.connection_string);
+            if (url.protocol.includes('sqlite')) return connection.connection_string;
+            return url.pathname.replace('/', '');
+        } catch {
+            const parts = connection.connection_string.split('/');
+            return parts.length > 0 ? parts[parts.length - 1] : undefined;
+        }
+    };
+
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         try {
             if (isEditMode) {
                 await invoke('update_tag', { id: editTag.id, name, color });
             } else {
-                await invoke('create_tag', { name, color });
+                const dbName = getDbName();
+                await invoke('create_tag', {
+                    name,
+                    color,
+                    connection_id: connection?.id,
+                    database_name: dbName
+                });
             }
             onSuccess();
             setName('');

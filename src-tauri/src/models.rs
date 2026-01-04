@@ -20,6 +20,7 @@ pub struct Tag {
 pub struct TableTag {
     pub table_name: String,
     pub connection_id: i64,
+    pub database_name: String,
     pub tag_id: i64,
 }
 

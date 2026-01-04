@@ -14,6 +14,8 @@ export interface TableTag {
     tag_id: number;
     table_name: string;
     connection_id: number;
+    database_name: string;
+    order_index?: number;
 }
 
 export interface SavedQuery {

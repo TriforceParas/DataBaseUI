@@ -191,8 +191,61 @@ export const MainInterface: React.FC<MainInterfaceProps> = ({ connection: initia
         highlightRowIndex, setHighlightRowIndex,
         handleRevertChange,
         handleConfirmChanges,
-        handleDiscardChanges
+        handleDiscardChanges,
+        executeConfirmChanges,
+        executeConfirmSelected,
+        executeDiscardChanges,
+        executeDiscardSelected
     } = changeManager;
+
+    // Wrapper to execute confirm with the required arguments
+    const handleExecuteConfirm = React.useCallback(() => {
+        executeConfirmChanges(tabs, results, addLog, fetchTableData);
+    }, [executeConfirmChanges, tabs, results, addLog, fetchTableData]);
+
+    // Wrapper to execute discard with the required arguments  
+    const handleExecuteDiscard = React.useCallback(() => {
+        // Capture tabs with changes before they are cleared
+        const tabsToRefresh = Object.keys(pendingChanges);
+
+        executeDiscardChanges(setSelectedIndices);
+
+        // Refresh data for all tabs that had changes
+        tabsToRefresh.forEach(tabId => {
+            const tab = tabs.find(t => t.id === tabId);
+            if (tab && tab.type === 'table') {
+                fetchTableData(tabId, tab.title);
+            }
+        });
+    }, [executeDiscardChanges, setSelectedIndices, pendingChanges, tabs, fetchTableData]);
+
+    // Wrapper for selective confirm
+    const handleConfirmSelected = React.useCallback((selected: { tabId: string; indices: number[] }[]) => {
+        executeConfirmSelected(selected, tabs, results, addLog, fetchTableData);
+    }, [executeConfirmSelected, tabs, results, addLog, fetchTableData]);
+
+    // Wrapper for selective discard
+    const handleDiscardSelected = React.useCallback((selected: { tabId: string; indices: number[] }[]) => {
+        executeDiscardSelected(selected);
+
+        // Refresh data for affected tabs
+        const uniqueTabs = new Set(selected.map(s => s.tabId));
+        uniqueTabs.forEach(tabId => {
+            const tab = tabs.find(t => t.id === tabId);
+            if (tab && tab.type === 'table') {
+                fetchTableData(tabId, tab.title);
+            }
+        });
+    }, [executeDiscardSelected, tabs, fetchTableData]);
+
+    // Wrapper for revert change (single)
+    const handleRevertChangeWrapper = React.useCallback((tabId: string, index: number) => {
+        handleRevertChange(tabId, index);
+        const tab = tabs.find(t => t.id === tabId);
+        if (tab && tab.type === 'table') {
+            fetchTableData(tabId, tab.title);
+        }
+    }, [handleRevertChange, tabs, fetchTableData]);
 
     // TableCreator state persistence per tab
     const [tableCreatorStates, setTableCreatorStates] = useState<Record<string, TableCreatorState>>({});
@@ -555,6 +608,7 @@ export const MainInterface: React.FC<MainInterfaceProps> = ({ connection: initia
             handleOpenEditWindow={handleOpenInsertSidebar}
             handleOpenSchema={handleOpenSchema}
             onRefresh={handleRefresh}
+            onRefreshConnection={fetchTables}
 
             // Sidebar Props
             tables={tables}
@@ -629,8 +683,14 @@ export const MainInterface: React.FC<MainInterfaceProps> = ({ connection: initia
             // Changelog Actions
             handleConfirmChanges={handleConfirmChanges}
             handleDiscardChanges={handleDiscardChanges}
-            handleRevertChange={handleRevertChange}
+            handleExecuteConfirm={handleExecuteConfirm}
+            handleExecuteDiscard={handleExecuteDiscard}
+            handleConfirmSelected={handleConfirmSelected}
+            handleDiscardSelected={handleDiscardSelected}
+            handleRevertChange={handleRevertChangeWrapper}
             handleNavigateToChange={handleNavigateToChangeWrapper}
+            changelogConfirm={changeManager.changelogConfirm}
+            setChangelogConfirm={changeManager.setChangelogConfirm}
 
             // Modals props
             tableConfirmModal={tableConfirmModal}

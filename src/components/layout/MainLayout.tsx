@@ -36,7 +36,8 @@ interface MainLayoutProps {
     handleOpenLogs: () => void;
     handleOpenEditWindow: () => void;
     handleOpenSchema: () => void;
-    onRefresh: () => void; // mapped to fetchTables in Navbar usage if needed, or we pass specific prop
+    onRefresh: () => void; // For data refresh (active tab)
+    onRefreshConnection: () => void; // For connection refresh (tables list)
 
     // Sidebar Props
     tables: string[];
@@ -113,6 +114,12 @@ interface MainLayoutProps {
     handleDiscardChanges: () => void;
     handleRevertChange: (tabId: string, index: number) => void;
     handleNavigateToChange: (tabId: string, rowIndex: number) => void;
+    handleExecuteConfirm: () => void;
+    handleExecuteDiscard: () => void;
+    handleConfirmSelected: (selected: { tabId: string; indices: number[] }[]) => void;
+    handleDiscardSelected: (selected: { tabId: string; indices: number[] }[]) => void;
+    changelogConfirm: { type: 'confirm' | 'discard' } | null;
+    setChangelogConfirm: React.Dispatch<React.SetStateAction<{ type: 'confirm' | 'discard' } | null>>;
 
     // Modals props
     tableConfirmModal: { type: 'truncate' | 'drop'; tableName: string } | null;
@@ -216,7 +223,7 @@ export const MainLayout: React.FC<MainLayoutProps> = (props) => {
                     newConnection={{
                         isOpen: props.showNewConnModal,
                         onClose: () => props.setShowNewConnModal(false),
-                        onSuccess: () => { props.setShowNewConnModal(false); props.onRefresh(); }
+                        onSuccess: () => { props.setShowNewConnModal(false); props.onRefreshConnection(); }
                     }}
                     tableConfirm={{
                         modal: props.tableConfirmModal,
@@ -236,11 +243,11 @@ export const MainLayout: React.FC<MainLayoutProps> = (props) => {
                         // Or just handle confirm/discard via existing props?
                         // MainInterface used `changelogConfirm` state.
                         // I'll add changelogConfirm to Props (as `any` for now).
-                        modal: null, // Placeholder or fix via props in next revision.
-                        setModal: () => { },
+                        modal: props.changelogConfirm,
+                        setModal: props.setChangelogConfirm,
                         pendingChangesCount: totalChanges,
-                        onConfirm: props.handleConfirmChanges,
-                        onDiscard: props.handleDiscardChanges
+                        onConfirm: props.handleExecuteConfirm,
+                        onDiscard: props.handleExecuteDiscard
                     }}
                     saveItem={{
                         modal: props.saveModal,
@@ -258,7 +265,7 @@ export const MainLayout: React.FC<MainLayoutProps> = (props) => {
                         setShowDbMenu={props.setShowDbMenu}
                         setShowPreferences={props.setShowPreferences}
                         handleAddTableTab={props.handleAddTableTab}
-                        fetchTables={props.onRefresh}
+                        fetchTables={props.onRefreshConnection}
                         handleAddQuery={props.handleAddQuery}
                         showChangelog={props.showChangelog}
                         setShowChangelog={props.setShowChangelog}
@@ -375,6 +382,8 @@ export const MainLayout: React.FC<MainLayoutProps> = (props) => {
                         tabs={props.tabs}
                         onConfirm={props.handleConfirmChanges}
                         onDiscard={props.handleDiscardChanges}
+                        onConfirmSelected={props.handleConfirmSelected}
+                        onDiscardSelected={props.handleDiscardSelected}
                         onRevert={props.handleRevertChange}
                         onNavigate={props.handleNavigateToChange}
                     />

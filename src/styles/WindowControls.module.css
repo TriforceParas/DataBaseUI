@@ -23,17 +23,19 @@
 }
 
 .button:hover {
-    background-color: rgba(255, 255, 255, 0.1);
+    background-color: var(--bg-tertiary);
     color: var(--text-primary);
 }
 
 .closeButton {
     composes: button;
+    border-radius: 0 !important;
 }
 
 .closeButton:hover {
     background-color: #ef4444;
     color: white;
+    border-radius: 0 !important;
 }
 
 .modalOverlay {

@@ -66,7 +66,7 @@
     /* More rounded as per image */
     color: var(--text-primary);
     font-size: 0.95rem;
-    transition: border-color 0.2s;
+    transition: border-color 0.08s ease-out;
 }
 
 .mainInput:focus {
@@ -97,7 +97,7 @@
     align-items: center;
     border-bottom: 1px solid var(--border-color);
     /* Subtle separator */
-    transition: background-color 0.1s;
+    transition: background-color 0.05s ease-out;
 }
 
 .columnRow:hover {

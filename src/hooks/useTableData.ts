@@ -60,7 +60,17 @@ export const useTableData = ({ connection, addLog, tableSchemas, setTableSchemas
 
             // Execute
             const res = await api.executeQuery(connection.connection_string, query);
-            const lastRes = res.length > 0 ? res[res.length - 1] : null;
+            let lastRes = res.length > 0 ? res[res.length - 1] : null;
+
+            // Ensure columns are present even for empty tables by using schema
+            if ((!lastRes || !lastRes.columns || lastRes.columns.length === 0) && tableSchemas[tableName]) {
+                if (!lastRes) {
+                    lastRes = { columns: [], rows: [] };
+                }
+                if (!lastRes.columns || lastRes.columns.length === 0) {
+                    lastRes.columns = tableSchemas[tableName].map(c => c.name);
+                }
+            }
 
             // Get total count (separate call is standard for pagination)
             const countRes = await api.executeQuery(connection.connection_string, countQuery);

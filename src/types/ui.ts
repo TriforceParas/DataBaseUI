@@ -19,6 +19,7 @@ export interface TabItem {
     isPreview?: boolean;
     savedQueryId?: number;
     savedFunctionId?: number;
+    databaseName?: string;
 }
 
 export interface PaginationState {

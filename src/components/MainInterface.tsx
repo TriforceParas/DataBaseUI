@@ -112,6 +112,12 @@ export const MainInterface: React.FC<MainInterfaceProps> = ({ connection: initia
         handleOpenSavedQuery
     } = useTabs();
 
+    let currentDbName = '';
+    try {
+        const url = new URL(connection.connection_string || '');
+        currentDbName = url.pathname.substring(1);
+    } catch (e) { }
+
     const {
         results,
         setResults,
@@ -178,7 +184,7 @@ export const MainInterface: React.FC<MainInterfaceProps> = ({ connection: initia
         connection,
         onRefreshTables: fetchTables,
         onTableDropped: (tableName) => {
-            setTabs(tabs.filter(t => t.title !== tableName));
+            setTabs(tabs.filter(t => !(t.title === tableName && t.databaseName === currentDbName)));
         },
         addLog
     });
@@ -308,10 +314,10 @@ export const MainInterface: React.FC<MainInterfaceProps> = ({ connection: initia
             const res = await api.executeQuery(connection.connection_string, func.function_body);
             const lastRes = res.length > 0 ? res[res.length - 1] : null;
             setResults(prev => ({ ...prev, [tabId]: { data: lastRes, allData: res, loading: false, error: null } }));
-            addLog(func.function_body, 'Success', undefined, undefined, lastRes ? lastRes.rows.length : 0, 'User');
+            addLog(func.function_body, 'Success', `fn:${func.name}`, undefined, lastRes ? lastRes.rows.length : 0, 'User');
         } catch (e) {
             setResults(prev => ({ ...prev, [tabId]: { data: null, loading: false, error: String(e) } }));
-            addLog(func.function_body, 'Error', undefined, String(e), 0, 'User');
+            addLog(func.function_body, 'Error', `fn:${func.name}`, String(e), 0, 'User');
         }
     };
 
@@ -381,15 +387,15 @@ export const MainInterface: React.FC<MainInterfaceProps> = ({ connection: initia
     // Single click opens table in preview mode (italic title, can be replaced by next single-click)
     // Double-click on tab pins it (removes preview mode)
     const handleTableClick = (tableName: string) => {
-        // Check if already exists as a pinned tab
-        const existingPinned = tabs.find(t => t.title === tableName && t.type === 'table' && !t.isPreview);
+        // Check if already exists as a pinned tab for THIS database
+        const existingPinned = tabs.find(t => t.title === tableName && t.type === 'table' && !t.isPreview && t.databaseName === currentDbName);
         if (existingPinned) {
             setActiveTabId(existingPinned.id);
             return;
         }
 
-        // Check if this table is already the preview tab
-        const existingPreview = tabs.find(t => t.title === tableName && t.type === 'table' && t.isPreview);
+        // Check if this table is already the preview tab for THIS database
+        const existingPreview = tabs.find(t => t.title === tableName && t.type === 'table' && t.isPreview && t.databaseName === currentDbName);
         if (existingPreview) {
             setActiveTabId(existingPreview.id);
             return;
@@ -398,22 +404,25 @@ export const MainInterface: React.FC<MainInterfaceProps> = ({ connection: initia
         // Find any existing preview tab (to replace it)
         const previewTab = tabs.find(t => t.isPreview);
 
+        const newTabId = `table-${currentDbName}-${tableName}`;
+
         if (previewTab) {
             // Replace the preview tab with the new table
             setTabs(tabs.map(t =>
                 t.id === previewTab.id
-                    ? { ...t, id: `table-${tableName}`, title: tableName, isPreview: true }
+                    ? { ...t, id: newTabId, title: tableName, isPreview: true, databaseName: currentDbName }
                     : t
             ));
-            // Clear results for old preview tab
-            const newResults = { ...results };
-            delete newResults[previewTab.id];
-            setResults(newResults);
-            setActiveTabId(`table-${tableName}`);
+            // Clear results for old preview tab if it's different
+            if (previewTab.id !== newTabId) {
+                const newResults = { ...results };
+                delete newResults[previewTab.id];
+                setResults(newResults);
+            }
+            setActiveTabId(newTabId);
         } else {
             // Create new preview tab
-            const newTabId = `table-${tableName}`;
-            setTabs([...tabs, { id: newTabId, type: 'table', title: tableName, isPreview: true }]);
+            setTabs([...tabs, { id: newTabId, type: 'table', title: tableName, isPreview: true, databaseName: currentDbName }]);
             setActiveTabId(newTabId);
         }
     };
@@ -455,10 +464,24 @@ export const MainInterface: React.FC<MainInterfaceProps> = ({ connection: initia
     };
 
     const handleOpenInsertSidebar = () => {
-        if (!activeTab || activeTab.type !== 'table') return;
+        // Toggle: if already open, just close it
+        if (showEditWindow) {
+            setShowEditWindow(false);
+            return;
+        }
 
         // Close changelog if open, then open edit pane
         setShowChangelog(false);
+
+        // Check if we have an active table tab
+        if (!activeTab || activeTab.type !== 'table') {
+            // Still allow opening the pane, but with no data
+            setPanelColumns([]);
+            setEditData(undefined);
+            setShowEditWindow(true);
+            return;
+        }
+
         const currentData = results[activeTab.id]?.data;
         setPanelColumns(currentData?.columns || []);
 
@@ -602,7 +625,7 @@ export const MainInterface: React.FC<MainInterfaceProps> = ({ connection: initia
             activeTab={activeTab}
 
             // Navbar Actions
-            handleAddTableTab={handleAddTableTab}
+            handleAddTableTab={() => handleAddTableTab(currentDbName)}
             handleAddQuery={handleAddQuery}
             handleOpenLogs={handleOpenLogs}
             handleOpenEditWindow={handleOpenInsertSidebar}
@@ -637,6 +660,7 @@ export const MainInterface: React.FC<MainInterfaceProps> = ({ connection: initia
             closeTab={closeTab}
             pinTab={pinTab}
             handleDragEnd={handleDragEnd}
+            currentDbName={currentDbName}
 
             // MainViewContent Props
             results={results}

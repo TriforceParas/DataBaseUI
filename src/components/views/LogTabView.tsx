@@ -1,5 +1,5 @@
-import React from 'react';
-import { Activity, Copy, ChevronDown, Download, ChevronLeft, ChevronRight } from 'lucide-react';
+import React, { useState } from 'react';
+import { Activity, Copy, ChevronDown, Download, ChevronLeft, ChevronRight, EyeOff, Eye } from 'lucide-react';
 import styles from '../../styles/MainLayout.module.css';
 import { DataGrid } from '../datagrid/DataGrid';
 import { Tab, SystemLog, PaginationState } from '../../types/index';
@@ -7,8 +7,6 @@ import { Tab, SystemLog, PaginationState } from '../../types/index';
 interface LogTabViewProps {
     activeTab: Tab;
     logs: SystemLog[];
-    selectedIndices: Set<number>;
-    setSelectedIndices: (action: Set<number> | ((prev: Set<number>) => Set<number>)) => void;
     paginationMap: Record<string, PaginationState>;
     setPaginationMap: React.Dispatch<React.SetStateAction<Record<string, PaginationState>>>;
     activeDropdown: 'copy' | 'export' | 'pageSize' | null;
@@ -20,8 +18,6 @@ interface LogTabViewProps {
 export const LogTabView: React.FC<LogTabViewProps> = ({
     activeTab,
     logs,
-    selectedIndices,
-    setSelectedIndices,
     paginationMap,
     setPaginationMap,
     activeDropdown,
@@ -29,10 +25,15 @@ export const LogTabView: React.FC<LogTabViewProps> = ({
     onCopy,
     onExport
 }) => {
-    const pag = paginationMap[activeTab.id] || { page: 1, pageSize: 50, total: logs.length };
-    // We update total in render if mismatch, but usually this should be done in effect. 
-    // Here we just use logs.length.
-    if (pag.total !== logs.length) pag.total = logs.length;
+    const [hideSuccess, setHideSuccess] = useState(false);
+    const [selectedIndices, setSelectedIndices] = useState<Set<number>>(new Set());
+
+    // Filter logs based on hideSuccess toggle
+    const filteredLogs = hideSuccess ? logs.filter(l => l.status.toLowerCase() !== 'success') : logs;
+
+    const pag = paginationMap[activeTab.id] || { page: 1, pageSize: 50, total: filteredLogs.length };
+    // Update total based on filtered logs
+    if (pag.total !== filteredLogs.length) pag.total = filteredLogs.length;
 
     const totalPages = Math.ceil(pag.total / pag.pageSize) || 1;
 
@@ -41,12 +42,27 @@ export const LogTabView: React.FC<LogTabViewProps> = ({
 
     const start = (pag.page - 1) * pag.pageSize;
     const end = start + pag.pageSize;
-    const paginatedLogs = logs.slice(start, end);
+    const paginatedLogs = filteredLogs.slice(start, end);
 
     return (
         <>
             <div className={styles.tableToolbar}>
                 <div style={{ fontWeight: 600, display: 'flex', alignItems: 'center', gap: '0.5rem' }}><Activity size={16} /></div>
+
+                {/* Hide Success Toggle */}
+                <button
+                    className={styles.secondaryBtn}
+                    onClick={() => setHideSuccess(!hideSuccess)}
+                    style={{
+                        marginLeft: '0.5rem',
+                        backgroundColor: hideSuccess ? 'rgba(239, 68, 68, 0.1)' : 'transparent',
+                        borderColor: hideSuccess ? '#ef4444' : undefined
+                    }}
+                    title={hideSuccess ? 'Show all logs' : 'Hide success logs'}
+                >
+                    {hideSuccess ? <Eye size={14} style={{ marginRight: 4 }} /> : <EyeOff size={14} style={{ marginRight: 4 }} />}
+                    {hideSuccess ? 'Show All' : 'Hide Success'}
+                </button>
 
                 {/* Copy Dropdown */}
                 <div style={{ position: 'relative', marginLeft: '0.5rem', display: 'inline-block' }}>
@@ -101,7 +117,7 @@ export const LogTabView: React.FC<LogTabViewProps> = ({
                     <DataGrid
                         data={{
                             columns: ['Time', 'Status', 'Table', 'Query', 'Error', 'User', 'Rows'],
-                            rows: paginatedLogs.map(l => [l.time, l.status, l.table || '-', l.query, l.error || '', l.user || '', l.rows ? String(l.rows) : '-'])
+                            rows: paginatedLogs.map(l => [l.time, l.status, l.table || '-', l.query, l.error || '', l.user || '', l.rows != null ? String(l.rows) : '-'])
                         }}
                         loading={false}
                         error={null}

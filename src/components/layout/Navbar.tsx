@@ -363,9 +363,13 @@ export const Navbar: React.FC<NavbarProps> = ({
                     className={`${styles.iconBtn} ${totalChanges > 0 ? styles.changesBtnPending : ''}`}
                     onClick={() => {
                         if (showChangelog) {
+                            // Just close changelog
                             setShowChangelog(false);
                         } else {
-                            if (showEditWindow) handleOpenEditWindow();
+                            // Close edit pane first, then open changelog
+                            if (showEditWindow) {
+                                handleOpenEditWindow();
+                            }
                             setShowChangelog(true);
                         }
                     }}
@@ -391,20 +395,30 @@ export const Navbar: React.FC<NavbarProps> = ({
                     }} />
                 </button>
                 <div className={styles.verticalDivider} style={{ marginRight: 0 }}></div>
-                <div style={{ display: 'flex', alignItems: 'center', height: '100%', flexShrink: 0 }}>
-                    <button className={styles.navControlButton} onClick={handleOpenLogs} title="Logs">
+                <div style={{ display: 'flex', alignItems: 'center', height: '100%', flexShrink: 0, gap: '0.5rem', padding: '0 0.25rem' }}>
+                    <button className={styles.iconBtn} onClick={handleOpenLogs} title="Logs">
                         <Icons.Activity size={16} />
                     </button>
-                    <button className={styles.navControlButton} onClick={handleOpenSchema} title="Schema">
+                    <button className={styles.iconBtn} onClick={handleOpenSchema} title="Schema">
                         <Icons.Schema size={16} />
                     </button>
                     <button
-                        className={styles.navControlButton}
-                        onClick={handleOpenEditWindow}
+                        className={styles.iconBtn}
+                        onClick={() => {
+                            if (showEditWindow) {
+                                // Just close the edit pane
+                                handleOpenEditWindow();
+                            } else {
+                                // Close changelog first, then open edit pane
+                                if (showChangelog) {
+                                    setShowChangelog(false);
+                                }
+                                handleOpenEditWindow();
+                            }
+                        }}
                         title={showEditWindow ? "Close Edit Pane" : "Open Edit Pane"}
                         style={{
-                            backgroundColor: showEditWindow ? 'var(--bg-tertiary)' : 'transparent',
-                            color: showEditWindow ? 'var(--text-primary)' : 'var(--text-secondary)'
+                            backgroundColor: showEditWindow ? 'var(--bg-tertiary)' : 'transparent'
                         }}
                     >
                         <Icons.ListPlus size={16} />

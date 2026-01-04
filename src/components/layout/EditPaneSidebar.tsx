@@ -254,7 +254,23 @@ export const EditPaneSidebar: React.FC<EditPaneSidebarProps> = ({
 
             {/* Content with matching background */}
             <div style={{ flex: 1, overflowY: 'auto', padding: '1rem', backgroundColor: 'var(--bg-primary)' }}>
-                {!hasSelection ? (
+                {columns.length === 0 ? (
+                    <div style={{
+                        height: '100%',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        color: 'var(--text-secondary)',
+                        textAlign: 'center',
+                        padding: '2rem'
+                    }}>
+                        <div style={{ marginBottom: '0.5rem', opacity: 0.6 }}>No table selected</div>
+                        <div style={{ fontSize: '0.85rem' }}>
+                            Open a table first to edit rows.
+                        </div>
+                    </div>
+                ) : !hasSelection ? (
                     <div style={{
                         height: '100%',
                         display: 'flex',

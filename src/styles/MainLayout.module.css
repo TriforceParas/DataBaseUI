@@ -5,6 +5,8 @@
     width: 100vw;
     color: var(--text-primary);
     overflow: hidden;
+    /* Layout containment for performance */
+    contain: layout style;
 }
 
 .navBar {
@@ -42,12 +44,11 @@
     justify-content: center;
     border-radius: var(--radius-sm);
     color: var(--text-primary);
-    transition: background-color 0.1s ease-out, color 0.1s ease-out;
+    transition: background-color 0.08s ease-out, color 0.08s ease-out;
     background: transparent;
     border: none;
     cursor: pointer;
     user-select: none;
-    will-change: background-color;
 }
 
 .iconBtn:hover {
@@ -69,7 +70,7 @@
     justify-content: center;
     border-radius: var(--radius-sm);
     color: var(--text-primary);
-    transition: background-color 0.1s ease-out, border-color 0.1s ease-out;
+    transition: background-color 0.08s ease-out, border-color 0.08s ease-out;
     background: transparent;
     border: 1px solid var(--border-color);
     cursor: pointer;
@@ -77,7 +78,6 @@
     font-size: 0.85rem;
     font-weight: 500;
     user-select: none;
-    will-change: background-color;
 }
 
 .outlineBtn:hover {
@@ -389,13 +389,14 @@
     display: flex;
     flex-direction: column;
     flex-shrink: 0;
-    transition: width 0.25s ease-in-out, opacity 0.25s ease-in-out;
+    transition: width 0.15s ease-out, opacity 0.15s ease-out;
     overflow: hidden;
     white-space: nowrap;
     user-select: none;
-    will-change: transform;
-    transform: none;
-    /* Changed from translateX(0) to avoid creating stacking context */
+    contain: layout style;
+    /* GPU acceleration for smoother animation */
+    -webkit-transform: translateZ(0);
+    transform: translateZ(0);
 }
 
 .sidebar>* {
@@ -592,7 +593,7 @@
     font-size: 0.85rem;
     color: var(--text-primary);
     cursor: pointer;
-    transition: background-color 0.15s;
+    transition: background-color 0.06s ease-out;
 }
 
 .dropdownItem:hover {
@@ -606,12 +607,11 @@
     margin-bottom: 2px;
     cursor: grab;
     background-color: transparent;
-    transition: background-color 0.08s ease-out;
+    transition: background-color 0.05s ease-out;
     border-radius: 4px;
     font-size: 0.9rem;
     color: var(--text-primary);
     user-select: none;
-    will-change: background-color;
 }
 
 .sidebarItem:hover {
@@ -629,13 +629,12 @@
     align-items: center;
     justify-content: center;
     color: var(--text-primary);
-    transition: background-color 0.2s, color 0.2s;
+    transition: background-color 0.08s ease-out, color 0.08s ease-out;
     background: transparent;
     border: none;
     cursor: pointer;
     border-radius: 0;
     user-select: none;
-    will-change: background-color;
 }
 
 .navControlButton:hover {

@@ -160,7 +160,13 @@ export const TableTabView: React.FC<TableTabViewProps> = ({
                 <div style={{ flex: 1, border: '1px solid var(--border-color)', borderRadius: '6px', background: 'var(--bg-secondary)', overflow: 'hidden', marginBottom: '0.5rem' }}>
                     <DataGrid
                         key={activeTab.id}
-                        data={results[activeTab.id]?.data || null}
+                        data={
+                            // Use result data if available, otherwise construct from schema for empty tables
+                            results[activeTab.id]?.data ||
+                            (tableSchemas[activeTab.title]?.length > 0
+                                ? { columns: tableSchemas[activeTab.title].map(c => c.name), rows: [] }
+                                : null)
+                        }
                         loading={results[activeTab.id]?.loading || false}
                         error={results[activeTab.id]?.error || null}
                         selectedIndices={selectedIndices}

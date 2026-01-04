@@ -1,5 +1,9 @@
 @import './vars.css';
 
+/* ========================================
+   WebKitGTK Performance Optimizations
+   ======================================== */
+
 * {
     box-sizing: border-box;
     margin: 0;
@@ -9,6 +13,9 @@
 html {
     overflow: hidden;
     overflow-x: hidden;
+    /* Force GPU compositing for smoother rendering */
+    -webkit-transform: translateZ(0);
+    transform: translateZ(0);
 }
 
 body {
@@ -17,11 +24,29 @@ body {
     color: var(--text-primary);
     line-height: 1.5;
     -webkit-font-smoothing: antialiased;
+    /* Optimize text rendering for performance */
+    text-rendering: optimizeSpeed;
     overflow: hidden;
     overflow-x: hidden;
     /* App like feel */
     height: 100vh;
     width: 100vw;
+    /* Enable 3D transform context for GPU acceleration */
+    -webkit-transform-style: preserve-3d;
+    transform-style: preserve-3d;
+}
+
+/* Reduce motion for users who prefer it and improve performance */
+@media (prefers-reduced-motion: reduce) {
+
+    *,
+    *::before,
+    *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+        scroll-behavior: auto !important;
+    }
 }
 
 button {

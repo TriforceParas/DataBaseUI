@@ -10,9 +10,9 @@ export const useTabs = () => {
 
     const activeTab = tabs.find(t => t.id === activeTabId);
 
-    const handleAddTableTab = useCallback(() => {
-        const newTabId = `create - table - ${Date.now()} `;
-        setTabs(prev => [...prev, { id: newTabId, type: 'create-table', title: 'New Table' }]);
+    const handleAddTableTab = useCallback((databaseName?: string) => {
+        const newTabId = `create-table-${Date.now()}`;
+        setTabs(prev => [...prev, { id: newTabId, type: 'create-table', title: 'New Table', databaseName }]);
         setActiveTabId(newTabId);
     }, []);
 

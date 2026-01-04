@@ -33,6 +33,7 @@ interface TabBarProps {
     onDragEnd: (event: DragEndEvent) => void;
     tags: Tag[];
     tableTags: TableTag[];
+    currentDatabaseName?: string;
 }
 
 const restrictToHorizontalAxis: Modifier = ({ transform }) => {
@@ -47,13 +48,13 @@ const TabIcon = ({ tab, color }: { tab: TabItem; color?: string }) => {
     // Use passed color if available (e.g. from tag)
     const iconColor = color || 'var(--text-primary)';
 
-    if (tab.type === 'query') return <Icons.Code2 size={14} style={{ flexShrink: 0, color: iconColor }} />;
-    if (tab.type === 'function' || tab.type === 'function-output') return <Icons.MathFunction size={14} style={{ flexShrink: 0, color: iconColor }} />;
-    if (tab.type === 'table') return <Icons.Table size={14} style={{ flexShrink: 0, color: iconColor }} />;
-    if (tab.type === 'log') return <Icons.Activity size={14} style={{ flexShrink: 0, color: iconColor }} />;
-    if (tab.type === 'create-table') return <Icons.Plus size={14} style={{ flexShrink: 0, color: iconColor }} />;
-    if ((tab.type as string) === 'schema-diagram') return <Icons.Schema size={14} style={{ flexShrink: 0, color: iconColor }} />;
-    return <Icons.Table size={14} style={{ flexShrink: 0, color: iconColor }} />;
+    if (tab.type === 'query') return <Icons.Code2 size={14} color={iconColor} style={{ flexShrink: 0 }} />;
+    if (tab.type === 'function' || tab.type === 'function-output') return <Icons.MathFunction size={14} color={iconColor} style={{ flexShrink: 0 }} />;
+    if (tab.type === 'table') return <Icons.Table size={14} color={iconColor} style={{ flexShrink: 0 }} />;
+    if (tab.type === 'logs') return <Icons.Activity size={14} color={iconColor} style={{ flexShrink: 0 }} />;
+    if (tab.type === 'create-table') return <Icons.Plus size={14} color={iconColor} style={{ flexShrink: 0 }} />;
+    if ((tab.type as string) === 'schema-diagram') return <Icons.Schema size={14} color={iconColor} style={{ flexShrink: 0 }} />;
+    return <Icons.Table size={14} color={iconColor} style={{ flexShrink: 0 }} />;
 };
 
 function SortableTab({ tab, isActive, onClick, onClose, onDoubleClick, color }: { tab: TabItem, isActive: boolean, onClick: () => void, onClose: (e: any, id: string) => void, onDoubleClick?: () => void, color?: string }) {
@@ -134,7 +135,7 @@ function SortableTab({ tab, isActive, onClick, onClose, onDoubleClick, color }: 
     );
 }
 
-export const TabBar: React.FC<TabBarProps> = ({ tabs, activeTabId, onTabClick, onTabClose, onTabDoubleClick, onDragEnd, tags, tableTags }) => {
+export const TabBar: React.FC<TabBarProps> = ({ tabs, activeTabId, onTabClick, onTabClose, onTabDoubleClick, onDragEnd, tags, tableTags, currentDatabaseName }) => {
     const sensors = useSensors(
         useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
         useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
@@ -152,7 +153,12 @@ export const TabBar: React.FC<TabBarProps> = ({ tabs, activeTabId, onTabClick, o
                         {tabs.map(tab => {
                             let color: string | undefined;
                             if (tab.type === 'table') {
-                                const tt = tableTags.find(t => t.table_name === tab.title);
+                                // Match by both table name and database name if available
+                                const tabDb = tab.databaseName || currentDatabaseName;
+                                const tt = tableTags.find(t =>
+                                    t.table_name === tab.title &&
+                                    (tabDb ? t.database_name === tabDb : true)
+                                );
                                 const tag = tt ? tags.find(t => t.id === tt.tag_id) : undefined;
                                 color = tag ? tag.color : 'var(--text-primary)';
                             }

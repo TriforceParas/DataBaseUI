@@ -66,6 +66,7 @@ interface MainLayoutProps {
     closeTab: (e: React.MouseEvent, id: string) => void;
     pinTab: (id: string) => void;
     handleDragEnd: (event: any) => void;
+    currentDbName?: string;
 
     // MainViewContent Props
     results: Record<string, TableDataState>;
@@ -317,6 +318,7 @@ export const MainLayout: React.FC<MainLayoutProps> = (props) => {
                             onDragEnd={props.handleDragEnd}
                             tags={props.tags}
                             tableTags={props.tableTags}
+                            currentDatabaseName={props.currentDbName}
                         />
 
                         <div className={styles.mainView}>
@@ -375,6 +377,7 @@ export const MainLayout: React.FC<MainLayoutProps> = (props) => {
                         </div>
                     </div>
 
+                    {/* Sidebars - always rendered for animation, isOpen controls visibility */}
                     <ChangelogSidebar
                         isOpen={props.showChangelog}
                         onClose={() => props.setShowChangelog(false)}

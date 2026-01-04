@@ -164,8 +164,6 @@ export const MainViewContent: React.FC<MainViewContentProps> = ({
             <LogTabView
                 activeTab={activeTab}
                 logs={logs}
-                selectedIndices={selectedIndices}
-                setSelectedIndices={setSelectedIndices}
                 paginationMap={paginationMap}
                 setPaginationMap={setPaginationMap}
                 activeDropdown={activeDropdown}

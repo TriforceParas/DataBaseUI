@@ -29,6 +29,9 @@
     -webkit-user-select: none;
     -moz-user-select: none;
     -ms-user-select: none;
+    /* Performance optimizations for scrolling */
+    contain: strict;
+    -webkit-overflow-scrolling: touch;
 }
 
 .table {

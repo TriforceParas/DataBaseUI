@@ -64,11 +64,11 @@ export const duplicateTable = (params: {
  * SAVED QUERIES
  */
 
-export const listQueries = (connectionId: number) =>
-    invoke<SavedQuery[]>('list_queries', { connectionId });
+export const listQueries = (connectionId: number, databaseName?: string) =>
+    invoke<SavedQuery[]>('list_queries', { connectionId, databaseName });
 
-export const saveQuery = (name: string, query: string, connectionId: number) =>
-    invoke<number>('save_query', { name, query, connectionId });
+export const saveQuery = (name: string, query: string, connectionId: number, databaseName?: string) =>
+    invoke<number>('save_query', { name, query, connectionId, databaseName });
 
 export const updateQuery = (id: number, name: string, query: string) =>
     invoke<void>('update_query', { id, name, query });
@@ -80,11 +80,11 @@ export const deleteQuery = (id: number) =>
  * SAVED FUNCTIONS
  */
 
-export const listFunctions = (connectionId: number) =>
-    invoke<SavedFunction[]>('list_functions', { connectionId });
+export const listFunctions = (connectionId: number, databaseName?: string) =>
+    invoke<SavedFunction[]>('list_functions', { connectionId, databaseName });
 
-export const saveFunction = (name: string, functionBody: string, connectionId: number) =>
-    invoke<number>('save_function', { name, functionBody, connectionId });
+export const saveFunction = (name: string, functionBody: string, connectionId: number, databaseName?: string) =>
+    invoke<number>('save_function', { name, functionBody, connectionId, databaseName });
 
 export const updateFunction = (id: number, name: string, functionBody: string) =>
     invoke<void>('update_function', { id, name, functionBody });

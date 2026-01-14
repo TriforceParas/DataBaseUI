@@ -11,15 +11,17 @@ async fn insert_saved_item(
     name: &str,
     content: &str,
     connection_id: i64,
+    database_name: Option<&str>,
 ) -> Result<i64, String> {
     let sql = format!(
-        "INSERT INTO {} (name, {}, connection_id) VALUES (?, ?, ?)",
+        "INSERT INTO {} (name, {}, connection_id, database_name) VALUES (?, ?, ?, ?)",
         table, content_col
     );
     let result = sqlx::query(&sql)
         .bind(name)
         .bind(content)
         .bind(connection_id)
+        .bind(database_name)
         .execute(db)
         .await
         .map_err(|e| format!("Failed to save to {}: {}", table, e))?;
@@ -66,6 +68,7 @@ pub async fn save_query(
     name: String,
     query: String,
     connection_id: i64,
+    database_name: Option<String>,
 ) -> Result<i64, String> {
     insert_saved_item(
         &state.db,
@@ -74,6 +77,7 @@ pub async fn save_query(
         &name,
         &query,
         connection_id,
+        database_name.as_deref(),
     )
     .await
 }
@@ -82,11 +86,14 @@ pub async fn save_query(
 pub async fn list_queries(
     state: State<'_, AppState>,
     connection_id: i64,
+    database_name: Option<String>,
 ) -> Result<Vec<SavedQuery>, String> {
     sqlx::query_as::<_, SavedQuery>(
-        "SELECT id, name, query, connection_id, datetime(created_at) as created_at FROM saved_queries WHERE connection_id = ? ORDER BY created_at DESC",
+        "SELECT id, name, query, connection_id, database_name, datetime(created_at) as created_at FROM saved_queries WHERE connection_id = ? AND (database_name = ? OR (database_name IS NULL AND ? IS NULL)) ORDER BY created_at DESC",
     )
     .bind(connection_id)
+    .bind(&database_name)
+    .bind(&database_name)
     .fetch_all(&state.db)
     .await
     .map_err(|e| format!("Failed to list queries: {}", e))
@@ -113,6 +120,7 @@ pub async fn save_function(
     name: String,
     function_body: String,
     connection_id: i64,
+    database_name: Option<String>,
 ) -> Result<i64, String> {
     insert_saved_item(
         &state.db,
@@ -121,6 +129,7 @@ pub async fn save_function(
         &name,
         &function_body,
         connection_id,
+        database_name.as_deref(),
     )
     .await
 }
@@ -129,11 +138,14 @@ pub async fn save_function(
 pub async fn list_functions(
     state: State<'_, AppState>,
     connection_id: i64,
+    database_name: Option<String>,
 ) -> Result<Vec<SavedFunction>, String> {
     sqlx::query_as::<_, SavedFunction>(
-        "SELECT id, name, function_body, connection_id, datetime(created_at) as created_at FROM saved_functions WHERE connection_id = ? ORDER BY created_at DESC",
+        "SELECT id, name, function_body, connection_id, database_name, datetime(created_at) as created_at FROM saved_functions WHERE connection_id = ? AND (database_name = ? OR (database_name IS NULL AND ? IS NULL)) ORDER BY created_at DESC",
     )
     .bind(connection_id)
+    .bind(&database_name)
+    .bind(&database_name)
     .fetch_all(&state.db)
     .await
     .map_err(|e| format!("Failed to list functions: {}", e))

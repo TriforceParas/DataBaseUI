@@ -9,12 +9,12 @@ export const useSavedItems = (connection: Connection) => {
 
     const fetchSavedItems = useCallback(async () => {
         try {
-            const queries = await api.listQueries(connection.id);
+            const queries = await api.listQueries(connection.id, connection.database_name || undefined);
             setSavedQueries(queries);
-            const funcs = await api.listFunctions(connection.id);
+            const funcs = await api.listFunctions(connection.id, connection.database_name || undefined);
             setSavedFunctions(funcs);
         } catch (e) { console.error('Failed to load saved items:', e); }
-    }, [connection.id]);
+    }, [connection.id, connection.database_name]);
 
     useEffect(() => {
         fetchSavedItems();
@@ -22,7 +22,7 @@ export const useSavedItems = (connection: Connection) => {
 
     const saveQuery = async (name: string, query: string): Promise<number | null> => {
         try {
-            const savedId = await api.saveQuery(name, query, connection.id);
+            const savedId = await api.saveQuery(name, query, connection.id, connection.database_name || undefined);
             fetchSavedItems();
             return savedId;
         } catch (e) {
@@ -33,7 +33,7 @@ export const useSavedItems = (connection: Connection) => {
 
     const saveFunction = async (name: string, functionBody: string): Promise<number | null> => {
         try {
-            const savedId = await api.saveFunction(name, functionBody, connection.id);
+            const savedId = await api.saveFunction(name, functionBody, connection.id, connection.database_name || undefined);
             fetchSavedItems();
             return savedId;
         } catch (e) {

@@ -80,6 +80,7 @@ pub struct SavedQuery {
     pub name: String,
     pub query: String,
     pub connection_id: i64,
+    pub database_name: Option<String>,
     pub created_at: String,
 }
 
@@ -89,5 +90,6 @@ pub struct SavedFunction {
     pub name: String,
     pub function_body: String,
     pub connection_id: i64,
+    pub database_name: Option<String>,
     pub created_at: String,
 }

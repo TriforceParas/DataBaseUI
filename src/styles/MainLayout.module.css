@@ -603,7 +603,8 @@
 .sidebarItem {
     display: flex;
     align-items: center;
-    padding: 4px 8px;
+    gap: 0.65rem;
+    padding: 6px 12px;
     margin-bottom: 2px;
     cursor: grab;
     background-color: transparent;
@@ -640,4 +641,42 @@
 .navControlButton:hover {
     background-color: var(--bg-tertiary);
     color: var(--text-primary);
+}
+
+.browseBtn {
+    background-color: var(--bg-tertiary);
+    border: 1px solid var(--border-color);
+    color: var(--text-primary);
+    padding: 0 1rem;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 0.9rem;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    transition: all 0.2s;
+}
+
+.browseBtn:hover {
+    background-color: var(--bg-secondary);
+    border-color: var(--text-secondary);
+}
+
+.zoomBtn {
+    width: 30px;
+    height: 30px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 4px;
+    border: 1px solid var(--border-color);
+    background-color: var(--bg-tertiary);
+    color: var(--text-primary);
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.zoomBtn:hover {
+    background-color: var(--bg-secondary);
+    border-color: var(--text-secondary);
 }

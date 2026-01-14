@@ -150,8 +150,8 @@ pub async fn init_db<R: Runtime>(app: &AppHandle<R>) -> Result<Pool<Sqlite>, Str
             .await
             .unwrap_or_default();
 
-    // Check if connection_id column exists
-    if !tags_table_sql.contains("connection_id") {
+    // Check if connection_id column exists OR if it points to the stale connections_old table
+    if !tags_table_sql.contains("connection_id") || tags_table_sql.contains("connections_old") {
         println!("Migrating tags schema...");
 
         // 1. Rename existing table
@@ -230,6 +230,7 @@ pub async fn init_db<R: Runtime>(app: &AppHandle<R>) -> Result<Pool<Sqlite>, Str
         .replace(" ", "")
         .contains(&expected_unique.replace(" ", ""))
         || table_sql.contains("tags_old")
+        || table_sql.contains("connections_old")
     {
         println!("Migrating table_tags schema...");
 
@@ -292,7 +293,65 @@ pub async fn init_db<R: Runtime>(app: &AppHandle<R>) -> Result<Pool<Sqlite>, Str
         println!("Migration of table_tags completed.");
     }
 
-    // Saved Queries table
+    // Migration: Check if saved_queries has database_name column
+    let sq_sql: String = sqlx::query_scalar("SELECT sql FROM sqlite_master WHERE type='table' AND name='saved_queries'")
+        .fetch_optional(&pool)
+        .await
+        .unwrap_or_default()
+        .unwrap_or_default();
+
+    if !sq_sql.contains("database_name") {
+        println!("Migrating saved_queries schema (adding database_name)...");
+        let _ = sqlx::query("DROP TABLE IF EXISTS saved_queries_old").execute(&pool).await;
+        let _ = sqlx::query("ALTER TABLE saved_queries RENAME TO saved_queries_old").execute(&pool).await;
+
+        create_table_schema(
+            &pool,
+            "saved_queries",
+            "CREATE TABLE IF NOT EXISTS saved_queries (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                name TEXT NOT NULL,
+                query TEXT NOT NULL,
+                connection_id INTEGER NOT NULL,
+                database_name TEXT,
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY(connection_id) REFERENCES connections(id) ON DELETE CASCADE
+            );",
+        ).await?;
+
+        let _ = sqlx::query(
+            "INSERT INTO saved_queries (id, name, query, connection_id, created_at)
+             SELECT id, name, query, connection_id, created_at FROM saved_queries_old"
+        ).execute(&pool).await;
+
+        let _ = sqlx::query("DROP TABLE saved_queries_old").execute(&pool).await;
+    } else if sq_sql.contains("connections_old") {
+        println!("Migrating saved_queries schema (fixing stale foreign key)...");
+        let _ = sqlx::query("DROP TABLE IF EXISTS saved_queries_old").execute(&pool).await;
+        let _ = sqlx::query("ALTER TABLE saved_queries RENAME TO saved_queries_old").execute(&pool).await;
+
+        create_table_schema(
+            &pool,
+            "saved_queries",
+            "CREATE TABLE IF NOT EXISTS saved_queries (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                name TEXT NOT NULL,
+                query TEXT NOT NULL,
+                connection_id INTEGER NOT NULL,
+                database_name TEXT,
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY(connection_id) REFERENCES connections(id) ON DELETE CASCADE
+            );",
+        ).await?;
+
+        let _ = sqlx::query(
+            "INSERT INTO saved_queries (id, name, query, connection_id, database_name, created_at)
+             SELECT id, name, query, connection_id, database_name, created_at FROM saved_queries_old"
+        ).execute(&pool).await;
+
+        let _ = sqlx::query("DROP TABLE saved_queries_old").execute(&pool).await;
+    }
+
     create_table_schema(
         &pool,
         "saved_queries",
@@ -301,13 +360,72 @@ pub async fn init_db<R: Runtime>(app: &AppHandle<R>) -> Result<Pool<Sqlite>, Str
             name TEXT NOT NULL,
             query TEXT NOT NULL,
             connection_id INTEGER NOT NULL,
+            database_name TEXT,
             created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
             FOREIGN KEY(connection_id) REFERENCES connections(id) ON DELETE CASCADE
         );",
     )
     .await?;
 
-    // Saved Functions table
+    // Migration: Check if saved_functions has database_name column
+    let sf_sql: String = sqlx::query_scalar("SELECT sql FROM sqlite_master WHERE type='table' AND name='saved_functions'")
+        .fetch_optional(&pool)
+        .await
+        .unwrap_or_default()
+        .unwrap_or_default();
+
+    if !sf_sql.contains("database_name") {
+        println!("Migrating saved_functions schema (adding database_name)...");
+        let _ = sqlx::query("DROP TABLE IF EXISTS saved_functions_old").execute(&pool).await;
+        let _ = sqlx::query("ALTER TABLE saved_functions RENAME TO saved_functions_old").execute(&pool).await;
+
+        create_table_schema(
+            &pool,
+            "saved_functions",
+            "CREATE TABLE IF NOT EXISTS saved_functions (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                name TEXT NOT NULL,
+                function_body TEXT NOT NULL,
+                connection_id INTEGER NOT NULL,
+                database_name TEXT,
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY(connection_id) REFERENCES connections(id) ON DELETE CASCADE
+            );",
+        ).await?;
+
+        let _ = sqlx::query(
+            "INSERT INTO saved_functions (id, name, function_body, connection_id, created_at)
+             SELECT id, name, function_body, connection_id, created_at FROM saved_functions_old"
+        ).execute(&pool).await;
+
+        let _ = sqlx::query("DROP TABLE saved_functions_old").execute(&pool).await;
+    } else if sf_sql.contains("connections_old") {
+        println!("Migrating saved_functions schema (fixing stale foreign key)...");
+        let _ = sqlx::query("DROP TABLE IF EXISTS saved_functions_old").execute(&pool).await;
+        let _ = sqlx::query("ALTER TABLE saved_functions RENAME TO saved_functions_old").execute(&pool).await;
+
+        create_table_schema(
+            &pool,
+            "saved_functions",
+            "CREATE TABLE IF NOT EXISTS saved_functions (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                name TEXT NOT NULL,
+                function_body TEXT NOT NULL,
+                connection_id INTEGER NOT NULL,
+                database_name TEXT,
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY(connection_id) REFERENCES connections(id) ON DELETE CASCADE
+            );",
+        ).await?;
+
+        let _ = sqlx::query(
+            "INSERT INTO saved_functions (id, name, function_body, connection_id, database_name, created_at)
+             SELECT id, name, function_body, connection_id, database_name, created_at FROM saved_functions_old"
+        ).execute(&pool).await;
+
+        let _ = sqlx::query("DROP TABLE saved_functions_old").execute(&pool).await;
+    }
+
     create_table_schema(
         &pool,
         "saved_functions",
@@ -316,6 +434,7 @@ pub async fn init_db<R: Runtime>(app: &AppHandle<R>) -> Result<Pool<Sqlite>, Str
             name TEXT NOT NULL,
             function_body TEXT NOT NULL,
             connection_id INTEGER NOT NULL,
+            database_name TEXT,
             created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
             FOREIGN KEY(connection_id) REFERENCES connections(id) ON DELETE CASCADE
         );",

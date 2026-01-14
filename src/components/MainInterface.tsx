@@ -315,7 +315,10 @@ export const MainInterface: React.FC<MainInterfaceProps> = ({ connection: initia
 
         try {
             const invoke = (await import('@tauri-apps/api/core')).invoke;
-            const connectionString = await invoke<string>('get_connection_string', { connectionId: connection.id });
+            const connectionString = await invoke<string>('get_connection_string', {
+                connectionId: connection.id,
+                databaseName: connection.database_name
+            });
             const res = await api.executeQuery(connectionString, func.function_body);
             const lastRes = res.length > 0 ? res[res.length - 1] : null;
             setResults(prev => ({ ...prev, [tabId]: { data: lastRes, allData: res, loading: false, error: null } }));

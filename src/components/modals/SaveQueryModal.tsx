@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { RiCloseLine, RiSaveLine } from 'react-icons/ri';
-import styles from '../../styles/Form.module.css';
+import { Icons } from '../../assets/icons';
 
 interface SaveQueryModalProps {
     isOpen: boolean;
@@ -70,12 +69,26 @@ export const SaveQueryModal: React.FC<SaveQueryModalProps> = ({
                     border: '1px solid var(--border-color)'
                 }}
             >
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
-                    <h3 style={{ margin: 0, color: 'var(--text-primary)' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
+                    <h3 style={{ margin: 0, color: 'var(--text-primary)', fontSize: '1.1rem', fontWeight: 600 }}>
                         Save {type === 'query' ? 'Query' : 'Function'}
                     </h3>
-                    <div className={styles.closeBtn} onClick={onClose}>
-                        <RiCloseLine size={20} />
+                    <div
+                        onClick={onClose}
+                        style={{
+                            cursor: 'pointer',
+                            color: 'var(--text-secondary)',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            padding: '4px',
+                            borderRadius: '4px',
+                            transition: 'background-color 0.2s'
+                        }}
+                        onMouseEnter={e => e.currentTarget.style.backgroundColor = 'var(--bg-tertiary)'}
+                        onMouseLeave={e => e.currentTarget.style.backgroundColor = 'transparent'}
+                    >
+                        <Icons.X size={18} />
                     </div>
                 </div>
 
@@ -104,16 +117,63 @@ export const SaveQueryModal: React.FC<SaveQueryModalProps> = ({
                     {error && <span style={{ color: '#ef4444', fontSize: '0.85rem', marginTop: '0.5rem', display: 'block' }}>{error}</span>}
                 </div>
 
-                <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'flex-end' }}>
+                <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'flex-end', marginTop: '1.5rem' }}>
                     <button
                         onClick={onClose}
-                        className={styles.cancelBtn}
-                        style={{ padding: '0.5rem 1rem' }}
+                        style={{
+                            padding: '0.5rem 1rem',
+                            backgroundColor: 'transparent',
+                            border: '1px solid var(--border-color)',
+                            color: 'var(--text-secondary)',
+                            borderRadius: '6px',
+                            cursor: 'pointer',
+                            fontSize: '0.9rem',
+                            fontWeight: 500,
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '0.5rem',
+                            transition: 'all 0.2s'
+                        }}
+                        onMouseEnter={e => {
+                            e.currentTarget.style.backgroundColor = 'var(--bg-tertiary)';
+                            e.currentTarget.style.borderColor = 'var(--text-secondary)';
+                        }}
+                        onMouseLeave={e => {
+                            e.currentTarget.style.backgroundColor = 'transparent';
+                            e.currentTarget.style.borderColor = 'var(--border-color)';
+                        }}
                     >
                         Cancel
                     </button>
-                    <button className={styles.primaryBtn} onClick={handleSave}>
-                        <RiSaveLine size={16} /> Save
+                    <button
+                        onClick={handleSave}
+                        style={{
+                            padding: '0.5rem 1.25rem',
+                            backgroundColor: 'var(--accent-primary)',
+                            border: '1px solid transparent',
+                            color: 'white',
+                            borderRadius: '6px',
+                            cursor: 'pointer',
+                            fontSize: '0.9rem',
+                            fontWeight: 600,
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '0.6rem',
+                            transition: 'all 0.2s',
+                            boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
+                        }}
+                        onMouseEnter={e => {
+                            e.currentTarget.style.backgroundColor = 'var(--accent-hover)';
+                            e.currentTarget.style.transform = 'translateY(-1px)';
+                            e.currentTarget.style.boxShadow = '0 4px 8px rgba(0,0,0,0.15)';
+                        }}
+                        onMouseLeave={e => {
+                            e.currentTarget.style.backgroundColor = 'var(--accent-primary)';
+                            e.currentTarget.style.transform = 'translateY(0)';
+                            e.currentTarget.style.boxShadow = '0 2px 4px rgba(0,0,0,0.1)';
+                        }}
+                    >
+                        <Icons.Save size={16} /> Save
                     </button>
                 </div>
             </div>

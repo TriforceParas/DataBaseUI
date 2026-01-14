@@ -4,6 +4,7 @@ import * as api from '../api';
 import { Connection, ColumnSchema, SavedFunction } from '../types/index';
 import { MainLayout } from './layout/MainLayout';
 import { TableCreatorState } from './editors';
+import { openConnectionWindow } from '../utils/windowManager';
 import { useSystemLogs, useSavedItems, useTableOperations, useTableData, useResultsPane, useTabs, useTableActions, usePersistenceActions, useDatabaseRegistry, useChangeManager, useAppSystem, useSchemaOperations, useDataMutation, ChangeError } from '../hooks';
 import { useToast } from './common/Toast';
 import { ErrorSummaryModal } from './modals/ErrorSummaryModal';
@@ -22,53 +23,8 @@ export const MainInterface: React.FC<MainInterfaceProps> = ({ connection: initia
     }, [initialConnection]);
 
     const handleSwitchDatabase = (dbName: string) => {
-        // Update connection string with new database
-        // Assuming connection string format: protocol://user:pass@host:port/dbname
-        // We need robust replacement.
-        try {
-            const url = new URL(connection.connection_string);
-            // URL object might act weird with some protocols, but usually 'postgres:', 'mysql:' work enough to parse.
-            // SQLite is 'sqlite://path', pathname is path.
-            // If postgres/mysql:
-            if (url.protocol.includes('postgres') || url.protocol.includes('mysql')) {
-                url.pathname = `/${dbName}`;
-                // Keep the rest
-                let newStr = url.toString();
-                // URL.toString() might add execution slashes or encode things.
-                // Reconstruct manually if needed to be safe and clean.
-                // But for now let's try standard replacement if simple.
-
-                // Fallback manual replacement if URL fails or we want to be sure about format
-                const parts = connection.connection_string.split('://');
-                if (parts.length === 2) {
-                    const protocol = parts[0];
-                    const rest = parts[1];
-                    const atSplit = rest.split('@');
-                    if (atSplit.length === 2) {
-                        const credentials = atSplit[0];
-                        const hostPart = atSplit[1];
-                        const slashIdx = hostPart.indexOf('/');
-                        if (slashIdx !== -1) {
-                            newStr = `${protocol}://${credentials}@${hostPart.substring(0, slashIdx)}/${dbName}`;
-                        } else {
-                            newStr = `${protocol}://${credentials}@${hostPart}/${dbName}`;
-                        }
-                    } else {
-                        // No auth
-                        const slashIdx = rest.indexOf('/');
-                        if (slashIdx !== -1) {
-                            newStr = `${protocol}://${rest.substring(0, slashIdx)}/${dbName}`;
-                        } else {
-                            newStr = `${protocol}://${rest}/${dbName}`;
-                        }
-                    }
-                }
-
-                setConnection({ ...connection, connection_string: newStr });
-            }
-        } catch (e) {
-            console.error("Failed to switch database string", e);
-        }
+        // Update connection with new database_name
+        setConnection({ ...connection, database_name: dbName });
     };
 
 
@@ -85,7 +41,6 @@ export const MainInterface: React.FC<MainInterfaceProps> = ({ connection: initia
     } = useAppSystem(connection);
 
     // --- Modal State ---
-    const [showNewConnModal, setShowNewConnModal] = useState(false);
     const [showPreferences, setShowPreferences] = useState(false);
     const [tableSchemas, setTableSchemas] = useState<Record<string, ColumnSchema[]>>({});
     const [showEditWindow, setShowEditWindow] = useState(false);
@@ -115,11 +70,8 @@ export const MainInterface: React.FC<MainInterfaceProps> = ({ connection: initia
         handleOpenSavedQuery
     } = useTabs();
 
-    let currentDbName = '';
-    try {
-        const url = new URL(connection.connection_string || '');
-        currentDbName = url.pathname.substring(1);
-    } catch (e) { }
+    // Get current database name from connection
+    const currentDbName = connection.database_name || connection.name;
 
     const {
         results,
@@ -362,7 +314,9 @@ export const MainInterface: React.FC<MainInterfaceProps> = ({ connection: initia
         setResults(prev => ({ ...prev, [tabId]: { data: null, loading: true, error: null } }));
 
         try {
-            const res = await api.executeQuery(connection.connection_string, func.function_body);
+            const invoke = (await import('@tauri-apps/api/core')).invoke;
+            const connectionString = await invoke<string>('get_connection_string', { connectionId: connection.id });
+            const res = await api.executeQuery(connectionString, func.function_body);
             const lastRes = res.length > 0 ? res[res.length - 1] : null;
             setResults(prev => ({ ...prev, [tabId]: { data: lastRes, allData: res, loading: false, error: null } }));
             addLog(func.function_body, 'Success', `fn:${func.name}`, undefined, lastRes ? lastRes.rows.length : 0, 'User');
@@ -617,7 +571,7 @@ export const MainInterface: React.FC<MainInterfaceProps> = ({ connection: initia
         setActiveTabId(logTabId);
     };
 
-    const handleOpenSchema = () => {
+    const handleOpenSchema = async () => {
         // Open Database Schema Diagram tab
         const tabId = 'schema-diagram';
         const existingTab = tabs.find(t => t.id === tabId);
@@ -625,10 +579,12 @@ export const MainInterface: React.FC<MainInterfaceProps> = ({ connection: initia
             setActiveTabId(tabId);
         } else {
             // Fetch all table schemas first
+            const invoke = (await import('@tauri-apps/api/core')).invoke;
+            const connectionString = await invoke<string>('get_connection_string', { connectionId: connection.id });
             Promise.all(tables.map(async (tableName) => {
                 if (!tableSchemas[tableName]) {
                     try {
-                        const schema = await api.getTableSchema(connection.connection_string, tableName);
+                        const schema = await api.getTableSchema(connectionString, tableName);
                         setTableSchemas(prev => ({ ...prev, [tableName]: schema }));
                     } catch (e) {
                         console.error(`Failed to get schema for ${tableName}`, e);
@@ -689,7 +645,7 @@ export const MainInterface: React.FC<MainInterfaceProps> = ({ connection: initia
                 onSwitchConnection={handleSwitchConnectionWrapper}
                 onSwitchDatabase={handleSwitchDatabase}
                 onTableClick={handleTableClick}
-                onAddConnection={() => setShowNewConnModal(true)}
+                onAddConnection={() => openConnectionWindow()}
                 onGetTableSchema={handleGetTableSchema}
                 onEditTableSchema={handleEditTableSchema}
                 onDuplicateTable={handleDuplicateTable}
@@ -776,8 +732,7 @@ export const MainInterface: React.FC<MainInterfaceProps> = ({ connection: initia
                 // ModalManager Props
                 saveModal={saveModal}
                 setSaveModal={setSaveModal}
-                showNewConnModal={showNewConnModal}
-                setShowNewConnModal={setShowNewConnModal}
+
                 showEditWindow={showEditWindow}
                 setShowEditWindow={setShowEditWindow}
                 panelColumns={panelColumns}

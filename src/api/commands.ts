@@ -16,8 +16,8 @@ import {
 export const listConnections = () =>
     invoke<Connection[]>('list_connections');
 
-export const verifyConnection = (connectionString: string) =>
-    invoke<void>('verify_connection', { connectionString });
+export const verifyConnection = (connectionString: string, credentialId?: string) =>
+    invoke<void>('verify_connection', { connectionString, credentialId });
 
 export const saveConnection = (name: string, connectionString: string) =>
     invoke<number>('save_connection', { name, connectionString });

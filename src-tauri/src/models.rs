@@ -1,11 +1,35 @@
 use serde::{Deserialize, Serialize};
 use sqlx::FromRow;
 
+/// New Connection model - stores metadata only, credentials are in OS keyring
 #[derive(Serialize, Deserialize, Clone, Debug, FromRow)]
 pub struct Connection {
     pub id: i64,
     pub name: String,
+    pub db_type: String,              // "mysql", "postgres", "sqlite"
+    pub host: String,
+    pub port: i32,
+    pub database_name: Option<String>,
+    pub credential_id: Option<String>, // Reference to keyring entry
+    pub ssl_mode: Option<String>,
+    pub created_at: String,
+}
+
+/// Legacy Connection model for migration
+#[derive(Serialize, Deserialize, Clone, Debug, FromRow)]
+pub struct ConnectionLegacy {
+    pub id: i64,
+    pub name: String,
     pub connection_string: String,
+    pub created_at: String,
+}
+
+/// Credential entry - stored in app DB, actual password in OS keyring
+#[derive(Serialize, Deserialize, Clone, Debug, FromRow)]
+pub struct Credential {
+    pub id: String,           // UUID
+    pub name: String,         // Display name
+    pub username: String,     // Username (not sensitive)
     pub created_at: String,
 }
 

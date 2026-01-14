@@ -1,4 +1,4 @@
-use sqlx::{migrate::MigrateDatabase, sqlite::SqlitePoolOptions, Pool, Sqlite};
+use sqlx::{migrate::MigrateDatabase, sqlite::SqlitePoolOptions, Pool, Sqlite, Row};
 use std::fs;
 use tauri::{AppHandle, Manager, Runtime};
 
@@ -28,17 +28,95 @@ pub async fn init_db<R: Runtime>(app: &AppHandle<R>) -> Result<Pool<Sqlite>, Str
         .await
         .map_err(|e| format!("Failed to connect to database: {}", e))?;
 
+    // Create credentials table first (since connections references it)
+    create_table_schema(
+        &pool,
+        "credentials",
+        "CREATE TABLE IF NOT EXISTS credentials (
+            id TEXT PRIMARY KEY,
+            name TEXT NOT NULL,
+            username TEXT NOT NULL,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        );",
+    )
+    .await?;
+
+    // Check if connections table has old schema (connection_string column)
+    let connections_sql: String = sqlx::query_scalar(
+        "SELECT sql FROM sqlite_master WHERE type='table' AND name='connections'"
+    )
+    .fetch_optional(&pool)
+    .await
+    .unwrap_or(None)
+    .unwrap_or_default();
+
+    let needs_migration = connections_sql.contains("connection_string");
+
+    if needs_migration && !connections_sql.is_empty() {
+        println!("Migrating connections to new schema...");
+        
+        // Rename old table
+        let _ = sqlx::query("DROP TABLE IF EXISTS connections_old")
+            .execute(&pool)
+            .await;
+        let _ = sqlx::query("ALTER TABLE connections RENAME TO connections_old")
+            .execute(&pool)
+            .await;
+    }
+
+    // Create new connections table
     create_table_schema(
         &pool,
         "connections",
         "CREATE TABLE IF NOT EXISTS connections (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             name TEXT NOT NULL,
-            connection_string TEXT NOT NULL,
-            created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+            db_type TEXT NOT NULL DEFAULT 'mysql',
+            host TEXT NOT NULL DEFAULT 'localhost',
+            port INTEGER NOT NULL DEFAULT 3306,
+            database_name TEXT,
+            credential_id TEXT,
+            ssl_mode TEXT,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY(credential_id) REFERENCES credentials(id) ON DELETE SET NULL
         );",
     )
     .await?;
+
+    // Migrate old connections if needed
+    if needs_migration {
+        let old_conns: Vec<(i64, String, String, String)> = sqlx::query_as(
+            "SELECT id, name, connection_string, datetime(created_at) as created_at FROM connections_old"
+        )
+        .fetch_all(&pool)
+        .await
+        .unwrap_or_default();
+
+        for (id, name, conn_str, created_at) in old_conns {
+            // Parse connection string to extract parts
+            let (db_type, host, port, database_name) = parse_connection_string(&conn_str);
+            
+            let _ = sqlx::query(
+                "INSERT INTO connections (id, name, db_type, host, port, database_name, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)"
+            )
+            .bind(id)
+            .bind(&name)
+            .bind(&db_type)
+            .bind(&host)
+            .bind(port)
+            .bind(&database_name)
+            .bind(&created_at)
+            .execute(&pool)
+            .await;
+            
+            println!("Migrated connection '{}' (credentials lost - please re-add)", name);
+        }
+
+        let _ = sqlx::query("DROP TABLE connections_old")
+            .execute(&pool)
+            .await;
+        println!("Connection migration completed.");
+    }
 
     // Cleanup any stale migration tables from previous runs
     let _ = sqlx::query("DROP TABLE IF EXISTS tags_old")
@@ -47,6 +125,7 @@ pub async fn init_db<R: Runtime>(app: &AppHandle<R>) -> Result<Pool<Sqlite>, Str
     let _ = sqlx::query("DROP TABLE IF EXISTS table_tags_old")
         .execute(&pool)
         .await;
+
 
     create_table_schema(
         &pool,
@@ -256,4 +335,71 @@ async fn create_table_schema(
         .await
         .map_err(|e| format!("Failed to create {} table: {}", table_name, e))?;
     Ok(())
+}
+
+/// Parse a legacy connection string to extract components
+/// Returns (db_type, host, port, database_name)
+fn parse_connection_string(conn_str: &str) -> (String, String, i32, Option<String>) {
+    // Format: protocol://[user:pass@]host:port[/database]
+    let mut db_type = "mysql".to_string();
+    let mut host = "localhost".to_string();
+    let mut port = 3306;
+    let mut database_name = None;
+
+    // Extract protocol
+    if let Some(idx) = conn_str.find("://") {
+        let protocol = &conn_str[..idx];
+        db_type = match protocol {
+            "mysql" => "mysql".to_string(),
+            "postgres" | "postgresql" => "postgres".to_string(),
+            "sqlite" => "sqlite".to_string(),
+            _ => protocol.to_string(),
+        };
+        
+        // Set default port based on db type
+        port = match db_type.as_str() {
+            "postgres" => 5432,
+            "mysql" => 3306,
+            _ => 3306,
+        };
+
+        let rest = &conn_str[idx + 3..];
+        
+        // For SQLite, the rest is the file path
+        if db_type == "sqlite" {
+            host = rest.to_string();
+            return (db_type, host, 0, None);
+        }
+        
+        // Remove credentials if present (user:pass@)
+        let after_creds = if let Some(at_idx) = rest.rfind('@') {
+            &rest[at_idx + 1..]
+        } else {
+            rest
+        };
+        
+        // Split on / to get host:port and database
+        let parts: Vec<&str> = after_creds.splitn(2, '/').collect();
+        let host_port = parts[0];
+        
+        if parts.len() > 1 {
+            // Remove query params from database name
+            let db = parts[1].split('?').next().unwrap_or("");
+            if !db.is_empty() {
+                database_name = Some(db.to_string());
+            }
+        }
+        
+        // Split host:port
+        if let Some(colon_idx) = host_port.rfind(':') {
+            host = host_port[..colon_idx].to_string();
+            if let Ok(p) = host_port[colon_idx + 1..].parse::<i32>() {
+                port = p;
+            }
+        } else {
+            host = host_port.to_string();
+        }
+    }
+
+    (db_type, host, port, database_name)
 }

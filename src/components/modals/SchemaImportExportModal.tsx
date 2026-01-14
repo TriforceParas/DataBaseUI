@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import { open } from '@tauri-apps/plugin-dialog';
 import { Connection } from '../../types';
-import { X, Upload, Download, Loader2, AlertTriangle, FolderOpen } from 'lucide-react';
+import { RiCloseLine, RiUploadLine, RiDownloadLine, RiLoader4Line, RiErrorWarningLine, RiFolderOpenLine } from 'react-icons/ri';
 
 interface SchemaImportExportModalProps {
     isOpen: boolean;
@@ -37,7 +37,7 @@ export const SchemaImportExportModal: React.FC<SchemaImportExportModalProps> = (
                 multiple: false,
                 title: mode === 'export' ? 'Select Export Directory' : 'Select Import Directory'
             });
-            
+
             if (selected && typeof selected === 'string') {
                 setDirectoryPath(selected);
             }
@@ -53,9 +53,10 @@ export const SchemaImportExportModal: React.FC<SchemaImportExportModalProps> = (
         setLogs(prev => [...prev, `Starting ${mode} operation...`]);
 
         try {
+            const connectionString = await invoke<string>('get_connection_string', { connectionId: connection.id });
             const command = mode === 'export' ? 'export_schema' : 'import_schema';
             const result = await invoke<string>(command, {
-                connectionString: connection.connection_string,
+                connectionString,
                 directoryPath: directoryPath
             });
 
@@ -89,11 +90,11 @@ export const SchemaImportExportModal: React.FC<SchemaImportExportModalProps> = (
                     display: 'flex', alignItems: 'center', justifyContent: 'space-between'
                 }}>
                     <h3 style={{ margin: 0, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                        {mode === 'export' ? <Upload size={20} /> : <Download size={20} />}
+                        {mode === 'export' ? <RiUploadLine size={20} /> : <RiDownloadLine size={20} />}
                         Schema {mode === 'export' ? 'Export' : 'Import'}
                     </h3>
                     <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-secondary)' }}>
-                        <X size={20} />
+                        <RiCloseLine size={20} />
                     </button>
                 </div>
 
@@ -103,7 +104,7 @@ export const SchemaImportExportModal: React.FC<SchemaImportExportModalProps> = (
                     <div style={{ marginBottom: '1.5rem', padding: '1rem', backgroundColor: 'var(--bg-tertiary)', borderRadius: '6px' }}>
                         <div style={{ fontSize: '0.9rem', color: 'var(--text-secondary)', marginBottom: '0.25rem' }}>Target Connection</div>
                         <div style={{ fontWeight: 600, wordBreak: 'break-word' }}>{connection.name}</div>
-                        <div style={{ fontSize: '0.8rem', opacity: 0.7, wordBreak: 'break-all' }}>{connection.connection_string}</div>
+                        <div style={{ fontSize: '0.8rem', opacity: 0.7, wordBreak: 'break-all' }}>{connection.db_type}://{connection.host}:{connection.port}/{connection.database_name}</div>
                     </div>
 
                     <div style={{ marginBottom: '1.5rem' }}>
@@ -139,28 +140,28 @@ export const SchemaImportExportModal: React.FC<SchemaImportExportModalProps> = (
                                 onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--bg-hover)'}
                                 onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'var(--bg-tertiary)'}
                             >
-                                <FolderOpen size={16} /> Browse
+                                <RiFolderOpenLine size={16} /> Browse
                             </button>
                         </div>
                         <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginTop: '0.5rem' }}>
-                            {mode === 'export' 
-                                ? 'Select a directory where the schema files will be exported' 
+                            {mode === 'export'
+                                ? 'Select a directory where the schema files will be exported'
                                 : 'Select a directory containing .sql files to import'}
                         </p>
                     </div>
 
                     {mode === 'import' && (
                         <div style={{
-                            marginBottom: '1rem', 
+                            marginBottom: '1rem',
                             padding: '1rem',
-                            borderLeft: '3px solid #f59e0b', 
+                            borderLeft: '3px solid #f59e0b',
                             backgroundColor: 'rgba(245, 158, 11, 0.1)',
                             borderRadius: '4px',
                             fontSize: '0.9rem',
                             lineHeight: '1.6'
                         }}>
                             <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontWeight: 600, color: '#f59e0b', marginBottom: '0.5rem' }}>
-                                <AlertTriangle size={18} /> Warning
+                                <RiErrorWarningLine size={18} /> Warning
                             </div>
                             <div style={{ color: 'var(--text-primary)', wordBreak: 'break-word', whiteSpace: 'normal' }}>
                                 Importing will execute all .sql files in the directory against the selected database. This might modify data or structure. Ensure the source is trusted.
@@ -206,7 +207,7 @@ export const SchemaImportExportModal: React.FC<SchemaImportExportModalProps> = (
                             display: 'flex', alignItems: 'center', gap: '0.5rem'
                         }}
                     >
-                        {isExecuting && <Loader2 size={16} className="animate-spin" />}
+                        {isExecuting && <RiLoader4Line size={16} className="animate-spin" />}
                         {mode === 'export' ? 'Start Export' : 'Start Import'}
                     </button>
                 </div>

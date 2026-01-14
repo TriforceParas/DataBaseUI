@@ -30,3 +30,5 @@ chrono = { version = "0.4", features = ["serde"] }
 sqlx = { version = "0.7", features = ["runtime-tokio-rustls", "any", "sqlite", "postgres", "mysql", "chrono", "rust_decimal"] }
 rust_decimal = "1.33"
 tokio = { version = "1", features = ["full"] }
+keyring = { version = "3", features = ["apple-native", "windows-native", "sync-secret-service"] }
+uuid = { version = "1", features = ["v4"] }

@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { X, ZoomIn, ZoomOut, Monitor, Folder, Settings, Palette, FolderOpen } from 'lucide-react';
+import React, { useState } from 'react';
+import { RiCloseLine, RiZoomInLine, RiZoomOutLine, RiComputerLine, RiFolderLine, RiSettings3Line, RiPaletteLine, RiFolderOpenLine } from 'react-icons/ri';
 import { open } from '@tauri-apps/plugin-dialog';
 import styles from '../../styles/MainLayout.module.css';
 
@@ -17,34 +17,42 @@ interface PreferencesModalProps {
     setDefaultExportPath: (path: string) => void;
 }
 
-type TabType = 'theme' | 'display' | 'directory' | 'settings';
+type TabType = 'theme' | 'scaling' | 'directories' | 'settings';
 
 export const PreferencesModal: React.FC<PreferencesModalProps> = ({
     isOpen, onClose, theme, setTheme, zoom, setZoom, availableThemes,
     enableChangeLog, setEnableChangeLog, defaultExportPath, setDefaultExportPath
 }) => {
+    const tabs: { id: TabType; label: string; icon: React.ReactNode }[] = [
+        { id: 'theme', label: 'Theme', icon: <RiPaletteLine size={18} /> },
+        { id: 'scaling', label: 'Display', icon: <RiComputerLine size={18} /> },
+        { id: 'directories', label: 'Directories', icon: <RiFolderLine size={18} /> },
+        { id: 'settings', label: 'Settings', icon: <RiSettings3Line size={18} /> },
+    ];
+
     const [activeTab, setActiveTab] = useState<TabType>('theme');
 
-    // Local zoom state for preview
-    const [localZoom, setLocalZoom] = useState(zoom);
 
-    // Sync local zoom when opening
-    useEffect(() => {
-        if (isOpen) setLocalZoom(zoom);
-    }, [isOpen, zoom]);
 
-    const handleApplyZoom = () => {
-        setZoom(localZoom);
-    };
-
-    const handleRevertZoom = () => {
-        setLocalZoom(zoom);
+    const handleBrowseDefaultDir = async () => {
+        try {
+            const selected = await open({
+                directory: true,
+                multiple: false,
+                defaultPath: defaultExportPath || undefined
+            });
+            if (selected && typeof selected === 'string') {
+                setDefaultExportPath(selected);
+            }
+        } catch (err) {
+            console.error('Failed to open directory picker:', err);
+        }
     };
 
     if (!isOpen) return null;
 
-    const currentThemeObj = availableThemes.find(t => t.id === theme);
-    const currentMode = currentThemeObj?.type || 'dark';
+
+
 
     const renderSidebarItem = (id: TabType, label: string, icon: React.ReactNode) => (
         <button
@@ -114,7 +122,7 @@ export const PreferencesModal: React.FC<PreferencesModalProps> = ({
                             justifyContent: 'center'
                         }}
                     >
-                        <X size={24} />
+                        <RiCloseLine size={24} />
                     </button>
                 </div>
 
@@ -122,10 +130,9 @@ export const PreferencesModal: React.FC<PreferencesModalProps> = ({
                 <div style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
                     {/* Sidebar */}
                     <div style={{ width: '250px', borderRight: '1px solid var(--border-color)', padding: '20px', display: 'flex', flexDirection: 'column' }}>
-                        {renderSidebarItem('theme', 'Appearance', <Palette size={18} />)}
-                        {renderSidebarItem('display', 'Display & Scaling', <Monitor size={18} />)}
-                        {renderSidebarItem('directory', 'File Locations', <Folder size={18} />)}
-                        {renderSidebarItem('settings', 'App Settings', <Settings size={18} />)}
+                        {tabs.map(tab => (
+                            renderSidebarItem(tab.id, tab.label, tab.icon)
+                        ))}
                     </div>
 
                     {/* Content */}
@@ -160,47 +167,20 @@ export const PreferencesModal: React.FC<PreferencesModalProps> = ({
                             </div>
                         )}
 
-                        {activeTab === 'display' && (
+                        {activeTab === 'scaling' && (
                             <div>
                                 <h3 style={{ fontSize: '1.5rem', marginBottom: '20px' }}>Display Interface Scaling</h3>
 
                                 <div style={{ marginBottom: '30px' }}>
                                     <label style={{ display: 'block', marginBottom: '10px', color: 'var(--text-secondary)' }}>Scale Factor</label>
-                                    <div style={{ display: 'flex', alignItems: 'center', gap: '15px', marginBottom: '15px' }}>
-                                        <button
-                                            className={styles.secondaryBtn}
-                                            onClick={() => setLocalZoom(0.75)}
-                                            style={{
-                                                border: localZoom === 0.75 ? '2px solid var(--accent-primary)' : undefined
-                                            }}
-                                        >S (75%)</button>
-                                        <button
-                                            className={styles.secondaryBtn}
-                                            onClick={() => setLocalZoom(1.0)}
-                                            style={{
-                                                border: localZoom === 1.0 ? '2px solid var(--accent-primary)' : undefined
-                                            }}
-                                        >M (100%)</button>
-                                        <button
-                                            className={styles.secondaryBtn}
-                                            onClick={() => setLocalZoom(1.5)}
-                                            style={{
-                                                border: localZoom === 1.5 ? '2px solid var(--accent-primary)' : undefined
-                                            }}
-                                        >L (150%)</button>
-                                    </div>
                                     <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
-                                        <ZoomOut size={20} style={{ cursor: 'pointer', opacity: localZoom <= 0.5 ? 0.3 : 1 }} onClick={() => setLocalZoom(Math.max(0.5, localZoom - 0.05))} />
-                                        <input
-                                            type="range"
-                                            min="50"
-                                            max="200"
-                                            value={localZoom * 100}
-                                            onChange={(e) => setLocalZoom(Number(e.target.value) / 100)}
-                                            style={{ flex: 1, accentColor: 'var(--accent-primary)' }}
-                                        />
-                                        <ZoomIn size={20} style={{ cursor: 'pointer', opacity: localZoom >= 2.0 ? 0.3 : 1 }} onClick={() => setLocalZoom(Math.min(2.0, localZoom + 0.05))} />
-                                        <span style={{ width: '60px', textAlign: 'right', fontWeight: 600, fontSize: '1rem' }}>{Math.round(localZoom * 100)}%</span>
+                                        <button onClick={() => setZoom(Math.max(0.7, zoom - 0.1))} className={styles.zoomBtn}>
+                                            <RiZoomOutLine size={16} />
+                                        </button>
+                                        <span style={{ minWidth: '3rem', textAlign: 'center' }}>{Math.round(zoom * 100)}%</span>
+                                        <button onClick={() => setZoom(Math.min(1.5, zoom + 0.1))} className={styles.zoomBtn}>
+                                            <RiZoomInLine size={16} />
+                                        </button>
                                     </div>
                                 </div>
 
@@ -217,7 +197,7 @@ export const PreferencesModal: React.FC<PreferencesModalProps> = ({
                                     </div>
 
                                     {/* Sample UI elements at selected scale */}
-                                    <div style={{ transform: `scale(${localZoom})`, transformOrigin: 'top left', marginBottom: `${(localZoom - 1) * 80}px` }}>
+                                    <div style={{ transform: `scale(${zoom})`, transformOrigin: 'top left', marginBottom: `${(zoom - 1) * 80}px` }}>
                                         <div style={{ marginBottom: '12px' }}>
                                             <span style={{ fontSize: '1.2rem', fontWeight: 600, color: 'var(--text-primary)' }}>Database Tables</span>
                                         </div>
@@ -245,19 +225,14 @@ export const PreferencesModal: React.FC<PreferencesModalProps> = ({
                                             }}>products</div>
                                         </div>
                                         <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
-                                            This is how your interface text will appear at {Math.round(localZoom * 100)}% scale.
+                                            This is how your interface text will appear at {Math.round(zoom * 100)}% scale.
                                         </div>
                                     </div>
-                                </div>
-
-                                <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
-                                    <button className={styles.secondaryBtn} onClick={handleRevertZoom} disabled={localZoom === zoom}>Revert</button>
-                                    <button className={styles.primaryBtn} onClick={handleApplyZoom}>Apply</button>
                                 </div>
                             </div>
                         )}
 
-                        {activeTab === 'directory' && (
+                        {activeTab === 'directories' && (
                             <div>
                                 <h3 style={{ fontSize: '1.5rem', marginBottom: '20px' }}>Default Save Locations</h3>
 
@@ -277,23 +252,10 @@ export const PreferencesModal: React.FC<PreferencesModalProps> = ({
                                                 background: 'var(--bg-tertiary)',
                                                 color: 'var(--text-primary)'
                                             }}
+                                            readOnly
                                         />
-                                        <button
-                                            className={styles.secondaryBtn}
-                                            onClick={async () => {
-                                                const selected = await open({
-                                                    directory: true,
-                                                    multiple: false,
-                                                    title: 'Select Export Directory'
-                                                });
-                                                if (selected && typeof selected === 'string') {
-                                                    setDefaultExportPath(selected);
-                                                }
-                                            }}
-                                            style={{ display: 'flex', alignItems: 'center', gap: '6px' }}
-                                        >
-                                            <FolderOpen size={16} />
-                                            Browse
+                                        <button className={styles.browseBtn} onClick={handleBrowseDefaultDir}>
+                                            <RiFolderOpenLine size={16} /> Browse
                                         </button>
                                     </div>
                                     <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginTop: '8px' }}>

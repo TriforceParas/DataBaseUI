@@ -1,4 +1,5 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useRef } from 'react';
+import { invoke } from '@tauri-apps/api/core';
 import { Connection, PendingChange, QueryResult, Tab } from '../types/index';
 import { generateRowChangeSql } from '../utils/sqlHelpers';
 import * as api from '../api';
@@ -59,6 +60,15 @@ export const useChangeManager = (
     const [changelogConfirm, setChangelogConfirm] = useState<{ type: 'confirm' | 'discard' } | null>(null);
     const [highlightRowIndex, setHighlightRowIndex] = useState<number | null>(null);
 
+    const connectionStringRef = useRef<string | null>(null);
+
+    const getConnectionString = useCallback(async (): Promise<string> => {
+        if (connectionStringRef.current) return connectionStringRef.current;
+        const connStr = await invoke<string>('get_connection_string', { connectionId: connection.id });
+        connectionStringRef.current = connStr;
+        return connStr;
+    }, [connection.id]);
+
     const handleRevertChange = useCallback((tabId: string, changeIndex: number) => {
         setPendingChanges(prev => {
             const list = prev[tabId] || [];
@@ -79,7 +89,8 @@ export const useChangeManager = (
         addLog: (query: string, status: 'Success' | 'Error', table?: string, error?: string, rows?: number, user?: string) => void,
         fetchTableData: (tabId: string, tableName: string) => Promise<void>
     ) => {
-        const isMysql = connection.connection_string.startsWith('mysql:');
+        const isMysql = connection.db_type === 'mysql';
+        const connectionString = await getConnectionString();
         const errors: ChangeError[] = [];
         const successfulTabIds: Set<string> = new Set();
 
@@ -91,7 +102,7 @@ export const useChangeManager = (
             for (const change of schemaChanges) {
                 if (change.generatedSql) {
                     try {
-                        await api.executeQuery(connection.connection_string, change.generatedSql);
+                        await api.executeQuery(connectionString, change.generatedSql);
                         addLog(change.generatedSql, 'Success', change.tableName, undefined, 1);
                         successfulTabIds.add(tabId);
                     } catch (e) {
@@ -120,7 +131,7 @@ export const useChangeManager = (
 
                 if (query) {
                     try {
-                        await api.executeQuery(connection.connection_string, query);
+                        await api.executeQuery(connectionString, query);
                         addLog(query, 'Success', change.tableName, undefined, 1);
                         successfulTabIds.add(tabId);
                     } catch (e) {
@@ -182,24 +193,25 @@ export const useChangeManager = (
         }
 
         setChangelogConfirm(null);
-    }, [connection, pendingChanges, options]);
+    }, [connection.id, connection.db_type, pendingChanges, options, getConnectionString]);
 
     // Retry failed changes with FK checks disabled (MySQL only)
     const retryWithFKDisabled = useCallback(async (
         errors: ChangeError[],
         addLog: (query: string, status: 'Success' | 'Error', table?: string, error?: string, rows?: number, user?: string) => void
     ) => {
-        const isMysql = connection.connection_string.startsWith('mysql:');
+        const isMysql = connection.db_type === 'mysql';
         if (!isMysql) {
             alert('Foreign key bypass is only supported for MySQL databases.');
             return;
         }
 
+        const connectionString = await getConnectionString();
         const newErrors: ChangeError[] = [];
 
         try {
             // Disable FK checks
-            await api.executeQuery(connection.connection_string, 'SET FOREIGN_KEY_CHECKS=0');
+            await api.executeQuery(connectionString, 'SET FOREIGN_KEY_CHECKS=0');
             addLog('SET FOREIGN_KEY_CHECKS=0', 'Success', undefined, undefined, 0);
 
             for (const { change } of errors) {
@@ -207,7 +219,7 @@ export const useChangeManager = (
                 if (!query) continue;
 
                 try {
-                    await api.executeQuery(connection.connection_string, query);
+                    await api.executeQuery(connectionString, query);
                     addLog(query, 'Success', change.tableName, undefined, 1);
                 } catch (e) {
                     const errorMsg = String(e);
@@ -221,7 +233,7 @@ export const useChangeManager = (
             }
 
             // Re-enable FK checks
-            await api.executeQuery(connection.connection_string, 'SET FOREIGN_KEY_CHECKS=1');
+            await api.executeQuery(connectionString, 'SET FOREIGN_KEY_CHECKS=1');
             addLog('SET FOREIGN_KEY_CHECKS=1', 'Success', undefined, undefined, 0);
 
             if (newErrors.length > 0 && options?.onErrors) {
@@ -233,10 +245,11 @@ export const useChangeManager = (
             addLog(`Error during FK bypass: ${e}`, 'Error', undefined, String(e));
             // Try to re-enable FK checks even on error
             try {
-                await api.executeQuery(connection.connection_string, 'SET FOREIGN_KEY_CHECKS=1');
+                const connectionString = await getConnectionString();
+                await api.executeQuery(connectionString, 'SET FOREIGN_KEY_CHECKS=1');
             } catch { /* ignore */ }
         }
-    }, [connection, options]);
+    }, [connection.id, connection.db_type, options, getConnectionString]);
 
     // Execute confirm for selected changes only
     const executeConfirmSelected = useCallback(async (
@@ -246,7 +259,8 @@ export const useChangeManager = (
         addLog: (query: string, status: 'Success' | 'Error', table?: string, error?: string, rows?: number, user?: string) => void,
         fetchTableData: (tabId: string, tableName: string) => Promise<void>
     ) => {
-        const isMysql = connection.connection_string.startsWith('mysql:');
+        const isMysql = connection.db_type === 'mysql';
+        const connectionString = await getConnectionString();
         const errors: ChangeError[] = [];
         const successfulIndices: Map<string, Set<number>> = new Map();
 
@@ -261,7 +275,7 @@ export const useChangeManager = (
                 const originalIdx = indices[selectedChanges.indexOf(change)];
                 if (change.generatedSql) {
                     try {
-                        await api.executeQuery(connection.connection_string, change.generatedSql);
+                        await api.executeQuery(connectionString, change.generatedSql);
                         addLog(change.generatedSql, 'Success', change.tableName, undefined, 1);
                         if (!successfulIndices.has(tabId)) successfulIndices.set(tabId, new Set());
                         successfulIndices.get(tabId)!.add(originalIdx);
@@ -287,7 +301,7 @@ export const useChangeManager = (
                     const query = generateRowChangeSql(change, cols, isMysql);
                     if (query) {
                         try {
-                            await api.executeQuery(connection.connection_string, query);
+                            await api.executeQuery(connectionString, query);
                             addLog(query, 'Success', change.tableName, undefined, 1);
                             if (!successfulIndices.has(tabId)) successfulIndices.set(tabId, new Set());
                             successfulIndices.get(tabId)!.add(originalIdx);
@@ -334,7 +348,7 @@ export const useChangeManager = (
         } else if (options?.onSuccess) {
             options.onSuccess();
         }
-    }, [connection, pendingChanges, options]);
+    }, [connection.id, connection.db_type, pendingChanges, options, getConnectionString]);
 
     const handleDiscardChanges = useCallback(() => {
         setChangelogConfirm({ type: 'discard' });

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { X, Save } from 'lucide-react';
-import styles from '../../styles/ConnectionForm.module.css';
+import { RiCloseLine, RiSaveLine } from 'react-icons/ri';
+import styles from '../../styles/Form.module.css';
 
 interface SaveQueryModalProps {
     isOpen: boolean;
@@ -74,12 +74,9 @@ export const SaveQueryModal: React.FC<SaveQueryModalProps> = ({
                     <h3 style={{ margin: 0, color: 'var(--text-primary)' }}>
                         Save {type === 'query' ? 'Query' : 'Function'}
                     </h3>
-                    <button
-                        onClick={onClose}
-                        style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-secondary)' }}
-                    >
-                        <X size={20} />
-                    </button>
+                    <div className={styles.closeBtn} onClick={onClose}>
+                        <RiCloseLine size={20} />
+                    </div>
                 </div>
 
                 <div style={{ marginBottom: '1rem' }}>
@@ -115,12 +112,8 @@ export const SaveQueryModal: React.FC<SaveQueryModalProps> = ({
                     >
                         Cancel
                     </button>
-                    <button
-                        onClick={handleSave}
-                        className={styles.addButton}
-                        style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.5rem 1rem' }}
-                    >
-                        <Save size={16} /> Save
+                    <button className={styles.primaryBtn} onClick={handleSave}>
+                        <RiSaveLine size={16} /> Save
                     </button>
                 </div>
             </div>

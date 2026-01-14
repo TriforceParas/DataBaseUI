@@ -1,5 +1,5 @@
 import React from 'react';
-import { Loader2 } from 'lucide-react';
+import { RiLoader4Line } from 'react-icons/ri';
 
 interface FullscreenLoaderProps {
     isVisible: boolean;

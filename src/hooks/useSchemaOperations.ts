@@ -1,4 +1,5 @@
 import { useCallback } from 'react';
+import { invoke } from '@tauri-apps/api/core';
 import * as api from '../api';
 import { Connection, QueryResult, TabItem, TableDataState, ColumnSchema } from '../types/index';
 import { TableCreatorState } from '../components/editors/TableCreator';
@@ -25,9 +26,14 @@ export const useSchemaOperations = ({
     addLog
 }: UseSchemaOperationsProps) => {
 
+    const getConnectionString = useCallback(async (): Promise<string> => {
+        return await invoke<string>('get_connection_string', { connectionId: connection.id });
+    }, [connection.id]);
+
     const handleGetTableSchema = useCallback(async (tableName: string) => {
         try {
-            const schema = await api.getTableSchema(connection.connection_string, tableName);
+            const connectionString = await getConnectionString();
+            const schema = await api.getTableSchema(connectionString, tableName);
 
             // Convert schema to QueryResult format for display in DataGrid
             const schemaResult: QueryResult = {
@@ -57,12 +63,13 @@ export const useSchemaOperations = ({
             console.error('Failed to get table schema:', e);
             addLog(`SHOW COLUMNS FROM ${tableName}`, 'Error', tableName, String(e), 0, 'System');
         }
-    }, [connection, tabs, setTabs, setActiveTabId, setResults, addLog]);
+    }, [connection.id, tabs, setTabs, setActiveTabId, setResults, addLog, getConnectionString]);
 
     const handleEditTableSchema = useCallback(async (tableName: string) => {
         try {
+            const connectionString = await getConnectionString();
             // Fetch existing schema
-            const schema = await api.getTableSchema(connection.connection_string, tableName);
+            const schema = await api.getTableSchema(connectionString, tableName);
 
             // Convert ColumnSchema to ColumnDef format
             const columns = schema.map((col: ColumnSchema) => ({
@@ -93,13 +100,14 @@ export const useSchemaOperations = ({
             console.error('Failed to fetch table schema:', e);
             alert(`Failed to fetch table schema: ${e}`);
         }
-    }, [connection, tabs, setTabs, setActiveTabId, setTableCreatorStates, setOriginalSchemas]);
+    }, [connection.id, tabs, setTabs, setActiveTabId, setTableCreatorStates, setOriginalSchemas, getConnectionString]);
 
     // Refresh schema for an existing edit tab after changes are confirmed
     const refreshEditTableSchema = useCallback(async (tabId: string, tableName: string) => {
         try {
+            const connectionString = await getConnectionString();
             // Re-fetch schema from database
-            const schema = await api.getTableSchema(connection.connection_string, tableName);
+            const schema = await api.getTableSchema(connectionString, tableName);
 
             // Convert ColumnSchema to ColumnDef format
             const columns = schema.map((col: ColumnSchema) => ({
@@ -125,7 +133,7 @@ export const useSchemaOperations = ({
         } catch (e) {
             console.error('Failed to refresh table schema:', e);
         }
-    }, [connection, setTableCreatorStates, setOriginalSchemas]);
+    }, [connection.id, setTableCreatorStates, setOriginalSchemas, getConnectionString]);
 
     return {
         handleGetTableSchema,
@@ -133,4 +141,3 @@ export const useSchemaOperations = ({
         refreshEditTableSchema
     };
 };
-

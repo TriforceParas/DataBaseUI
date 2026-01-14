@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { X, CheckCircle, AlertCircle, Info } from 'lucide-react';
+import { RiCloseLine, RiCheckboxCircleLine, RiErrorWarningLine, RiInformationLine } from 'react-icons/ri';
 import { open } from '@tauri-apps/plugin-shell';
 
 export interface ToastMessage {
@@ -17,10 +17,10 @@ interface ToastProps {
 
 const ToastIcon = ({ type }: { type?: 'success' | 'error' | 'info' }) => {
     switch (type) {
-        case 'error': return <AlertCircle size={20} style={{ color: '#ef4444', flexShrink: 0 }} />; // Red
-        case 'info': return <Info size={20} style={{ color: '#3b82f6', flexShrink: 0 }} />; // Blue
+        case 'error': return <RiErrorWarningLine size={20} style={{ color: '#ef4444', flexShrink: 0 }} />; // Red
+        case 'info': return <RiInformationLine size={20} style={{ color: '#3b82f6', flexShrink: 0 }} />; // Blue
         case 'success':
-        default: return <CheckCircle size={20} style={{ color: '#22c55e', flexShrink: 0 }} />; // Green
+        default: return <RiCheckboxCircleLine size={20} style={{ color: '#22c55e', flexShrink: 0 }} />; // Green
     }
 };
 
@@ -103,7 +103,7 @@ const Toast: React.FC<ToastProps> = ({ toast, onDismiss }) => {
                 onMouseOver={(e) => e.currentTarget.style.background = 'var(--bg-tertiary)'}
                 onMouseOut={(e) => e.currentTarget.style.background = 'transparent'}
             >
-                <X size={16} />
+                <RiCloseLine size={16} />
             </button>
         </div>
     );

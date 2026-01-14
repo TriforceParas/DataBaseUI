@@ -1,5 +1,6 @@
 
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
+import { invoke } from '@tauri-apps/api/core';
 import { Connection } from '../types/index';
 import * as api from '../api';
 
@@ -20,6 +21,10 @@ export const useTableOperations = ({ connection, onRefreshTables, onTableDropped
     // Duplicate Table Modal State
     const [duplicateTableModal, setDuplicateTableModal] = useState<string | null>(null);
 
+    const getConnectionString = useCallback(async (): Promise<string> => {
+        return await invoke<string>('get_connection_string', { connectionId: connection.id });
+    }, [connection.id]);
+
     // Duplicate Table - Show modal
     const handleDuplicateTable = (tableName: string) => {
         setDuplicateTableModal(tableName);
@@ -30,8 +35,9 @@ export const useTableOperations = ({ connection, onRefreshTables, onTableDropped
         if (!duplicateTableModal) return;
 
         try {
+            const connectionString = await getConnectionString();
             await api.duplicateTable({
-                connectionString: connection.connection_string,
+                connectionString,
                 sourceTable: duplicateTableModal,
                 newTable: newName,
                 includeData
@@ -61,12 +67,13 @@ export const useTableOperations = ({ connection, onRefreshTables, onTableDropped
         if (!tableConfirmModal) return;
 
         try {
+            const connectionString = await getConnectionString();
             if (tableConfirmModal.type === 'truncate') {
-                await api.truncateTable(connection.connection_string, tableConfirmModal.tableName);
+                await api.truncateTable(connectionString, tableConfirmModal.tableName);
                 onRefreshTables();
                 addLog(`TRUNCATE TABLE ${tableConfirmModal.tableName}`, 'Success', tableConfirmModal.tableName, undefined, 0, 'System');
             } else if (tableConfirmModal.type === 'drop') {
-                await api.dropTable(connection.connection_string, tableConfirmModal.tableName);
+                await api.dropTable(connectionString, tableConfirmModal.tableName);
                 // Close any tabs for this table
                 onTableDropped(tableConfirmModal.tableName);
                 onRefreshTables();

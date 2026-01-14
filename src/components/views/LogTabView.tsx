@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Activity, Copy, ChevronDown, Download, ChevronLeft, ChevronRight, EyeOff, Eye, RefreshCw } from 'lucide-react';
+import { RiPulseLine, RiFileCopyLine, RiArrowDownSLine, RiDownloadLine, RiArrowLeftSLine, RiArrowRightSLine, RiEyeOffLine, RiEyeLine, RiRefreshLine } from 'react-icons/ri';
 import styles from '../../styles/MainLayout.module.css';
 import { DataGrid } from '../datagrid/DataGrid';
 import { Tab, SystemLog, PaginationState } from '../../types/index';
@@ -50,14 +50,14 @@ export const LogTabView: React.FC<LogTabViewProps> = ({
         <>
             <div className={styles.tableToolbar}>
                 <div style={{ fontWeight: 600, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                    <Activity size={16} />
+                    <RiPulseLine size={16} />
                     {onRefresh && (
                         <button
                             className={styles.iconBtn}
                             onClick={onRefresh}
                             title="Refresh logs"
                         >
-                            <RefreshCw size={14} />
+                            <RiRefreshLine size={14} />
                         </button>
                     )}
                 </div>
@@ -73,14 +73,14 @@ export const LogTabView: React.FC<LogTabViewProps> = ({
                     }}
                     title={hideSuccess ? 'Show all logs' : 'Hide success logs'}
                 >
-                    {hideSuccess ? <Eye size={14} style={{ marginRight: 4 }} /> : <EyeOff size={14} style={{ marginRight: 4 }} />}
+                    {hideSuccess ? <RiEyeLine size={14} style={{ marginRight: 4 }} /> : <RiEyeOffLine size={14} style={{ marginRight: 4 }} />}
                     {hideSuccess ? 'Show All' : 'Hide Success'}
                 </button>
 
                 {/* Copy Dropdown */}
                 <div style={{ position: 'relative', marginLeft: '0.5rem', display: 'inline-block' }}>
                     <button className={styles.secondaryBtn} onClick={() => setActiveDropdown(activeDropdown === 'copy' ? null : 'copy')}>
-                        <Copy size={14} style={{ marginRight: 4 }} /> Copy <ChevronDown size={12} style={{ marginLeft: 2 }} />
+                        <RiFileCopyLine size={14} style={{ marginRight: 4 }} /> Copy <RiArrowDownSLine size={12} style={{ marginLeft: 2 }} />
                     </button>
                     {activeDropdown === 'copy' && (
                         <div className={styles.dropdownMenu} style={{ position: 'absolute', top: '100%', left: 0, zIndex: 100, backgroundColor: 'var(--bg-primary)', border: '1px solid var(--border-color)', borderRadius: '4px', marginTop: '4px', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)', minWidth: '100px' }}>
@@ -92,7 +92,7 @@ export const LogTabView: React.FC<LogTabViewProps> = ({
                 {/* Export Dropdown */}
                 <div style={{ position: 'relative', marginLeft: '0.5rem', display: 'inline-block' }}>
                     <button className={styles.secondaryBtn} onClick={() => setActiveDropdown(activeDropdown === 'export' ? null : 'export')}>
-                        <Download size={14} style={{ marginRight: 4 }} /> Export <ChevronDown size={12} style={{ marginLeft: 2 }} />
+                        <RiDownloadLine size={14} style={{ marginRight: 4 }} /> Export <RiArrowDownSLine size={12} style={{ marginLeft: 2 }} />
                     </button>
                     {activeDropdown === 'export' && (
                         <div className={styles.dropdownMenu} style={{ position: 'absolute', top: '100%', left: 0, zIndex: 100, backgroundColor: 'var(--bg-primary)', border: '1px solid var(--border-color)', borderRadius: '4px', marginTop: '4px', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)', minWidth: '100px' }}>
@@ -104,13 +104,13 @@ export const LogTabView: React.FC<LogTabViewProps> = ({
 
                 {/* Pagination Controls */}
                 <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.85rem' }}>
-                    <button className={styles.iconBtn} disabled={pag.page === 1} onClick={() => setPage(pag.page - 1)}><ChevronLeft size={16} /></button>
+                    <button className={styles.iconBtn} disabled={pag.page === 1} onClick={() => setPage(pag.page - 1)}><RiArrowLeftSLine size={16} /></button>
                     <span>Page {pag.page} of {totalPages}</span>
-                    <button className={styles.iconBtn} disabled={pag.page === totalPages} onClick={() => setPage(pag.page + 1)}><ChevronRight size={16} /></button>
+                    <button className={styles.iconBtn} disabled={pag.page === totalPages} onClick={() => setPage(pag.page + 1)}><RiArrowRightSLine size={16} /></button>
 
                     <div style={{ position: 'relative', marginLeft: '0.5rem' }}>
                         <div style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', border: '1px solid var(--border-color)', borderRadius: '4px', padding: '2px 6px' }} onClick={() => setActiveDropdown(activeDropdown === 'pageSize' ? null : 'pageSize')}>
-                            {pag.pageSize} / page <ChevronDown size={12} style={{ marginLeft: 4 }} />
+                            {pag.pageSize} / page <RiArrowDownSLine size={12} style={{ marginLeft: 4 }} />
                         </div>
                         {activeDropdown === 'pageSize' && (
                             <div className={styles.dropdownMenu} style={{ position: 'absolute', bottom: '100%', right: 0, marginBottom: '4px', backgroundColor: 'var(--bg-primary)', border: '1px solid var(--border-color)', borderRadius: '4px', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)', minWidth: '80px', zIndex: 100 }}>

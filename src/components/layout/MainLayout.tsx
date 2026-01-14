@@ -138,8 +138,7 @@ interface MainLayoutProps {
     // ModalManager Props
     saveModal: { type: 'query' | 'function' } | null;
     setSaveModal: (val: { type: 'query' | 'function' } | null) => void;
-    showNewConnModal: boolean;
-    setShowNewConnModal: (val: boolean) => void;
+
     showEditWindow: boolean;
     setShowEditWindow: (val: boolean) => void;
     panelColumns: string[];
@@ -230,11 +229,7 @@ export const MainLayout: React.FC<MainLayoutProps> = (props) => {
                         defaultExportPath: props.defaultExportPath,
                         setDefaultExportPath: props.setDefaultExportPath
                     }}
-                    newConnection={{
-                        isOpen: props.showNewConnModal,
-                        onClose: () => props.setShowNewConnModal(false),
-                        onSuccess: () => { props.setShowNewConnModal(false); props.onRefreshConnection(); }
-                    }}
+
                     tableConfirm={{
                         modal: props.tableConfirmModal,
                         setModal: props.setTableConfirmModal,
@@ -353,7 +348,7 @@ export const MainLayout: React.FC<MainLayoutProps> = (props) => {
                                 tableCreatorStates={props.tableCreatorStates}
                                 originalSchemas={props.originalSchemas}
                                 setTableCreatorStates={props.setTableCreatorStates}
-                                connectionString={props.connection.connection_string}
+                                connection={props.connection}
                                 tabQueries={props.tabQueries}
                                 setTabQueries={props.setTabQueries}
                                 resultsVisible={props.resultsVisible}

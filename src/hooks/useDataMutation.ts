@@ -1,4 +1,5 @@
-import { useCallback } from 'react';
+import { useCallback, useRef } from 'react';
+import { invoke } from '@tauri-apps/api/core';
 import * as api from '../api';
 import { Connection, PendingChange, TabItem, TableDataState } from '../types/index';
 
@@ -30,6 +31,15 @@ export const useDataMutation = ({
     addLog
 }: UseDataMutationProps) => {
 
+    const connectionStringRef = useRef<string | null>(null);
+
+    const getConnectionString = useCallback(async (): Promise<string> => {
+        if (connectionStringRef.current) return connectionStringRef.current;
+        const connStr = await invoke<string>('get_connection_string', { connectionId: connection.id });
+        connectionStringRef.current = connStr;
+        return connStr;
+    }, [connection.id]);
+
     const handlePanelSubmit = useCallback(async (data: Record<string, any>[]) => {
         if (!activeTab || activeTab.type !== 'table') return;
 
@@ -44,7 +54,7 @@ export const useDataMutation = ({
             const cols = currentData.columns;
             const idColIdx = cols.findIndex(c => c.toLowerCase() === 'id' || c.toLowerCase().includes('uuid')); // naive PK hint
             const idColName = idColIdx !== -1 ? cols[idColIdx] : null;
-            const isMysql = connection.connection_string.startsWith('mysql:');
+            const isMysql = connection.db_type === 'mysql';
             const q = isMysql ? '`' : '"';
 
             const safeVal = (v: any) => {
@@ -95,11 +105,6 @@ export const useDataMutation = ({
                             });
                         }
                     });
-                } else {
-                    // Case 2: Updating a virtual row (already a pending INSERT)
-                    // The 'onCellEdit' handler in EditPaneSidebar already handles this live,
-                    // so we don't need to add duplicate INSERT changes here.
-                    // If we wanted to "commit" new rows from a blank pane, it's handled below.
                 }
             });
 
@@ -120,7 +125,8 @@ export const useDataMutation = ({
         }
 
         // INSERT (Immediate)
-        const isMysql = connection.connection_string.startsWith('mysql:');
+        const connectionString = await getConnectionString();
+        const isMysql = connection.db_type === 'mysql';
         const q = isMysql ? '`' : '"';
         const tableName = activeTab.title;
 
@@ -141,7 +147,7 @@ export const useDataMutation = ({
         const query = `INSERT INTO ${q}${tableName}${q} (${cols}) VALUES ${valueGroups.join(', ')}`;
 
         try {
-            await api.executeQuery(connection.connection_string, query);
+            await api.executeQuery(connectionString, query);
             setShowEditWindow(false);
             setEditData(undefined);
             fetchTableData(activeTab.id, activeTab.title);
@@ -150,7 +156,7 @@ export const useDataMutation = ({
             alert(`Insert failed: ${e}`);
             addLog(`Insert failed: ${e}`, 'Error', activeTab.title, String(e));
         }
-    }, [activeTab, results, selectedIndices, editData, connection, setPendingChanges, setShowEditWindow, setEditData, setSelectedIndices, fetchTableData, addLog]);
+    }, [activeTab, results, selectedIndices, editData, connection.id, connection.db_type, setPendingChanges, setShowEditWindow, setEditData, setSelectedIndices, fetchTableData, addLog, getConnectionString]);
 
     return {
         handlePanelSubmit

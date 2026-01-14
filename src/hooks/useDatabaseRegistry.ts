@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
+import { invoke } from '@tauri-apps/api/core';
 import { Connection, Tag, TableTag } from '../types/index';
 import * as api from '../api';
 
@@ -25,12 +26,16 @@ export const useDatabaseRegistry = (connection: Connection): UseDatabaseRegistry
     const fetchTables = useCallback(async () => {
         setRefreshTrigger(prev => prev + 1);
         try {
-            const fetchedTables = await api.getTables(connection.connection_string);
+            const connectionString = await invoke<string>('get_connection_string', {
+                connectionId: connection.id,
+                databaseName: connection.database_name
+            });
+            const fetchedTables = await api.getTables(connectionString);
             setTables(fetchedTables);
         } catch (e) {
             console.error("Failed to fetch tables:", e);
         }
-    }, [connection.connection_string]);
+    }, [connection.id, connection.database_name]);
 
     const fetchConnections = useCallback(async () => {
         try {
@@ -43,15 +48,12 @@ export const useDatabaseRegistry = (connection: Connection): UseDatabaseRegistry
 
     const loadTags = useCallback(async () => {
         try {
-            // Extract DB name from connection string if possible, or use empty string/default
+            // Get DB name from connection model
             let dbName = '';
-            try {
-                const url = new URL(connection.connection_string);
-                if (url.protocol.includes('sqlite')) dbName = connection.connection_string;
-                else dbName = url.pathname.replace('/', '');
-            } catch {
-                const parts = connection.connection_string.split('/');
-                dbName = parts.length > 0 ? parts[parts.length - 1] : '';
+            if (connection.db_type === 'sqlite') {
+                dbName = connection.host;
+            } else {
+                dbName = connection.database_name || '';
             }
 
             const t = await api.getTags(connection.id, dbName);
@@ -61,7 +63,7 @@ export const useDatabaseRegistry = (connection: Connection): UseDatabaseRegistry
             const tt = await api.getTableTags(connection.id, dbName);
             setTableTags(tt);
         } catch (e) { console.error(e); }
-    }, [connection.id, connection.connection_string]);
+    }, [connection.id, connection.db_type, connection.host, connection.database_name]);
 
     // Auto-load on connection change
     useEffect(() => {

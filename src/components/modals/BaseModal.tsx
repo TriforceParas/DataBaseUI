@@ -1,5 +1,5 @@
 import React, { ReactNode } from 'react';
-import { X } from 'lucide-react';
+import { RiCloseLine } from 'react-icons/ri';
 import { Portal } from '../common/Portal';
 
 
@@ -49,19 +49,22 @@ export const BaseModal: React.FC<BaseModalProps> = ({
                         <button
                             onClick={onClose}
                             style={{
-                                background: 'none',
+                                background: 'transparent',
                                 border: 'none',
                                 cursor: 'pointer',
                                 color: 'var(--text-secondary)',
-                                padding: '4px'
+                                padding: '4px',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center'
                             }}
                         >
-                            <X size={18} />
+                            <RiCloseLine size={18} />
                         </button>
                     </div>
                     {children}
                 </div>
             </div>
-        </Portal>
+        </Portal >
     );
 };

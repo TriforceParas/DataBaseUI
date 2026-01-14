@@ -17,7 +17,7 @@ import dagre from 'dagre';
 import { ColumnSchema } from '../../types/index';
 
 // ... (imports remain)
-import { Key, Link, Table, ChevronDown, ChevronUp, Download } from 'lucide-react';
+import { RiKey2Line, RiLink, RiTableLine, RiArrowDownSLine, RiArrowUpSLine, RiDownloadLine } from 'react-icons/ri';
 
 // Dagre layout helper
 const getLayoutedElements = (nodes: Node[], edges: Edge[], direction = 'LR') => {
@@ -162,8 +162,8 @@ const ColumnRow = ({ col, isLast }: { col: ColumnSchema, isLast: boolean }) => {
             }}
         >
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                {isPK && <Key size={11} style={{ color: '#eab308' }} />}
-                {isFK && <Link size={11} style={{ color: '#3b82f6' }} />}
+                {isPK && <RiKey2Line size={11} style={{ color: '#eab308' }} />}
+                {isFK && <RiLink size={11} style={{ color: '#3b82f6' }} />}
                 <span style={{ color: 'var(--text-primary)', fontWeight: isPK ? 600 : 400 }}>
                     {col.name}
                 </span>
@@ -196,7 +196,7 @@ const TableHeader = ({ label, onClick }: { label: string; onClick?: (name: strin
         title="Click to open table data"
     >
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-            <Table size={14} style={{ opacity: 0.8 }} />
+            <RiTableLine size={14} style={{ opacity: 0.8 }} />
             {label}
         </div>
     </div>
@@ -219,11 +219,11 @@ const ToggleRow = ({ hasHiddenCount, expanded, onToggle }: { hasHiddenCount: num
     >
         {expanded ? (
             <>
-                <ChevronUp size={12} style={{ marginRight: 4 }} /> Show Less
+                <RiArrowUpSLine size={12} style={{ marginRight: 4 }} /> Show Less
             </>
         ) : (
             <>
-                <ChevronDown size={12} style={{ marginRight: 4 }} /> {hasHiddenCount} More Columns
+                <RiArrowDownSLine size={12} style={{ marginRight: 4 }} /> {hasHiddenCount} More Columns
             </>
         )}
     </div>
@@ -390,7 +390,7 @@ export const SchemaVisualizer: React.FC<SchemaVisualizerProps> = ({
                 <Controls style={controlsStyle}>
                     {onDownload && (
                         <ControlButton onClick={onDownload} title="Save Image">
-                            <Download />
+                            <RiDownloadLine />
                         </ControlButton>
                     )}
                 </Controls>
@@ -413,11 +413,11 @@ export const SchemaVisualizer: React.FC<SchemaVisualizerProps> = ({
                     zIndex: 10
                 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
-                    <Key size={11} style={{ color: '#eab308' }} />
+                    <RiKey2Line size={11} style={{ color: '#eab308' }} />
                     <span style={{ color: 'var(--text-secondary)' }}>Primary Key</span>
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
-                    <Link size={11} style={{ color: '#3b82f6' }} />
+                    <RiLink size={11} style={{ color: '#3b82f6' }} />
                     <span style={{ color: 'var(--text-secondary)' }}>Foreign Key</span>
                 </div>
             </div>

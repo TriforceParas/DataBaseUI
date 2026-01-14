@@ -1,7 +1,20 @@
+export type DbType = 'mysql' | 'postgres' | 'sqlite';
+
 export interface Connection {
     id: number;
     name: string;
-    connection_string: string;
+    db_type: DbType;
+    host: string;
+    port: number;
+    database_name?: string;
+    credential_id?: string;
+    ssl_mode?: string;
+}
+
+export interface Credential {
+    id: string;
+    name: string;
+    username: string;
 }
 
 export interface Tag {

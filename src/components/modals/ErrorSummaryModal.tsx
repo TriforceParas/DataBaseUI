@@ -1,6 +1,6 @@
 import React from 'react';
 import { BaseModal } from './BaseModal';
-import { AlertTriangle, RefreshCw } from 'lucide-react';
+import { RiErrorWarningLine, RiRefreshLine } from 'react-icons/ri';
 import styles from '../../styles/MainLayout.module.css';
 import { PendingChange } from '../../types/index';
 
@@ -14,6 +14,7 @@ interface ErrorSummaryModalProps {
     isOpen: boolean;
     onClose: () => void;
     errors: ChangeError[];
+    onRetry?: () => void;
     onRetryWithFKDisabled?: (errors: ChangeError[]) => void;
 }
 
@@ -21,6 +22,7 @@ export const ErrorSummaryModal: React.FC<ErrorSummaryModalProps> = ({
     isOpen,
     onClose,
     errors,
+    onRetry,
     onRetryWithFKDisabled
 }) => {
     // Handle conditional rendering at component level
@@ -79,7 +81,7 @@ export const ErrorSummaryModal: React.FC<ErrorSummaryModalProps> = ({
                             color: '#ef4444',
                             fontWeight: 600
                         }}>
-                            <AlertTriangle size={16} />
+                            <RiErrorWarningLine size={16} />
                             Foreign Key Constraint Errors ({fkErrors.length})
                         </div>
 
@@ -118,7 +120,7 @@ export const ErrorSummaryModal: React.FC<ErrorSummaryModalProps> = ({
                                     gap: '0.5rem'
                                 }}
                             >
-                                <RefreshCw size={14} />
+                                <RiRefreshLine size={14} />
                                 Retry with FK Checks Disabled
                             </button>
                         )}
@@ -141,7 +143,7 @@ export const ErrorSummaryModal: React.FC<ErrorSummaryModalProps> = ({
                             color: '#fbbf24',
                             fontWeight: 600
                         }}>
-                            <AlertTriangle size={16} />
+                            <RiErrorWarningLine size={16} />
                             Other Errors ({otherErrors.length})
                         </div>
 
@@ -171,14 +173,13 @@ export const ErrorSummaryModal: React.FC<ErrorSummaryModalProps> = ({
                 )}
             </div>
 
-            <div style={{
-                display: 'flex',
-                justifyContent: 'flex-end',
-                marginTop: '1.5rem'
-            }}>
-                <button className={styles.secondaryBtn} onClick={onClose}>
-                    Close
-                </button>
+            <div className={styles.actions}>
+                {onRetry && (
+                    <button className={styles.retryBtn} onClick={onRetry}>
+                        <RiRefreshLine size={16} /> Retry Failed
+                    </button>
+                )}
+                <button className={styles.closeBtn} onClick={onClose}>Close</button>
             </div>
         </BaseModal>
     );

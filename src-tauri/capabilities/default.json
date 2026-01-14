@@ -13,6 +13,8 @@
     "core:window:allow-close",
     "core:window:allow-start-dragging",
     "core:window:allow-center",
+    "core:webview:allow-create-webview-window",
+    "core:window:allow-set-focus",
     {
       "identifier": "fs:default",
       "allow": [

@@ -1,6 +1,6 @@
 import React from 'react';
-import { AlertTriangle } from 'lucide-react';
-import styles from '../../styles/ConnectionForm.module.css';
+import { RiErrorWarningLine } from 'react-icons/ri';
+import styles from '../../styles/Form.module.css';
 import { BaseModal } from './BaseModal';
 
 interface ConfirmModalProps {
@@ -25,7 +25,7 @@ export const ConfirmModal: React.FC<ConfirmModalProps> = ({
     return (
         <BaseModal
             title={title}
-            icon={isDangerous ? <AlertTriangle size={24} color="#ef4444" /> : undefined}
+            icon={isDangerous ? <RiErrorWarningLine size={24} color="#ef4444" /> : undefined}
             onClose={onCancel}
         >
             <p style={{
@@ -36,17 +36,18 @@ export const ConfirmModal: React.FC<ConfirmModalProps> = ({
             }}>
                 {message}
             </p>
-
-            <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'flex-end' }}>
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem' }}>
                 <button
                     onClick={onCancel}
-                    className={styles.addButton}
                     style={{
-                        flex: 'none',
-                        backgroundColor: 'transparent',
+                        padding: '0.5rem 1rem',
+                        background: 'transparent',
                         border: '1px solid var(--border-color)',
+                        borderRadius: 'var(--radius-sm)',
                         color: 'var(--text-primary)',
-                        padding: '0.5rem 1rem'
+                        cursor: 'pointer',
+                        fontSize: '0.9rem',
+                        height: '36px'
                     }}
                 >
                     {cancelText}

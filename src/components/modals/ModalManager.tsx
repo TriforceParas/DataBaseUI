@@ -3,7 +3,7 @@ import { PreferencesModal } from './PreferencesModal';
 import { ConfirmModal } from './ConfirmModal';
 import { DuplicateTableModal } from './DuplicateTableModal';
 import { SaveQueryModal } from './SaveQueryModal';
-import { NewConnectionModal } from './NewConnectionModal';
+
 
 interface ModalManagerProps {
     preferences: {
@@ -19,11 +19,7 @@ interface ModalManagerProps {
         defaultExportPath: string;
         setDefaultExportPath: (val: string) => void;
     };
-    newConnection: {
-        isOpen: boolean;
-        onClose: () => void;
-        onSuccess: () => void;
-    };
+
     tableConfirm: {
         modal: { type: 'truncate' | 'drop', tableName: string } | null;
         setModal: (val: { type: 'truncate' | 'drop', tableName: string } | null) => void;
@@ -52,7 +48,6 @@ interface ModalManagerProps {
 
 export const ModalManager: React.FC<ModalManagerProps> = ({
     preferences,
-    newConnection,
     tableConfirm,
     duplicateTable,
     changelogConfirm,
@@ -74,11 +69,7 @@ export const ModalManager: React.FC<ModalManagerProps> = ({
                 setDefaultExportPath={preferences.setDefaultExportPath}
             />
 
-            <NewConnectionModal
-                isOpen={newConnection.isOpen}
-                onClose={newConnection.onClose}
-                onSuccess={newConnection.onSuccess}
-            />
+
 
             {tableConfirm.modal && (
                 <ConfirmModal

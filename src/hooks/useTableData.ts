@@ -1,4 +1,5 @@
-import { useState, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
+import { invoke } from '@tauri-apps/api/core';
 import { Connection, SortState, TabResult, ColumnSchema } from '../types/index';
 import * as api from '../api';
 
@@ -13,6 +14,29 @@ export const useTableData = ({ connection, addLog, tableSchemas, setTableSchemas
     const [results, setResults] = useState<Record<string, TabResult>>({});
     const [paginationMap, setPaginationMap] = useState<Record<string, { page: number, pageSize: number, total: number }>>({});
     const [sortState, setSortState] = useState<SortState | null>(null);
+
+    // Cache connection string to avoid repeated calls
+    const connectionStringRef = useRef<string | null>(null);
+
+    const getConnectionString = useCallback(async (): Promise<string> => {
+        if (connectionStringRef.current) return connectionStringRef.current;
+        const connStr = await invoke<string>('get_connection_string', {
+            connectionId: connection.id,
+            databaseName: connection.database_name // Pass current database context
+        });
+        connectionStringRef.current = connStr;
+        return connStr;
+    }, [connection.id, connection.database_name]);
+
+    // Reset cache when connection changes (including database switch)
+    useEffect(() => {
+        connectionStringRef.current = null;
+    }, [connection.id, connection.database_name]);
+
+    // Reset cache manually if needed (legacy)
+    const resetConnectionCache = useCallback(() => {
+        connectionStringRef.current = null;
+    }, []);
 
     // Initial Loading State Helper
     const initTabResult = (tabId: string) => {
@@ -34,24 +58,23 @@ export const useTableData = ({ connection, addLog, tableSchemas, setTableSchemas
         const pageSize = pageSizeOverride !== undefined ? pageSizeOverride : currentPag.pageSize;
 
         try {
+            const connectionString = await getConnectionString();
+
             // Check if we need to fetch schema (for keys info)
             if (!tableSchemas[tableName]) {
-                api.getTableSchema(connection.connection_string, tableName)
+                api.getTableSchema(connectionString, tableName)
                     .then(schema => {
                         setTableSchemas(prev => ({ ...prev, [tableName]: schema }));
                     }).catch(err => console.error("Failed to background fetch schema for keys:", err));
             }
 
-            const isMysql = connection.connection_string.startsWith('mysql:');
+            const isMysql = connection.db_type === 'mysql';
             const q = isMysql ? '`' : '"';
             const offset = (page - 1) * pageSize;
 
             let orderByClause = '';
             if (sortState) {
                 orderByClause = `ORDER BY ${q}${sortState.column}${q} ${sortState.direction}`;
-            } else {
-                // Try to find a primary key or reasonable default? For now, empty.
-                // Ideally backend handles default sort if needed.
             }
 
             // Construct Query
@@ -59,7 +82,7 @@ export const useTableData = ({ connection, addLog, tableSchemas, setTableSchemas
             const countQuery = `SELECT COUNT(*) as count FROM ${q}${tableName}${q}`;
 
             // Execute
-            const res = await api.executeQuery(connection.connection_string, query);
+            const res = await api.executeQuery(connectionString, query);
             let lastRes = res.length > 0 ? res[res.length - 1] : null;
 
             // Ensure columns are present even for empty tables by using schema
@@ -73,7 +96,7 @@ export const useTableData = ({ connection, addLog, tableSchemas, setTableSchemas
             }
 
             // Get total count (separate call is standard for pagination)
-            const countRes = await api.executeQuery(connection.connection_string, countQuery);
+            const countRes = await api.executeQuery(connectionString, countQuery);
             const total = countRes.length > 0 && countRes[0].rows.length > 0 ? Number(countRes[0].rows[0][0]) : 0;
 
             updateTabResult(tabId, { data: lastRes, allData: res, loading: false, error: null });
@@ -86,17 +109,15 @@ export const useTableData = ({ connection, addLog, tableSchemas, setTableSchemas
             updateTabResult(tabId, { loading: false, error: String(e) });
             addLog(`SELECT * FROM ${tableName}`, 'Error', tableName, String(e), 0, 'System');
         }
-    }, [connection, paginationMap, sortState, addLog, tableSchemas, setTableSchemas]); // Dependencies
+    }, [connection.id, connection.db_type, paginationMap, sortState, addLog, tableSchemas, setTableSchemas, getConnectionString]);
 
     const handleRunQuery = useCallback(async (tabId: string, query: string) => {
         if (!query.trim()) return;
         initTabResult(tabId);
 
         try {
-            // Simple naive check for table name for logging - inherently imprecise for arbitrary queries
-            // But 'User' queries don't strictly require table matching for the 'Table' column in logs
-            // as much as System actions do.
-            const res = await api.executeQuery(connection.connection_string, query);
+            const connectionString = await getConnectionString();
+            const res = await api.executeQuery(connectionString, query);
             const lastRes = res.length > 0 ? res[res.length - 1] : null;
 
             updateTabResult(tabId, { data: lastRes, allData: res, loading: false, error: null });
@@ -105,7 +126,7 @@ export const useTableData = ({ connection, addLog, tableSchemas, setTableSchemas
             updateTabResult(tabId, { loading: false, error: String(e) });
             addLog(query, 'Error', undefined, String(e), 0, 'User');
         }
-    }, [connection, addLog]);
+    }, [addLog, getConnectionString]);
 
 
     const handleSort = useCallback((column: string) => {
@@ -124,6 +145,7 @@ export const useTableData = ({ connection, addLog, tableSchemas, setTableSchemas
         setSortState,
         handleSort,
         fetchTableData,
-        handleRunQuery
+        handleRunQuery,
+        resetConnectionCache
     };
 };

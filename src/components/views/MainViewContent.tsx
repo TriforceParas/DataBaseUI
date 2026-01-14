@@ -1,5 +1,5 @@
 import React from 'react';
-import { Tab, PendingChange, ColumnSchema, SystemLog, PaginationState, TableDataState } from '../../types/index';
+import { Tab, PendingChange, ColumnSchema, SystemLog, PaginationState, TableDataState, Connection } from '../../types/index';
 import { TableCreatorState } from '../editors';
 import { EmptyStateView } from './EmptyStateView';
 import { TableTabView } from './TableTabView';
@@ -34,7 +34,7 @@ interface MainViewContentProps {
     tableCreatorStates: Record<string, TableCreatorState>;
     originalSchemas: Record<string, TableCreatorState>;
     setTableCreatorStates: React.Dispatch<React.SetStateAction<Record<string, TableCreatorState>>>;
-    connectionString: string;
+    connection: Connection;
 
     // Query State
     tabQueries: Record<string, string>;
@@ -91,7 +91,7 @@ export const MainViewContent: React.FC<MainViewContentProps> = ({
     tableCreatorStates,
     originalSchemas,
     setTableCreatorStates,
-    connectionString,
+    connection,
     tabQueries,
     setTabQueries,
     resultsVisible,
@@ -186,7 +186,7 @@ export const MainViewContent: React.FC<MainViewContentProps> = ({
             <TableCreatorView
                 activeTabId={activeTab.id}
                 activeTabTitle={activeTab.title}
-                connectionString={connectionString}
+                connection={connection}
                 tableCreatorStates={tableCreatorStates}
                 originalSchemas={originalSchemas}
                 setTableCreatorStates={setTableCreatorStates}

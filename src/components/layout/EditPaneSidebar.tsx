@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { Save, Plus, Trash2, X } from 'lucide-react';
-import styles from '../../styles/ConnectionForm.module.css';
+import { RiSaveLine, RiAddLine, RiDeleteBinLine, RiCloseLine } from 'react-icons/ri';
+import styles from '../../styles/Form.module.css';
 import lStyles from '../../styles/MainLayout.module.css';
 import { TabResult, PendingChange } from '../../types/index';
 
@@ -330,7 +330,7 @@ export const EditPaneSidebar: React.FC<EditPaneSidebarProps> = ({
                                         cursor: 'pointer',
                                     }}
                                 >
-                                    <Trash2 size={12} />
+                                    <RiDeleteBinLine size={12} />
                                 </button>
 
                                 <div style={{
@@ -378,7 +378,7 @@ export const EditPaneSidebar: React.FC<EditPaneSidebarProps> = ({
                                 gap: '0.5rem'
                             }}
                         >
-                            <Plus size={16} /> Add Another Row
+                            <RiAddLine size={16} /> Add Another Row
                         </button>
                     </div>
                 ) : (
@@ -428,7 +428,7 @@ export const EditPaneSidebar: React.FC<EditPaneSidebarProps> = ({
                                 justifyContent: 'center'
                             }}
                         >
-                            <X size={14} style={{ marginRight: 6 }} /> Cancel
+                            <RiCloseLine size={14} style={{ marginRight: 6 }} /> Cancel
                         </button>
                         <button
                             onClick={handleSubmit}
@@ -438,7 +438,7 @@ export const EditPaneSidebar: React.FC<EditPaneSidebarProps> = ({
                                 justifyContent: 'center'
                             }}
                         >
-                            <Save size={14} style={{ marginRight: 6 }} /> Update
+                            <RiSaveLine size={14} style={{ marginRight: 6 }} /> Update
                         </button>
                     </div>
                 </div>

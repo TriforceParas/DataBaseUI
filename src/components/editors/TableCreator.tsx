@@ -1,8 +1,8 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import styles from '../../styles/TableCreator.module.css';
-import { Plus, Trash2, Key, X, Save, Fingerprint, RotateCcw } from 'lucide-react';
-import { PendingChange } from '../../types/index';
+import { RiAddLine, RiDeleteBinLine, RiKey2Line, RiCloseLine, RiSaveLine, RiFingerprintLine, RiRefreshLine } from 'react-icons/ri';
+import { PendingChange, Connection } from '../../types/index';
 
 export interface ColumnDef {
     name: string;
@@ -31,7 +31,7 @@ export interface TableCreatorState {
 
 
 interface TableCreatorProps {
-    connectionString: string;
+    connection: Connection;
     onSuccess: () => void;
     mode?: 'create' | 'edit';
     initialState?: TableCreatorState;
@@ -47,7 +47,7 @@ const DEFAULT_STATE: TableCreatorState = {
     foreignKeys: []
 };
 
-export const TableCreator: React.FC<TableCreatorProps> = ({ connectionString, onSuccess, mode = 'create', initialState, onStateChange, originalColumns, onSchemaChange }) => {
+export const TableCreator: React.FC<TableCreatorProps> = ({ connection, onSuccess, mode = 'create', initialState, onStateChange, originalColumns, onSchemaChange }) => {
     const [tableName, setTableName] = useState(initialState?.tableName ?? DEFAULT_STATE.tableName);
     const [columns, setColumns] = useState<ColumnDef[]>(initialState?.columns ?? DEFAULT_STATE.columns);
     const [foreignKeys, setForeignKeys] = useState<ForeignKeyDef[]>(initialState?.foreignKeys ?? DEFAULT_STATE.foreignKeys);
@@ -138,15 +138,20 @@ export const TableCreator: React.FC<TableCreatorProps> = ({ connectionString, on
         setColumns(newCols);
     };
 
-    const getDialect = (connStr: string) => {
-        if (connStr.startsWith('mysql:')) return 'mysql';
-        if (connStr.startsWith('postgres:')) return 'postgres';
+    const getDialect = () => {
+        if (connection.db_type === 'mysql') return 'mysql';
+        if (connection.db_type === 'postgres') return 'postgres';
         return 'sqlite';
     };
+
+    const getConnectionString = useCallback(async (): Promise<string> => {
+        return await invoke<string>('get_connection_string', { connectionId: connection.id });
+    }, [connection.id]);
 
     useEffect(() => {
         const fetchTables = async () => {
             try {
+                const connectionString = await getConnectionString();
                 const tables = await invoke<string[]>('get_tables', { connectionString });
                 setAvailableTables(tables);
             } catch (e) {
@@ -154,11 +159,12 @@ export const TableCreator: React.FC<TableCreatorProps> = ({ connectionString, on
             }
         };
         fetchTables();
-    }, [connectionString]);
+    }, [connection.id, getConnectionString]);
 
     const fetchColumnsForTable = async (tableName: string) => {
         if (refTableColumns[tableName]) return;
         try {
+            const connectionString = await getConnectionString();
             const cols = await invoke<string[]>('get_columns', { connectionString, tableName });
             setRefTableColumns(prev => ({ ...prev, [tableName]: cols }));
         } catch (e) {
@@ -199,7 +205,7 @@ export const TableCreator: React.FC<TableCreatorProps> = ({ connectionString, on
             return;
         }
 
-        const dialect = getDialect(connectionString);
+        const dialect = getDialect();
         const q = dialect === 'mysql' ? '`' : '"';
 
         // Helper to build column definition
@@ -296,6 +302,7 @@ export const TableCreator: React.FC<TableCreatorProps> = ({ connectionString, on
                 const allDefs = [colDefs, ...fkDefs].join(', ');
 
                 const query = `CREATE TABLE ${q}${tableName}${q} (${allDefs})`;
+                const connectionString = await getConnectionString();
                 await invoke('execute_query', { connectionString, query });
                 onSuccess();
             }
@@ -325,9 +332,9 @@ export const TableCreator: React.FC<TableCreatorProps> = ({ connectionString, on
                         />
                         <button className={styles.saveButton} onClick={handleCreate}>
                             {mode === 'edit' ? (
-                                <><Save size={14} /> Save Changes</>
+                                <><RiSaveLine size={14} /> Save Changes</>
                             ) : (
-                                <><Plus size={14} /> Create Table</>
+                                <><RiAddLine size={14} /> Create Table</>
                             )}
                         </button>
                     </div>
@@ -449,7 +456,7 @@ export const TableCreator: React.FC<TableCreatorProps> = ({ connectionString, on
                                                     }}
                                                     title="Clear"
                                                 >
-                                                    <X size={12} />
+                                                    <RiCloseLine size={12} />
                                                 </div>
                                             </div>
                                         )}
@@ -459,12 +466,12 @@ export const TableCreator: React.FC<TableCreatorProps> = ({ connectionString, on
                                     <div className={styles.constraintsGroup}>
                                         <label className={styles.constraintLabel} title="Primary Key">
                                             <input type="checkbox" checked={col.isPrimaryKey} onChange={e => updateColumn(idx, 'isPrimaryKey', e.target.checked)} />
-                                            <Key size={12} className={styles.constraintIcon} /> PK
+                                            <RiKey2Line size={12} className={styles.constraintIcon} /> PK
                                         </label>
 
                                         <label className={styles.constraintLabel} title="Unique">
                                             <input type="checkbox" checked={col.isUnique} onChange={e => updateColumn(idx, 'isUnique', e.target.checked)} />
-                                            <Fingerprint size={12} className={styles.constraintIcon} /> Unique
+                                            <RiFingerprintLine size={12} className={styles.constraintIcon} /> Unique
                                         </label>
                                         <label className={styles.constraintLabel} title="Nullable">
                                             <input type="checkbox" checked={col.isNullable} onChange={e => updateColumn(idx, 'isNullable', e.target.checked)} />
@@ -480,7 +487,7 @@ export const TableCreator: React.FC<TableCreatorProps> = ({ connectionString, on
                                             style={{ color: '#22c55e' }}
                                             title="Recover Column"
                                         >
-                                            <RotateCcw size={16} />
+                                            <RiRefreshLine size={16} />
                                         </button>
                                     ) : (
                                         <button
@@ -489,7 +496,7 @@ export const TableCreator: React.FC<TableCreatorProps> = ({ connectionString, on
                                             style={{ color: '#ef4444' }}
                                             title="Delete Column"
                                         >
-                                            <Trash2 size={16} />
+                                            <RiDeleteBinLine size={16} />
                                         </button>
                                     )}
                                 </div>
@@ -498,7 +505,7 @@ export const TableCreator: React.FC<TableCreatorProps> = ({ connectionString, on
                     </div>
 
                     <button className={styles.addColumnBtn} onClick={addColumn}>
-                        <Plus size={16} /> Add Column
+                        <RiAddLine size={16} /> Add Column
                     </button>
                 </div>
 
@@ -569,14 +576,14 @@ export const TableCreator: React.FC<TableCreatorProps> = ({ connectionString, on
                                     style={{ color: '#ef4444' }}
                                     title="Delete FK"
                                 >
-                                    <Trash2 size={16} />
+                                    <RiDeleteBinLine size={16} />
                                 </button>
                             </div>
                         ))}
                     </div>
 
                     <button className={styles.addColumnBtn} onClick={addForeignKey}>
-                        <Plus size={16} /> Add Foreign Key
+                        <RiAddLine size={16} /> Add Foreign Key
                     </button>
                 </div>
             </div>

@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { invoke } from '@tauri-apps/api/core';
-import { X, Check, Pencil } from 'lucide-react';
-import styles from '../../styles/ConnectionForm.module.css';
+import { RiCloseLine, RiCheckLine, RiPencilLine } from 'react-icons/ri';
+import styles from '../../styles/Form.module.css';
 import { Tag, Connection } from '../../types/index';
 
 interface TagManagerProps {
@@ -32,14 +32,10 @@ export const TagManager: React.FC<TagManagerProps> = ({ onSuccess, onCancel, edi
 
     const getDbName = () => {
         if (!connection) return undefined;
-        try {
-            const url = new URL(connection.connection_string);
-            if (url.protocol.includes('sqlite')) return connection.connection_string;
-            return url.pathname.replace('/', '');
-        } catch {
-            const parts = connection.connection_string.split('/');
-            return parts.length > 0 ? parts[parts.length - 1] : undefined;
+        if (connection.db_type === 'sqlite') {
+            return connection.host;
         }
+        return connection.database_name || undefined;
     };
 
     const handleSubmit = async (e: React.FormEvent) => {
@@ -72,7 +68,7 @@ export const TagManager: React.FC<TagManagerProps> = ({ onSuccess, onCancel, edi
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
                 <h3 className={styles.sectionTitle} style={{ margin: 0 }}>{isEditMode ? 'Edit Tag' : 'Create New Tag'}</h3>
                 <button type="button" onClick={onCancel} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-secondary)' }}>
-                    <X size={18} />
+                    <RiCloseLine size={18} />
                 </button>
             </div>
 
@@ -106,7 +102,7 @@ export const TagManager: React.FC<TagManagerProps> = ({ onSuccess, onCancel, edi
                                 transition: 'transform 0.1s'
                             }}
                         >
-                            {(color === c && !customColorMode) && <Check size={18} color={['#eab308', '#cbd5e1'].includes(c) ? 'black' : 'white'} strokeWidth={3} />}
+                            {(color === c && !customColorMode) && <RiCheckLine size={18} color={['#eab308', '#cbd5e1'].includes(c) ? 'black' : 'white'} strokeWidth={3} />}
                         </div>
                     ))}
                     <div style={{ position: 'relative', width: '36px', height: '36px' }}>
@@ -126,7 +122,7 @@ export const TagManager: React.FC<TagManagerProps> = ({ onSuccess, onCancel, edi
                             border: customColorMode ? '2px solid white' : '1px solid var(--border-color)',
                             boxShadow: customColorMode ? '0 0 0 2px var(--accent-primary)' : 'none'
                         }}>
-                            {customColorMode ? <Check size={18} color="white" strokeWidth={3} style={{ mixBlendMode: 'difference' }} /> : <Pencil size={16} color="white" style={{ filter: 'drop-shadow(0 1px 2px rgba(0,0,0,0.5))' }} />}
+                            {customColorMode ? <RiCheckLine size={18} color="white" strokeWidth={3} style={{ mixBlendMode: 'difference' }} /> : <RiPencilLine size={16} color="white" style={{ filter: 'drop-shadow(0 1px 2px rgba(0,0,0,0.5))' }} />}
                         </div>
                     </div>
                 </div>

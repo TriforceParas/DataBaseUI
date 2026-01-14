@@ -364,7 +364,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
     const fetchDatabases = async () => {
         try {
-            const dbs = await invoke<string[]>('get_databases', { connectionString: connection.connection_string });
+            // Get connection string from backend using connection ID
+            const connectionString = await invoke<string>('get_connection_string', { connectionId: connection.id });
+            const dbs = await invoke<string[]>('get_databases', { connectionString });
             // Filter out system schemas
             const systemSchemas = ['sys', 'information_schema', 'mysql', 'performance_schema'];
             const filteredDbs = dbs.filter(db => !systemSchemas.includes(db.toLowerCase()));
@@ -460,17 +462,14 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
     const isSearching = searchQuery.length > 0;
 
-    // Extract current database name from connection string
+    // Extract current database name from connection
     const getCurrentDatabase = () => {
         if (!connection) return undefined;
-        try {
-            const url = new URL(connection.connection_string);
-            if (url.protocol.includes('sqlite')) return connection.connection_string;
-            return url.pathname.replace('/', '');
-        } catch (e) {
-            const parts = connection.connection_string.split('/');
-            return parts.length > 0 ? parts[parts.length - 1] : connection.name;
+        if (connection.db_type === 'sqlite') {
+            // For SQLite, return the file path
+            return connection.host;
         }
+        return connection.database_name || connection.name;
     };
 
     return (
@@ -531,8 +530,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                                                 alignItems: 'center',
                                                 gap: '0.5rem',
                                                 fontSize: '0.9rem',
-                                                color: connection.connection_string.includes(`/${db}`)
-                                                    || (connection.connection_string.endsWith('/') && db === 'postgres') // weak check
+                                                color: (connection.database_name === db)
                                                     ? 'var(--accent-primary)' : 'var(--text-primary)',
                                                 // Check active logic is naive, but works if we switched using handleSwitchDatabase
                                             }}
@@ -698,7 +696,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                         <CollapsibleSection
                             title="Functions"
                             count={savedFunctions.length}
-                            icon={<Icons.MathFunction size={14} color="#f59e0b" />}
+                            icon={<Icons.MathFunction size={16} color="#f59e0b" />}
                             isOpen={expandedSections.has('az-functions')}
                             onToggle={() => toggleSection('az-functions')}
                         >

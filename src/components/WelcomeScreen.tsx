@@ -2,11 +2,33 @@ import React, { useEffect, useState } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import { getCurrentWindow } from '@tauri-apps/api/window';
 import styles from '../styles/Welcome.module.css';
-import { Connection } from '../types/index';
-import { Pencil, Trash2, Zap, Plus, FlaskConical } from 'lucide-react';
-import { ConnectionForm } from './ConnectionForm';
+import { Connection, DbType } from '../types/index';
+import { RiEdit2Line, RiDeleteBin7Line, RiAddLine, RiShieldKeyholeLine } from 'react-icons/ri';
+import { openConnectionWindow, openVaultWindow } from '../utils/windowManager';
+import { DiMysql } from 'react-icons/di';
+import { BiLogoPostgresql } from 'react-icons/bi';
+import { SiSqlite } from 'react-icons/si';
 
+const getDbIcon = (dbType: DbType) => {
+    switch (dbType) {
+        case 'mysql': return <DiMysql size={30} color="#00758F" />;
+        case 'postgres': return <BiLogoPostgresql size={30} color="#336791" />;
+        case 'sqlite': return <SiSqlite size={26} color="#003B57" />;
+        default: return <DiMysql size={30} color="#00758F" />;
+    }
+};
 
+const formatConnectionDisplay = (conn: Connection): string => {
+    if (conn.db_type === 'sqlite') {
+        const parts = conn.host.split('/');
+        return parts[parts.length - 1] || conn.host;
+    }
+    let display = `${conn.host}:${conn.port}`;
+    if (conn.database_name) {
+        display += `/${conn.database_name}`;
+    }
+    return display;
+};
 
 interface WelcomeScreenProps {
     onConnect: (connection: Connection) => void;
@@ -14,11 +36,8 @@ interface WelcomeScreenProps {
 
 export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onConnect }) => {
     const [connections, setConnections] = useState<Connection[]>([]);
-    const [showForm, setShowForm] = useState(false);
-    // const [editId, setEditId] = useState<number | null>(null); // Unused
     const [isConnecting, setIsConnecting] = useState(false);
     const [error, setError] = useState<string | null>(null);
-    const [connectionToEdit, setConnectionToEdit] = useState<Connection | null>(null);
 
     const fetchConnections = async () => {
         try {
@@ -29,34 +48,30 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onConnect }) => {
         }
     };
 
+    // Auto-refresh when window gains focus (e.g. after adding connection)
     useEffect(() => {
         fetchConnections();
         getCurrentWindow().center();
+
+        const unlisten = getCurrentWindow().onFocusChanged(({ payload: focused }) => {
+            if (focused) fetchConnections();
+        });
+
+        return () => {
+            unlisten.then(f => f());
+        };
     }, []);
 
     const handleEdit = (conn: Connection) => {
-        setConnectionToEdit(conn);
-        setShowForm(true);
-        setError(null);
+        openConnectionWindow(conn.id);
     };
-
-    const handleFormSuccess = () => {
-        setShowForm(false);
-        setConnectionToEdit(null);
-        fetchConnections();
-    };
-
-    const handleFormCancel = () => {
-        setShowForm(false);
-        setConnectionToEdit(null);
-    };
-
-    const [deleteTargetId, setDeleteTargetId] = useState<number | null>(null);
 
     const handleDeleteClick = (e: React.MouseEvent, id: number) => {
         e.stopPropagation();
         setDeleteTargetId(id);
     };
+
+    const [deleteTargetId, setDeleteTargetId] = useState<number | null>(null);
 
     const confirmDelete = async () => {
         if (deleteTargetId) {
@@ -71,21 +86,16 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onConnect }) => {
         }
     };
 
-    const toggleForm = () => {
-        if (showForm) {
-            handleFormCancel();
-        } else {
-            setShowForm(true);
-            setConnectionToEdit(null);
-            setError(null);
-        }
+    const openNewConnection = () => {
+        openConnectionWindow();
     };
 
     const handleConnect = async (conn: Connection) => {
         setError(null);
         setIsConnecting(true);
         try {
-            await invoke('verify_connection', { connectionString: conn.connection_string });
+            // Check connection first
+            await invoke('verify_connection_by_id', { connectionId: conn.id });
             onConnect(conn);
         } catch (e) {
             console.error("Failed to connect:", e);
@@ -94,7 +104,6 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onConnect }) => {
             setIsConnecting(false);
         }
     };
-
 
     return (
         <div className={styles.container}>
@@ -107,18 +116,13 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onConnect }) => {
                 </div>
             </div>
 
-            {/* Right Panel - Form */}
+            {/* Right Panel - Connections */}
             <div className={styles.rightPanel}>
-
-                {/* Window Controls embedded nicely top right */}
-
-
                 <div className={styles.headerRow}>
                     <h2 className={styles.sectionTitle}>Recent Connections</h2>
-
                     <div style={{ display: 'flex', gap: '0.5rem' }}>
-                        <button className={styles.newBtn} onClick={toggleForm}>
-                            <Plus size={16} /> New Connection
+                        <button className={styles.newBtn} onClick={openNewConnection}>
+                            <RiAddLine size={18} /> New Connection
                         </button>
                     </div>
                 </div>
@@ -135,42 +139,34 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onConnect }) => {
                     </div>
                 )}
 
-                {/* Form */}
-                {showForm && (
-                    <div className={styles.formContainer}>
-                        <ConnectionForm
-                            connectionToEdit={connectionToEdit}
-                            onSuccess={handleFormSuccess}
-                            onCancel={handleFormCancel}
-                        />
-                    </div>
-                )}
-
                 {/* Connections List */}
                 <div className={styles.connectionList}>
                     {connections.map(conn => (
                         <div key={conn.id} className={styles.connectionCard} onClick={() => handleConnect(conn)}>
                             <div className={styles.iconPlaceholder}>
-                                <Zap size={20} fill="currentColor" />
+                                {getDbIcon(conn.db_type)}
                             </div>
                             <div className={styles.cardDetails}>
                                 <div className={styles.cardTitle}>{conn.name}</div>
-                                <div className={styles.cardSubtitle}>{conn.connection_string}</div>
+                                <div className={styles.cardSubtitle}>{formatConnectionDisplay(conn)}</div>
                             </div>
 
                             <div className={styles.cardActions}>
                                 <button className={styles.actionBtn} onClick={(e) => { e.stopPropagation(); handleEdit(conn); }}>
-                                    <Pencil size={14} />
+                                    <RiEdit2Line size={16} />
                                 </button>
                                 <button className={styles.actionBtn} onClick={(e) => handleDeleteClick(e, conn.id)}>
-                                    <Trash2 size={14} />
+                                    <RiDeleteBin7Line size={16} />
                                 </button>
                             </div>
                         </div>
                     ))}
-                    {connections.length === 0 && !showForm && (
+                    {connections.length === 0 && (
                         <div style={{ color: 'var(--text-secondary)', textAlign: 'center', padding: '2rem' }}>
-                            No recent connections.
+                            <div style={{ marginBottom: '1rem' }}>No recent connections.</div>
+                            <button className={styles.newBtn} onClick={openNewConnection}>
+                                Create First Connection
+                            </button>
                         </div>
                     )}
                 </div>
@@ -179,14 +175,18 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onConnect }) => {
                 <div className={styles.footer}>
                     <div>Version 0.1.0</div>
                     <div className={styles.footerRight}>
-                        <div className={styles.testConnection}>
-                            <FlaskConical size={14} /> Test Connections
+                        <div
+                            className={styles.testConnection}
+                            onClick={openVaultWindow}
+                            style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.5rem' }}
+                        >
+                            <RiShieldKeyholeLine size={16} /> Credential Vault
                         </div>
                     </div>
                 </div>
             </div>
 
-            {/* Delete Modal */}
+            {/* Delete Confirmation Modal - Kept minimal for safety */}
             {deleteTargetId && (
                 <div className={styles.modalOverlay} onClick={() => setDeleteTargetId(null)}>
                     <div className={styles.modalContent} onClick={e => e.stopPropagation()}>

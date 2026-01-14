@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
-import { Copy } from 'lucide-react';
-import styles from '../../styles/ConnectionForm.module.css';
+import { RiFileCopyLine } from 'react-icons/ri';
+import styles from '../../styles/Form.module.css';
 import { BaseModal } from './BaseModal';
 
 interface DuplicateTableModalProps {
@@ -36,7 +36,7 @@ export const DuplicateTableModal: React.FC<DuplicateTableModalProps> = ({
     return (
         <BaseModal
             title="Duplicate Table"
-            icon={<Copy size={20} color="var(--accent-primary)" />}
+            icon={<div className={styles.iconWrapper}><RiFileCopyLine size={32} color="var(--accent-primary)" /></div>}
             onClose={onCancel}
         >
             <form onSubmit={handleSubmit}>

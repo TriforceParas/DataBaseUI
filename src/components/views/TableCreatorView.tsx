@@ -1,11 +1,11 @@
 import React from 'react';
 import { TableCreator, TableCreatorState } from '../editors';
-import { PendingChange } from '../../types/index';
+import { PendingChange, Connection } from '../../types/index';
 
 interface TableCreatorViewProps {
     activeTabId: string;
     activeTabTitle: string;
-    connectionString: string;
+    connection: Connection;
     tableCreatorStates: Record<string, TableCreatorState>;
     originalSchemas: Record<string, any>;
     setTableCreatorStates: React.Dispatch<React.SetStateAction<Record<string, TableCreatorState>>>;
@@ -17,7 +17,7 @@ interface TableCreatorViewProps {
 export const TableCreatorView: React.FC<TableCreatorViewProps> = ({
     activeTabId,
     activeTabTitle,
-    connectionString,
+    connection,
     tableCreatorStates,
     originalSchemas,
     setTableCreatorStates,
@@ -28,7 +28,7 @@ export const TableCreatorView: React.FC<TableCreatorViewProps> = ({
     return (
         <TableCreator
             key={activeTabId}
-            connectionString={connectionString}
+            connection={connection}
             onSuccess={onSuccess}
             mode={activeTabTitle.startsWith('Edit:') ? 'edit' : 'create'}
             initialState={tableCreatorStates[activeTabId]}

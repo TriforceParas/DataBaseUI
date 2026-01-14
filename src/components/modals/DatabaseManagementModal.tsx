@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import { open } from '@tauri-apps/plugin-dialog';
 import { Connection } from '../../types';
-import { X, Plus, Copy, Trash2, Upload, Download, Database, Loader2, AlertTriangle, FolderOpen, ChevronRight } from 'lucide-react';
+import { RiCloseLine, RiAddLine, RiFileCopyLine, RiDeleteBinLine, RiUploadLine, RiDownloadLine, RiDatabase2Line, RiLoader4Line, RiErrorWarningLine, RiFolderOpenLine, RiArrowRightSLine } from 'react-icons/ri';
 
 interface DatabaseManagementModalProps {
     isOpen: boolean;
@@ -60,7 +60,8 @@ export const DatabaseManagementModal: React.FC<DatabaseManagementModalProps> = (
     const fetchDatabases = async () => {
         setIsLoading(true);
         try {
-            const dbs = await invoke<string[]>('get_databases', { connectionString: connection.connection_string });
+            const connectionString = await invoke<string>('get_connection_string', { connectionId: connection.id });
+            const dbs = await invoke<string[]>('get_databases', { connectionString });
             const filteredDbs = dbs.filter(db => !SYSTEM_DATABASES.includes(db.toLowerCase()));
             setDatabases(filteredDbs);
         } catch (e) {
@@ -88,8 +89,9 @@ export const DatabaseManagementModal: React.FC<DatabaseManagementModalProps> = (
         setError(null);
         try {
             addLog(`Creating database "${newDbName}"...`);
+            const connectionString = await invoke<string>('get_connection_string', { connectionId: connection.id });
             await invoke('create_database', {
-                connectionString: connection.connection_string,
+                connectionString,
                 databaseName: newDbName
             });
             addLog(`Database "${newDbName}" created successfully!`);
@@ -116,8 +118,9 @@ export const DatabaseManagementModal: React.FC<DatabaseManagementModalProps> = (
         setError(null);
         try {
             addLog(`Duplicating database "${selectedDbToDuplicate}" to "${duplicateNewName}"...`);
+            const connectionString = await invoke<string>('get_connection_string', { connectionId: connection.id });
             await invoke('duplicate_database', {
-                connectionString: connection.connection_string,
+                connectionString,
                 sourceDatabase: selectedDbToDuplicate,
                 targetDatabase: duplicateNewName
             });
@@ -141,8 +144,9 @@ export const DatabaseManagementModal: React.FC<DatabaseManagementModalProps> = (
         setError(null);
         try {
             addLog(`Deleting database "${selectedDbToDelete}"...`);
+            const connectionString = await invoke<string>('get_connection_string', { connectionId: connection.id });
             await invoke('delete_database', {
-                connectionString: connection.connection_string,
+                connectionString,
                 databaseName: selectedDbToDelete
             });
             addLog(`Database "${selectedDbToDelete}" deleted successfully!`);
@@ -180,17 +184,18 @@ export const DatabaseManagementModal: React.FC<DatabaseManagementModalProps> = (
         setIsExecuting(true);
         setError(null);
         try {
+            const connectionString = await invoke<string>('get_connection_string', { connectionId: connection.id });
             if (activeTab === 'export') {
                 addLog(`Exporting schemas to "${directoryPath}"...`);
                 const result = await invoke<string>('export_schema', {
-                    connectionString: connection.connection_string,
+                    connectionString,
                     directoryPath: directoryPath
                 });
                 addLog(result);
             } else {
                 addLog(`Importing schemas from "${directoryPath}"...`);
                 const result = await invoke<string>('import_schema', {
-                    connectionString: connection.connection_string,
+                    connectionString,
                     directoryPath: directoryPath
                 });
                 addLog(result);
@@ -335,11 +340,11 @@ export const DatabaseManagementModal: React.FC<DatabaseManagementModalProps> = (
     };
 
     const tabData: { id: TabType; label: string; icon: React.ReactNode }[] = [
-        { id: 'create', label: 'Create', icon: <Plus size={14} /> },
-        { id: 'import', label: 'Import', icon: <Upload size={14} /> },
-        { id: 'export', label: 'Export', icon: <Download size={14} /> },
-        { id: 'duplicate', label: 'Duplicate', icon: <Copy size={14} /> },
-        { id: 'delete', label: 'Delete', icon: <Trash2 size={14} /> },
+        { id: 'create', label: 'Create', icon: <RiAddLine size={14} /> },
+        { id: 'import', label: 'Import', icon: <RiUploadLine size={14} /> },
+        { id: 'export', label: 'Export', icon: <RiDownloadLine size={14} /> },
+        { id: 'duplicate', label: 'Duplicate', icon: <RiFileCopyLine size={14} /> },
+        { id: 'delete', label: 'Delete', icon: <RiDeleteBinLine size={14} /> },
     ];
 
     return (
@@ -348,7 +353,7 @@ export const DatabaseManagementModal: React.FC<DatabaseManagementModalProps> = (
                 {/* Header */}
                 <div style={headerStyle}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                        <Database size={20} style={{ color: 'var(--accent-primary)' }} />
+                        <RiDatabase2Line size={20} style={{ color: 'var(--accent-primary)' }} />
                         <span style={{ fontSize: '1.1rem', fontWeight: 600, color: 'var(--text-primary)' }}>
                             Database Manager
                         </span>
@@ -363,7 +368,7 @@ export const DatabaseManagementModal: React.FC<DatabaseManagementModalProps> = (
                             padding: '0.25rem'
                         }}
                     >
-                        <X size={20} />
+                        <RiCloseLine size={20} />
                     </button>
                 </div>
 
@@ -399,7 +404,7 @@ export const DatabaseManagementModal: React.FC<DatabaseManagementModalProps> = (
                             color: '#dc2626',
                             fontSize: '0.85rem'
                         }}>
-                            <AlertTriangle size={16} />
+                            <RiErrorWarningLine size={16} />
                             {error}
                         </div>
                     )}
@@ -408,7 +413,7 @@ export const DatabaseManagementModal: React.FC<DatabaseManagementModalProps> = (
                     {activeTab === 'create' && (
                         <div style={sectionStyle}>
                             <div style={sectionTitleStyle}>
-                                <Plus size={16} /> Create New Database
+                                <RiAddLine size={16} /> Create New Database
                             </div>
                             <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginBottom: '2rem', marginTop: 0 }}>
                                 Create a new empty database on the connected server.
@@ -427,7 +432,7 @@ export const DatabaseManagementModal: React.FC<DatabaseManagementModalProps> = (
                                     onClick={handleCreateDatabase}
                                     disabled={!newDbName.trim() || isCreating}
                                 >
-                                    {isCreating ? <Loader2 size={14} className="spin" /> : <Plus size={14} />}
+                                    {isCreating ? <RiLoader4Line size={14} className="spin" /> : <RiAddLine size={14} />}
                                     Create
                                 </button>
                             </div>
@@ -438,7 +443,7 @@ export const DatabaseManagementModal: React.FC<DatabaseManagementModalProps> = (
                     {activeTab === 'import' && (
                         <div style={sectionStyle}>
                             <div style={sectionTitleStyle}>
-                                <Upload size={16} /> Import Schemas
+                                <RiUploadLine size={16} /> Import Schemas
                             </div>
                             <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginBottom: '1rem', marginTop: 0 }}>
                                 Select a directory containing SQL schema files to import into the current database.
@@ -454,7 +459,7 @@ export const DatabaseManagementModal: React.FC<DatabaseManagementModalProps> = (
                                         onClick={handleBrowseDirectory}
                                     />
                                     <button style={buttonStyle('secondary')} onClick={handleBrowseDirectory}>
-                                        <FolderOpen size={14} />
+                                        <RiFolderOpenLine size={14} />
                                         Browse
                                     </button>
                                 </div>
@@ -463,7 +468,7 @@ export const DatabaseManagementModal: React.FC<DatabaseManagementModalProps> = (
                                     onClick={handleImportExport}
                                     disabled={!directoryPath.trim() || isExecuting}
                                 >
-                                    {isExecuting ? <Loader2 size={14} className="spin" /> : <Upload size={14} />}
+                                    {isExecuting ? <RiLoader4Line size={14} className="spin" /> : <RiUploadLine size={14} />}
                                     Import
                                 </button>
                             </div>
@@ -474,7 +479,7 @@ export const DatabaseManagementModal: React.FC<DatabaseManagementModalProps> = (
                     {activeTab === 'export' && (
                         <div style={sectionStyle}>
                             <div style={sectionTitleStyle}>
-                                <Download size={16} /> Export Schemas
+                                <RiDownloadLine size={16} /> Export Schemas
                             </div>
                             <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginBottom: '1rem', marginTop: 0 }}>
                                 Export all table schemas from the current database to SQL files.
@@ -490,7 +495,7 @@ export const DatabaseManagementModal: React.FC<DatabaseManagementModalProps> = (
                                         onClick={handleBrowseDirectory}
                                     />
                                     <button style={buttonStyle('secondary')} onClick={handleBrowseDirectory}>
-                                        <FolderOpen size={14} />
+                                        <RiFolderOpenLine size={14} />
                                         Browse
                                     </button>
                                 </div>
@@ -499,7 +504,7 @@ export const DatabaseManagementModal: React.FC<DatabaseManagementModalProps> = (
                                     onClick={handleImportExport}
                                     disabled={!directoryPath.trim() || isExecuting}
                                 >
-                                    {isExecuting ? <Loader2 size={14} className="spin" /> : <Download size={14} />}
+                                    {isExecuting ? <RiLoader4Line size={14} className="spin" /> : <RiDownloadLine size={14} />}
                                     Export
                                 </button>
                             </div>
@@ -510,7 +515,7 @@ export const DatabaseManagementModal: React.FC<DatabaseManagementModalProps> = (
                     {activeTab === 'duplicate' && (
                         <div style={sectionStyle}>
                             <div style={sectionTitleStyle}>
-                                <Copy size={16} /> Duplicate Database
+                                <RiFileCopyLine size={16} /> Duplicate Database
                             </div>
                             <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginBottom: '1rem', marginTop: 0 }}>
                                 Create a copy of an existing database with a new name.
@@ -527,7 +532,7 @@ export const DatabaseManagementModal: React.FC<DatabaseManagementModalProps> = (
                                             <option key={db} value={db}>{db}</option>
                                         ))}
                                     </select>
-                                    <ChevronRight size={16} style={{ color: 'var(--text-muted)', flexShrink: 0 }} />
+                                    <RiArrowRightSLine size={16} style={{ color: 'var(--text-muted)', flexShrink: 0 }} />
                                     <input
                                         type="text"
                                         placeholder="New database name..."
@@ -541,7 +546,7 @@ export const DatabaseManagementModal: React.FC<DatabaseManagementModalProps> = (
                                     onClick={handleDuplicateDatabase}
                                     disabled={!selectedDbToDuplicate || !duplicateNewName.trim() || isDuplicating}
                                 >
-                                    {isDuplicating ? <Loader2 size={14} className="spin" /> : <Copy size={14} />}
+                                    {isDuplicating ? <RiLoader4Line size={14} className="spin" /> : <RiFileCopyLine size={14} />}
                                     Duplicate
                                 </button>
                             </div>
@@ -552,7 +557,7 @@ export const DatabaseManagementModal: React.FC<DatabaseManagementModalProps> = (
                     {activeTab === 'delete' && (
                         <div style={{ ...sectionStyle, borderColor: 'rgba(220, 38, 38, 0.3)' }}>
                             <div style={{ ...sectionTitleStyle, color: '#dc2626' }}>
-                                <Trash2 size={16} /> Delete Database
+                                <RiDeleteBinLine size={16} /> Delete Database
                             </div>
                             <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginBottom: '1rem', marginTop: 0 }}>
                                 Permanently delete a database. This action cannot be undone.
@@ -589,7 +594,7 @@ export const DatabaseManagementModal: React.FC<DatabaseManagementModalProps> = (
                                                 onClick={handleDeleteDatabase}
                                                 disabled={confirmDeleteName !== selectedDbToDelete || isDeleting}
                                             >
-                                                {isDeleting ? <Loader2 size={14} className="spin" /> : <Trash2 size={14} />}
+                                                {isDeleting ? <RiLoader4Line size={14} className="spin" /> : <RiDeleteBinLine size={14} />}
                                                 Delete
                                             </button>
                                         </div>

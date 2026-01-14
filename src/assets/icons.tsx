@@ -1,109 +1,117 @@
 import {
-    Activity,
-    AlertCircle,
-    AlertTriangle,
-    Check,
-    ChevronDown,
-    ChevronLeft,
-    ChevronRight,
-    ChevronUp,
-    Code2,
-    Copy,
-    CornerDownLeft,
-    Database,
-    Download,
-    Edit2,
-    FileCode,
-    FileText,
-    Filter,
-    Folder,
-    FunctionSquare,
-    GripVertical,
-    HelpCircle,
-    Home,
-    Key,
-    Layout,
-    Link,
-    ListPlus,
-    Maximize2,
-    Minimize2,
-    Minus,
-    MoreHorizontal,
-    MoreVertical,
-    MousePointer,
-    PanelLeftClose,
-    PanelLeftOpen,
-    Pencil,
-    Play,
-    Plus,
-    RefreshCw,
-    Save,
-    Search,
-    Settings,
-    SidebarClose,
-    SidebarOpen,
-    Table,
-    Terminal,
-    Trash2,
-    Upload,
-    Workflow,
-    X,
-    ZoomIn,
-    ZoomOut
-} from 'lucide-react';
+    PiPulse,
+    PiFunctionBold
+} from 'react-icons/pi';
+import {
+    TbLayoutSidebarLeftExpand,
+    TbLayoutSidebarLeftCollapse
+} from 'react-icons/tb';
+import {
+    IoSearchOutline
+} from 'react-icons/io5';
+import {
+    CiViewTable
+} from 'react-icons/ci';
+import {
+    LuRefreshCcw
+} from 'react-icons/lu';
+import {
+    RiAlertLine,
+    RiErrorWarningLine,
+    RiCheckLine,
+    RiArrowDownSLine,
+    RiArrowLeftSLine,
+    RiArrowRightSLine,
+    RiArrowUpSLine,
+    RiFileCopyLine,
+    RiCornerDownLeftLine,
+    RiDatabase2Line,
+    RiDownloadLine,
+    RiEdit2Line,
+    RiFileCodeLine,
+    RiFileTextLine,
+    RiFilterLine,
+    RiFunctions,
+    RiDragMove2Line,
+    RiQuestionLine,
+    RiHomeLine,
+    RiKey2Line,
+    RiLayoutMasonryLine,
+    RiLink,
+    RiListCheck2,
+    RiFullscreenLine,
+    RiFullscreenExitLine,
+    RiSubtractLine,
+    RiMoreFill,
+    RiMore2Fill,
+    RiCursorLine,
+    RiPencilLine,
+    RiPlayLine,
+    RiAddLine,
+    RiSaveLine,
+    RiSettings3Line,
+    RiTerminalBoxLine,
+    RiDeleteBinLine,
+    RiUploadLine,
+    RiGitMergeLine,
+    RiCloseLine,
+    RiZoomInLine,
+    RiZoomOutLine
+} from 'react-icons/ri';
+import { FaCode, FaRegFolder } from 'react-icons/fa';
 
 export const Icons = {
-    Activity,
-    AlertCircle,
-    AlertTriangle,
-    Check,
-    ChevronDown,
-    ChevronLeft,
-    ChevronRight,
-    ChevronUp,
-    Code2,
-    Copy,
-    CornerDownLeft,
-    Database,
-    Download,
-    Edit2,
-    FileCode,
-    FileText,
-    Filter,
-    Folder,
-    FunctionSquare,
-    GripVertical,
-    HelpCircle,
-    Home,
-    Key,
-    Layout,
-    Link,
-    ListPlus,
-    Maximize2,
-    Minimize2,
-    Minus,
-    MoreHorizontal,
-    MoreVertical,
-    MousePointer,
-    PanelLeftClose,
-    PanelLeftOpen,
-    Pencil,
-    Play,
-    Plus,
-    RefreshCw,
-    Save,
-    Search,
-    Settings,
-    SidebarClose,
-    SidebarOpen,
-    Table,
-    Terminal,
-    Trash2,
-    Upload,
-    Workflow,
-    X,
-    ZoomIn,
-    ZoomOut,
+    Activity: PiPulse,
+    AlertCircle: RiAlertLine,
+    AlertTriangle: RiErrorWarningLine,
+    Check: RiCheckLine,
+    ChevronDown: RiArrowDownSLine,
+    ChevronLeft: RiArrowLeftSLine,
+    ChevronRight: RiArrowRightSLine,
+    ChevronUp: RiArrowUpSLine,
+    Code2: FaCode,
+    Copy: RiFileCopyLine,
+    CornerDownLeft: RiCornerDownLeftLine,
+    Database: RiDatabase2Line,
+    Download: RiDownloadLine,
+    Edit2: RiEdit2Line,
+    FileCode: RiFileCodeLine,
+    FileText: RiFileTextLine,
+    Filter: RiFilterLine,
+    Folder: FaRegFolder,
+    FunctionSquare: RiFunctions,
+    GripVertical: RiDragMove2Line,
+    HelpCircle: RiQuestionLine,
+    Home: RiHomeLine,
+    Key: RiKey2Line,
+    Layout: RiLayoutMasonryLine,
+    Link: RiLink,
+    ListPlus: RiListCheck2,
+    Maximize2: RiFullscreenLine,
+    Minimize2: RiFullscreenExitLine,
+    Minus: RiSubtractLine,
+    MoreHorizontal: RiMoreFill,
+    MoreVertical: RiMore2Fill,
+    MousePointer: RiCursorLine,
+    PanelLeftClose: TbLayoutSidebarLeftCollapse,
+    PanelLeftOpen: TbLayoutSidebarLeftExpand,
+    Pencil: RiPencilLine,
+    Play: RiPlayLine,
+    Plus: RiAddLine,
+    RefreshCw: LuRefreshCcw,
+    Save: RiSaveLine,
+    Search: IoSearchOutline,
+    Settings: RiSettings3Line,
+    SidebarClose: TbLayoutSidebarLeftCollapse,
+    SidebarOpen: TbLayoutSidebarLeftExpand,
+    Table: CiViewTable,
+    Terminal: RiTerminalBoxLine,
+    Trash2: RiDeleteBinLine,
+    Upload: RiUploadLine,
+    Workflow: RiGitMergeLine,
+    X: RiCloseLine,
+    ZoomIn: RiZoomInLine,
+    ZoomOut: RiZoomOutLine,
     Schema: (props: any) => (
         <svg
             {...props}
@@ -125,22 +133,7 @@ export const Icons = {
             <rect x="14" y="16" width="7" height="5" rx="1" />
         </svg>
     ),
-    MathFunction: (props: any) => (
-        <svg
-            {...props}
-            width={props.size || 24}
-            height={props.size || 24}
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2.5"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-        >
-            <path d="M15.5 2.5c-2 0-3.5 1-3.5 3.5v12c0 2.5-1.5 3.5-3.5 3.5" />
-            <path d="M8.5 12h7" />
-        </svg>
-    )
+    MathFunction: PiFunctionBold
 };
 
 export type IconName = keyof typeof Icons;

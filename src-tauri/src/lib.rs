@@ -17,8 +17,15 @@ pub fn run() {
             commands::connection::save_connection,
             commands::connection::list_connections,
             commands::connection::verify_connection,
+            commands::connection::verify_connection_by_id,
             commands::connection::delete_connection,
             commands::connection::update_connection,
+            commands::connection::get_connection_string,
+            // Credentials
+            commands::credential::save_credential,
+            commands::credential::list_credentials,
+            commands::credential::delete_credential,
+            commands::credential::update_credential,
             // DB Ops
             commands::db_ops::get_tables,
             commands::db_ops::execute_query,

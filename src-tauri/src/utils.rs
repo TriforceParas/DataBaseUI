@@ -115,3 +115,14 @@ pub fn split_sql_statements(sql: &str, support_backslash_escape: bool) -> Vec<St
 
     stmts
 }
+
+/// Escapes a SQL identifier (table name, column name) for safe use in queries.
+/// - MySQL uses backticks: `table_name`
+/// - PostgreSQL and SQLite use double quotes: "table_name"
+/// Internal quotes are doubled to escape them.
+pub fn escape_identifier(name: &str, db_type: &str) -> String {
+    match db_type {
+        "mysql" => format!("`{}`", name.replace('`', "``")),
+        _ => format!("\"{}\"", name.replace('"', "\"\"")), // postgres/sqlite
+    }
+}

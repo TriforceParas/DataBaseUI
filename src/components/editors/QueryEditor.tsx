@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import Editor, { OnMount } from '@monaco-editor/react';
 import { THEMES } from '../../utils/themeUtils';
 import styles from '../../styles/MainLayout.module.css';
-import { Play, ChevronDown, Copy, Download, Save, FunctionSquare } from 'lucide-react';
+import { RiPlayLine, RiArrowDownSLine, RiFileCopyLine, RiDownloadLine, RiSaveLine, RiFunctions } from 'react-icons/ri';
 
 interface QueryEditorProps {
     value: string;
@@ -260,7 +260,7 @@ export const QueryEditor: React.FC<QueryEditorProps> = ({
                         onClick={() => onRunQuery(value)}
                         title="Run all queries (Ctrl+Enter)"
                     >
-                        <Play size={14} fill="currentColor" /> Run All
+                        <RiPlayLine size={14} fill="currentColor" /> Run All
                     </button>
 
                     {(selectedRowCount > 0) && (
@@ -273,7 +273,7 @@ export const QueryEditor: React.FC<QueryEditorProps> = ({
                                     onClick={() => setActiveDropdown(activeDropdown === 'copy' ? null : 'copy')}
                                     style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}
                                 >
-                                    <Copy size={14} /> Copy Selected ({selectedRowCount}) <ChevronDown size={12} />
+                                    <RiFileCopyLine size={14} /> Copy Selected ({selectedRowCount}) <RiArrowDownSLine size={12} />
                                 </button>
                                 {activeDropdown === 'copy' && (
                                     <div className={styles.dropdownMenu} style={{
@@ -312,7 +312,7 @@ export const QueryEditor: React.FC<QueryEditorProps> = ({
                                     onClick={() => setActiveDropdown(activeDropdown === 'export' ? null : 'export')}
                                     style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}
                                 >
-                                    <Download size={14} /> Export Selected ({selectedRowCount}) <ChevronDown size={12} />
+                                    <RiDownloadLine size={14} /> Export Selected ({selectedRowCount}) <RiArrowDownSLine size={12} />
                                 </button>
                                 {activeDropdown === 'export' && (
                                     <div className={styles.dropdownMenu} style={{
@@ -355,7 +355,7 @@ export const QueryEditor: React.FC<QueryEditorProps> = ({
                             onClick={onSaveChanges}
                             title="Save Changes"
                         >
-                            <Save size={14} /> Save
+                            <RiSaveLine size={14} /> Save
                         </button>
                     ) : (
                         <>
@@ -365,7 +365,7 @@ export const QueryEditor: React.FC<QueryEditorProps> = ({
                                     onClick={onSaveQuery}
                                     title="Save Query"
                                 >
-                                    <Save size={14} /> Save Query
+                                    <RiSaveLine size={14} /> Save Query
                                 </button>
                             )}
                             {onSaveFunction && (
@@ -374,7 +374,7 @@ export const QueryEditor: React.FC<QueryEditorProps> = ({
                                     onClick={onSaveFunction}
                                     title="Save Function"
                                 >
-                                    <FunctionSquare size={14} /> Save Function
+                                    <RiFunctions size={14} /> Save Function
                                 </button>
                             )}
                         </>
@@ -385,7 +385,7 @@ export const QueryEditor: React.FC<QueryEditorProps> = ({
                             onClick={onExportSql}
                             title="Export as .sql"
                         >
-                            <Download size={14} /> Export
+                            <RiDownloadLine size={14} /> Export
                         </button>
                     )}
                 </div>

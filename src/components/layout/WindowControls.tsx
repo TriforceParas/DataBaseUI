@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { createPortal } from 'react-dom';
 import { getCurrentWindow } from '@tauri-apps/api/window';
-import { Minus, Square, X } from 'lucide-react';
+import { VscChromeMinimize, VscChromeMaximize, VscChromeClose } from 'react-icons/vsc';
 import styles from '../../styles/WindowControls.module.css';
 
 interface WindowControlsProps {
@@ -59,7 +59,7 @@ export const WindowControls: React.FC<WindowControlsProps> = ({
                         className={styles.button}
                         title="Minimize"
                     >
-                        <Minus size={16} />
+                        <VscChromeMinimize size={16} />
                     </button>
                 )}
                 {showMaximize && (
@@ -69,7 +69,7 @@ export const WindowControls: React.FC<WindowControlsProps> = ({
                         className={styles.button}
                         title="Maximize"
                     >
-                        <Square size={14} />
+                        <VscChromeMaximize size={14} />
                     </button>
                 )}
                 {showClose && (
@@ -79,7 +79,7 @@ export const WindowControls: React.FC<WindowControlsProps> = ({
                         className={`${styles.button} ${styles.closeButton}`}
                         title="Close"
                     >
-                        <X size={18} />
+                        <VscChromeClose size={18} />
                     </button>
                 )}
             </div>

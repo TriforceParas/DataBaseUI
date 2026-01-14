@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import type { PendingChange } from '../../types/index';
-import { Check, Trash2, Undo2, Square, CheckSquare } from 'lucide-react';
+import { RiCheckLine, RiDeleteBinLine, RiArrowGoBackLine, RiCheckboxBlankLine, RiCheckboxLine } from 'react-icons/ri';
 import styles from '../../styles/MainLayout.module.css';
 
 interface ChangelogSidebarProps {
@@ -222,9 +222,9 @@ export const ChangelogSidebar: React.FC<ChangelogSidebarProps> = ({
                                                         title={selectedChanges.has(getChangeKey(tabId, idx)) ? 'Deselect' : 'Select'}
                                                     >
                                                         {selectedChanges.has(getChangeKey(tabId, idx)) ? (
-                                                            <CheckSquare size={16} />
+                                                            <RiCheckboxLine size={16} />
                                                         ) : (
-                                                            <Square size={16} />
+                                                            <RiCheckboxBlankLine size={16} />
                                                         )}
                                                     </button>
                                                     <span style={{
@@ -263,7 +263,7 @@ export const ChangelogSidebar: React.FC<ChangelogSidebarProps> = ({
                                                     style={{ background: 'none', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer', opacity: 0.6 }}
                                                     title="Undo"
                                                 >
-                                                    <Undo2 size={14} />
+                                                    <RiArrowGoBackLine size={14} />
                                                 </button>
                                             </div>
 
@@ -327,7 +327,7 @@ export const ChangelogSidebar: React.FC<ChangelogSidebarProps> = ({
                     onClick={handleDiscard}
                     disabled={totalChanges === 0}
                 >
-                    <Trash2 size={14} style={{ marginRight: 6 }} /> {hasSelection ? `Discard (${selectedChanges.size})` : 'Discard'}
+                    <RiDeleteBinLine size={14} style={{ marginRight: 6 }} /> {hasSelection ? `Discard (${selectedChanges.size})` : 'Discard'}
                 </button>
                 <button
                     className={styles.primaryBtn}
@@ -335,7 +335,7 @@ export const ChangelogSidebar: React.FC<ChangelogSidebarProps> = ({
                     onClick={handleConfirm}
                     disabled={totalChanges === 0}
                 >
-                    <Check size={14} style={{ marginRight: 6 }} /> {hasSelection ? `Confirm (${selectedChanges.size})` : 'Confirm'}
+                    <RiCheckLine size={14} style={{ marginRight: 6 }} /> {hasSelection ? `Confirm (${selectedChanges.size})` : 'Confirm'}
                 </button>
             </div>
         </div>

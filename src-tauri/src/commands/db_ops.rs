@@ -1,5 +1,5 @@
 use crate::models::{ColumnSchema, QueryResult};
-use crate::utils::{connect_to_db, detect_db_type, split_sql_statements};
+use crate::utils::{connect_to_db, detect_db_type, escape_identifier, split_sql_statements};
 use sqlx::any::AnyRow;
 use sqlx::{Column, Connection, Row, TypeInfo};
 use tauri;
@@ -205,9 +205,9 @@ pub async fn get_columns(
     let mut conn = connect_to_db(&connection_string).await?;
 
     let (query, col_idx) = match db_type {
-        "postgres" => (format!("SELECT column_name FROM information_schema.columns WHERE table_name = '{}' AND table_schema = 'public'", table_name), 0),
-        "mysql" => (format!("SHOW COLUMNS FROM {}", table_name), 0),
-        "sqlite" => (format!("PRAGMA table_info(\"{}\")", table_name), 1),
+        "postgres" => (format!("SELECT column_name FROM information_schema.columns WHERE table_name = '{}' AND table_schema = 'public'", table_name.replace('\'', "''")), 0),
+        "mysql" => (format!("SHOW COLUMNS FROM {}", escape_identifier(&table_name, db_type)), 0),
+        "sqlite" => (format!("PRAGMA table_info({})", escape_identifier(&table_name, db_type)), 1),
         _ => return Ok(vec![]),
     };
 
@@ -315,11 +315,25 @@ pub async fn get_table_schema(
         "postgres" => format!(
             "SELECT 
                 c.column_name, 
-                c.data_type, 
+                CASE 
+                    WHEN c.data_type = 'character varying' AND c.character_maximum_length IS NOT NULL 
+                        THEN 'varchar(' || c.character_maximum_length || ')'
+                    WHEN c.data_type = 'character varying' 
+                        THEN 'varchar'
+                    WHEN c.data_type = 'character' AND c.character_maximum_length IS NOT NULL 
+                        THEN 'char(' || c.character_maximum_length || ')'
+                    WHEN c.data_type = 'character' 
+                        THEN 'char'
+                    WHEN c.data_type = 'numeric' AND c.numeric_precision IS NOT NULL 
+                        THEN 'numeric(' || c.numeric_precision || ',' || COALESCE(c.numeric_scale, 0) || ')'
+                    WHEN c.data_type = 'decimal' AND c.numeric_precision IS NOT NULL 
+                        THEN 'decimal(' || c.numeric_precision || ',' || COALESCE(c.numeric_scale, 0) || ')'
+                    ELSE c.data_type
+                END as data_type, 
                 c.is_nullable, 
                 c.column_default,
                 CASE WHEN tc.constraint_type = 'PRIMARY KEY' THEN 'PRI' ELSE '' END as column_key,
-                '' as extra,
+                CASE WHEN c.column_default LIKE 'nextval%%' THEN 'auto_increment' ELSE '' END as extra,
                 ccu.table_name AS referenced_table,
                 ccu.column_name AS referenced_column
             FROM 
@@ -403,12 +417,11 @@ pub async fn truncate_table(connection_string: String, table_name: String) -> Re
     let db_type = detect_db_type(&connection_string)?;
     let mut conn = connect_to_db(&connection_string).await?;
 
+    let escaped_table = escape_identifier(&table_name, db_type);
     let query = if db_type == "sqlite" {
-        format!("DELETE FROM \"{}\"", table_name)
-    } else if db_type == "mysql" {
-        format!("TRUNCATE TABLE `{}`", table_name)
+        format!("DELETE FROM {}", escaped_table)
     } else {
-        format!("TRUNCATE TABLE \"{}\"", table_name)
+        format!("TRUNCATE TABLE {}", escaped_table)
     };
 
     sqlx::query(&query)
@@ -424,11 +437,7 @@ pub async fn drop_table(connection_string: String, table_name: String) -> Result
     let db_type = detect_db_type(&connection_string)?;
     let mut conn = connect_to_db(&connection_string).await?;
 
-    let query = if db_type == "mysql" {
-        format!("DROP TABLE `{}`", table_name)
-    } else {
-        format!("DROP TABLE \"{}\"", table_name)
-    };
+    let query = format!("DROP TABLE {}", escape_identifier(&table_name, db_type));
 
     sqlx::query(&query)
         .execute(&mut conn)
@@ -448,21 +457,14 @@ pub async fn duplicate_table(
     let db_type = detect_db_type(&connection_string)?;
     let mut conn = connect_to_db(&connection_string).await?;
 
-    let query = match db_type {
-        "postgres" | "sqlite" => format!(
-            "CREATE TABLE \"{}\" AS SELECT * FROM \"{}\"{}",
-            new_table,
-            source_table,
-            if include_data { "" } else { " WHERE 1=0" }
-        ),
-        "mysql" => format!(
-            "CREATE TABLE `{}` AS SELECT * FROM `{}`{}",
-            new_table,
-            source_table,
-            if include_data { "" } else { " WHERE 1=0" }
-        ),
-        _ => return Err("Unsupported database".to_string()),
-    };
+    let escaped_new = escape_identifier(&new_table, db_type);
+    let escaped_source = escape_identifier(&source_table, db_type);
+    let query = format!(
+        "CREATE TABLE {} AS SELECT * FROM {}{}",
+        escaped_new,
+        escaped_source,
+        if include_data { "" } else { " WHERE 1=0" }
+    );
 
     sqlx::query(&query)
         .execute(&mut conn)
@@ -499,18 +501,34 @@ pub async fn get_databases(connection_string: String) -> Result<Vec<String>, Str
 
 fn generate_create_table_sql(table_name: &str, columns: &[ColumnSchema], db_type: &str) -> String {
     let cols_sql: Vec<String> = columns.iter().map(|col| {
-        let mut line = format!("\"{}\" {}", col.name, col.type_name);
-        if db_type == "mysql" {
-            line = format!("`{}` {}", col.name, col.type_name);
-        }
+        // Handle PostgreSQL SERIAL types
+        let type_str = if db_type == "postgres" && col.is_auto_increment {
+            // Convert integer types to SERIAL equivalents
+            match col.type_name.to_lowercase().as_str() {
+                "integer" | "int" | "int4" => "SERIAL".to_string(),
+                "bigint" | "int8" => "BIGSERIAL".to_string(),
+                "smallint" | "int2" => "SMALLSERIAL".to_string(),
+                _ => col.type_name.clone(),
+            }
+        } else {
+            col.type_name.clone()
+        };
 
-        if !col.is_nullable {
+        let col_name = escape_identifier(&col.name, db_type);
+        let mut line = format!("{} {}", col_name, type_str);
+
+        // For SERIAL types, don't add NOT NULL (it's implicit)
+        let is_serial = db_type == "postgres" && col.is_auto_increment;
+        if !col.is_nullable && !is_serial {
             line.push_str(" NOT NULL");
         }
         
-        if let Some(def) = &col.default_value {
-            if !def.starts_with("nextval") && !def.contains("::") { 
-                 line.push_str(&format!(" DEFAULT {}", def));
+        // Skip default value for SERIAL columns (handled by sequence)
+        if !is_serial {
+            if let Some(def) = &col.default_value {
+                if !def.starts_with("nextval") && !def.contains("::") { 
+                     line.push_str(&format!(" DEFAULT {}", def));
+                }
             }
         }
         
@@ -525,7 +543,7 @@ fn generate_create_table_sql(table_name: &str, columns: &[ColumnSchema], db_type
         line
     }).collect();
 
-    let q_table_name = if db_type == "mysql" { format!("`{}`", table_name) } else { format!("\"{}\"", table_name) };
+    let q_table_name = escape_identifier(table_name, db_type);
     format!("CREATE TABLE IF NOT EXISTS {} (\n    {}\n);", q_table_name, cols_sql.join(",\n    "))
 }
 

@@ -9,7 +9,8 @@ import { writeFile, mkdir, exists, BaseDirectory } from '@tauri-apps/plugin-fs';
 export const captureSchemaScreenshot = async (
     containerRef: HTMLElement,
     onSuccess: (filePath: string) => void,
-    onError: (error: string) => void
+    onError: (error: string) => void,
+    customPath?: string
 ) => {
     try {
         // Define filter to exclude controls
@@ -40,23 +41,48 @@ export const captureSchemaScreenshot = async (
             bytes[i] = binaryString.charCodeAt(i);
         }
 
-        // Get save path
-        const picturesPath = await pictureDir();
-        const sqlUiDir = `${picturesPath}SQL-UI`;
+        let filePath = '';
+        let fileWritePath = '';
+        let options = undefined;
+        let timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+        let fileName = `schema_${timestamp}.png`;
 
-        // Ensure directory exists
-        const dirExists = await exists('SQL-UI', { baseDir: BaseDirectory.Picture });
-        if (!dirExists) {
-            await mkdir('SQL-UI', { baseDir: BaseDirectory.Picture, recursive: true });
+        if (customPath && customPath.trim() !== '') {
+            // Use custom path (Absolute)
+            // Ensure directory exists
+            try {
+                await mkdir(customPath, { recursive: true });
+            } catch (e) {
+                // Ignore if exists, or fail on write
+                console.log("Mkdir check:", e);
+            }
+
+            // Handle separators
+            const sep = customPath.includes('\\') ? '\\' : '/';
+            const cleanPath = customPath.endsWith(sep) ? customPath : customPath + sep;
+
+            filePath = `${cleanPath}${fileName}`;
+            fileWritePath = filePath;
+            // No options = absolute path usually
+        } else {
+            // Default: Pictures/SQL-UI
+            const picturesPath = await pictureDir();
+            const sqlUiDir = `${picturesPath}SQL-UI`;
+
+            // Ensure directory exists
+            const dirExists = await exists('SQL-UI', { baseDir: BaseDirectory.Picture });
+            if (!dirExists) {
+                await mkdir('SQL-UI', { baseDir: BaseDirectory.Picture, recursive: true });
+            }
+
+            filePath = `${sqlUiDir}\\${fileName}`;
+            // Relative path for BaseDirectory.Picture
+            fileWritePath = `SQL-UI\\${fileName}`;
+            options = { baseDir: BaseDirectory.Picture };
         }
 
-        // Generate filename with timestamp
-        const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
-        const fileName = `schema_${timestamp}.png`;
-        const filePath = `${sqlUiDir}\\${fileName}`;
-
         // Write file
-        await writeFile(`SQL-UI\\${fileName}`, bytes, { baseDir: BaseDirectory.Picture });
+        await writeFile(fileWritePath, bytes, options);
 
         onSuccess(filePath);
     } catch (error) {
@@ -82,28 +108,42 @@ export const getExportDirectory = async (): Promise<string> => {
 };
 
 /**
- * Save export file (CSV/JSON) to Documents/SQL-UI
+ * Save export file (CSV/JSON) to Documents/SQL-UI or Custom Path
  */
 export const saveExportFile = async (
     fileName: string,
     content: string,
     onSuccess: (filePath: string) => void,
-    onError: (error: string) => void
+    onError: (error: string) => void,
+    customPath?: string
 ) => {
     try {
-        const sqlUiDir = await getExportDirectory();
+        let filePath = '';
+        let fileWritePath = '';
+        let options = undefined;
 
-        // Ensure directory exists again inside the save function just in case
-        const dirExists = await exists('SQL-UI', { baseDir: BaseDirectory.Document });
-        if (!dirExists) {
-            await mkdir('SQL-UI', { baseDir: BaseDirectory.Document, recursive: true });
+        if (customPath && customPath.trim() !== '') {
+            // Use custom path
+            try {
+                await mkdir(customPath, { recursive: true });
+            } catch (e) {
+                console.log("Mkdir check:", e);
+            }
+
+            const sep = customPath.includes('\\') ? '\\' : '/';
+            const cleanPath = customPath.endsWith(sep) ? customPath : customPath + sep;
+            filePath = `${cleanPath}${fileName}`;
+            fileWritePath = filePath;
+        } else {
+            const sqlUiDir = await getExportDirectory();
+            filePath = `${sqlUiDir}\\${fileName}`;
+            fileWritePath = `SQL-UI\\${fileName}`;
+            options = { baseDir: BaseDirectory.Document };
         }
-
-        const filePath = `${sqlUiDir}\\${fileName}`;
 
         const encoder = new TextEncoder();
         const uint8Array = encoder.encode(content);
-        await writeFile(`SQL-UI\\${fileName}`, uint8Array, { baseDir: BaseDirectory.Document });
+        await writeFile(fileWritePath, uint8Array, options);
 
         onSuccess(filePath);
     } catch (error) {

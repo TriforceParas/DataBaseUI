@@ -40,6 +40,14 @@ pub async fn init_db<R: Runtime>(app: &AppHandle<R>) -> Result<Pool<Sqlite>, Str
     )
     .await?;
 
+    // Cleanup any stale migration tables from previous runs
+    let _ = sqlx::query("DROP TABLE IF EXISTS tags_old")
+        .execute(&pool)
+        .await;
+    let _ = sqlx::query("DROP TABLE IF EXISTS table_tags_old")
+        .execute(&pool)
+        .await;
+
     create_table_schema(
         &pool,
         "tags",
@@ -47,10 +55,64 @@ pub async fn init_db<R: Runtime>(app: &AppHandle<R>) -> Result<Pool<Sqlite>, Str
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             name TEXT NOT NULL,
             color TEXT NOT NULL,
-            created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+            connection_id INTEGER,
+            database_name TEXT,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY(connection_id) REFERENCES connections(id) ON DELETE CASCADE
         );",
     )
     .await?;
+
+    // Migration: Check if tags table has the connection_id column
+    // We check the actual SQL definition of the table
+    let tags_table_sql: String =
+        sqlx::query_scalar("SELECT sql FROM sqlite_master WHERE type='table' AND name='tags'")
+            .fetch_one(&pool)
+            .await
+            .unwrap_or_default();
+
+    // Check if connection_id column exists
+    if !tags_table_sql.contains("connection_id") {
+        println!("Migrating tags schema...");
+
+        // 1. Rename existing table
+        let _ = sqlx::query("DROP TABLE IF EXISTS tags_old")
+            .execute(&pool)
+            .await;
+        let _ = sqlx::query("ALTER TABLE tags RENAME TO tags_old")
+            .execute(&pool)
+            .await;
+
+        // 2. Create new table with correct schema
+        create_table_schema(
+            &pool,
+            "tags",
+            "CREATE TABLE IF NOT EXISTS tags (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                name TEXT NOT NULL,
+                color TEXT NOT NULL,
+                connection_id INTEGER,
+                database_name TEXT,
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY(connection_id) REFERENCES connections(id) ON DELETE CASCADE
+            );",
+        )
+        .await?;
+
+        // 3. Copy data
+        // Old table only had name and color, and likely created_at.
+        // We copy what we can. Newly added columns connection_id and database_name will be NULL.
+        let _ = sqlx::query(
+            "INSERT INTO tags (id, name, color, created_at) 
+             SELECT id, name, color, created_at FROM tags_old",
+        )
+        .execute(&pool)
+        .await;
+
+        // 4. Drop old table
+        let _ = sqlx::query("DROP TABLE tags_old").execute(&pool).await;
+        println!("Migration of tags completed.");
+    }
 
     create_table_schema(
         &pool,
@@ -79,21 +141,27 @@ pub async fn init_db<R: Runtime>(app: &AppHandle<R>) -> Result<Pool<Sqlite>, Str
 
     // The target unique constraint string we expect
     let expected_unique = "UNIQUE(table_name, connection_id, database_name, tag_id)";
-    
+
     // Also check if database_name column exists (for the data copy part)
     // If table exists but doesn't have our unique constraint OR doesn't have the column (though unsafe to rely just on column if constraint is wrong)
     // Simplest robust check: if SQL doesn't contain our expected unique string, Re-create.
-    
+
     // Normalizing string for check (simple contains)
-    if !table_sql.replace(" ", "").contains(&expected_unique.replace(" ", "")) {
+    if !table_sql
+        .replace(" ", "")
+        .contains(&expected_unique.replace(" ", ""))
+        || table_sql.contains("tags_old")
+    {
         println!("Migrating table_tags schema...");
-        
+
         // 1. Rename existing table
-        let _ = sqlx::query("DROP TABLE IF EXISTS table_tags_old").execute(&pool).await;
+        let _ = sqlx::query("DROP TABLE IF EXISTS table_tags_old")
+            .execute(&pool)
+            .await;
         let _ = sqlx::query("ALTER TABLE table_tags RENAME TO table_tags_old")
             .execute(&pool)
             .await;
-            
+
         // 2. Create new table with correct schema
         create_table_schema(
             &pool,
@@ -121,16 +189,16 @@ pub async fn init_db<R: Runtime>(app: &AppHandle<R>) -> Result<Pool<Sqlite>, Str
         .unwrap_or(0);
 
         if has_db_col_old > 0 {
-             // Old table has column, copy it directly
-             let _ = sqlx::query(
+            // Old table has column, copy it directly
+            let _ = sqlx::query(
                 "INSERT INTO table_tags (id, table_name, connection_id, tag_id, database_name) 
                  SELECT id, table_name, connection_id, tag_id, database_name FROM table_tags_old",
             )
             .execute(&pool)
             .await;
         } else {
-             // Old table does NOT have column, default to empty string
-             let _ = sqlx::query(
+            // Old table does NOT have column, default to empty string
+            let _ = sqlx::query(
                 "INSERT INTO table_tags (id, table_name, connection_id, tag_id, database_name) 
                  SELECT id, table_name, connection_id, tag_id, '' FROM table_tags_old",
             )
@@ -139,7 +207,9 @@ pub async fn init_db<R: Runtime>(app: &AppHandle<R>) -> Result<Pool<Sqlite>, Str
         }
 
         // 4. Drop old table
-        let _ = sqlx::query("DROP TABLE table_tags_old").execute(&pool).await;
+        let _ = sqlx::query("DROP TABLE table_tags_old")
+            .execute(&pool)
+            .await;
         println!("Migration of table_tags completed.");
     }
 

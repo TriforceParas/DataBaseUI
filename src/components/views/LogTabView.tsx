@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Activity, Copy, ChevronDown, Download, ChevronLeft, ChevronRight, EyeOff, Eye } from 'lucide-react';
+import { Activity, Copy, ChevronDown, Download, ChevronLeft, ChevronRight, EyeOff, Eye, RefreshCw } from 'lucide-react';
 import styles from '../../styles/MainLayout.module.css';
 import { DataGrid } from '../datagrid/DataGrid';
 import { Tab, SystemLog, PaginationState } from '../../types/index';
@@ -13,6 +13,7 @@ interface LogTabViewProps {
     setActiveDropdown: (val: 'copy' | 'export' | 'pageSize' | null) => void;
     onCopy: (format: 'CSV' | 'JSON') => void;
     onExport: (format: 'CSV' | 'JSON') => void;
+    onRefresh?: () => void;
 }
 
 export const LogTabView: React.FC<LogTabViewProps> = ({
@@ -23,7 +24,8 @@ export const LogTabView: React.FC<LogTabViewProps> = ({
     activeDropdown,
     setActiveDropdown,
     onCopy,
-    onExport
+    onExport,
+    onRefresh
 }) => {
     const [hideSuccess, setHideSuccess] = useState(false);
     const [selectedIndices, setSelectedIndices] = useState<Set<number>>(new Set());
@@ -47,7 +49,18 @@ export const LogTabView: React.FC<LogTabViewProps> = ({
     return (
         <>
             <div className={styles.tableToolbar}>
-                <div style={{ fontWeight: 600, display: 'flex', alignItems: 'center', gap: '0.5rem' }}><Activity size={16} /></div>
+                <div style={{ fontWeight: 600, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                    <Activity size={16} />
+                    {onRefresh && (
+                        <button
+                            className={styles.iconBtn}
+                            onClick={onRefresh}
+                            title="Refresh logs"
+                        >
+                            <RefreshCw size={14} />
+                        </button>
+                    )}
+                </div>
 
                 {/* Hide Success Toggle */}
                 <button

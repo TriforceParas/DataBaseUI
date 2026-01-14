@@ -4,8 +4,9 @@ import * as api from '../api';
 import { Connection, ColumnSchema, SavedFunction } from '../types/index';
 import { MainLayout } from './layout/MainLayout';
 import { TableCreatorState } from './editors';
-import { useSystemLogs, useSavedItems, useTableOperations, useTableData, useResultsPane, useTabs, useTableActions, usePersistenceActions, useDatabaseRegistry, useChangeManager, useAppSystem, useSchemaOperations, useDataMutation } from '../hooks';
+import { useSystemLogs, useSavedItems, useTableOperations, useTableData, useResultsPane, useTabs, useTableActions, usePersistenceActions, useDatabaseRegistry, useChangeManager, useAppSystem, useSchemaOperations, useDataMutation, ChangeError } from '../hooks';
 import { useToast } from './common/Toast';
+import { ErrorSummaryModal } from './modals/ErrorSummaryModal';
 interface MainInterfaceProps {
     connection: Connection;
     onSwitchConnection: (conn: Connection) => void;
@@ -78,7 +79,9 @@ export const MainInterface: React.FC<MainInterfaceProps> = ({ connection: initia
         zoom, setZoom,
         showDbMenu, setShowDbMenu,
         isCapturing, setIsCapturing,
-        availableThemes
+        availableThemes,
+        enableChangeLog, setEnableChangeLog,
+        defaultExportPath, setDefaultExportPath
     } = useAppSystem(connection);
 
     // --- Modal State ---
@@ -190,7 +193,52 @@ export const MainInterface: React.FC<MainInterfaceProps> = ({ connection: initia
     });
 
     // --- Orchestration: Change Manager (Action Engine) ---
-    const changeManager = useChangeManager(connection, { onSuccess: fetchTables });
+    // TableCreator state persistence per tab - moved here to be available for onSuccess
+    const [tableCreatorStates, setTableCreatorStates] = useState<Record<string, TableCreatorState>>({});
+    const [originalSchemas, setOriginalSchemas] = useState<Record<string, TableCreatorState>>({});
+
+    // Use ref to access current tableCreatorStates in callback without dependency issues
+    const tableCreatorStatesRef = React.useRef(tableCreatorStates);
+    React.useEffect(() => {
+        tableCreatorStatesRef.current = tableCreatorStates;
+    }, [tableCreatorStates]);
+
+    // State for error modal
+    const [changeErrors, setChangeErrors] = useState<ChangeError[]>([]);
+    const [showErrorModal, setShowErrorModal] = useState(false);
+
+    // Ref for refresh function to avoid circular dependency
+    const refreshEditTableSchemaRef = React.useRef<((tabId: string, tableName: string) => Promise<void>) | null>(null);
+
+    // Enhanced onSuccess: Refresh edit tabs from database to clear highlights and sync state
+    const handleChangeManagerSuccess = React.useCallback(() => {
+        fetchTables();
+
+        // Refresh all edit tabs from database to get current schema state
+        // This properly removes deleted columns and syncs everything
+        const tabsRef = tabs;
+        Object.keys(tableCreatorStatesRef.current).forEach(tabId => {
+            const state = tableCreatorStatesRef.current[tabId];
+            if (state && refreshEditTableSchemaRef.current) {
+                // Check if this is an edit tab (has a table name)
+                const tab = tabsRef.find(t => t.id === tabId);
+                if (tab && tab.title.startsWith('Edit:')) {
+                    refreshEditTableSchemaRef.current(tabId, state.tableName);
+                }
+            }
+        });
+    }, [fetchTables, tabs]);
+
+    // Handle errors from change confirmation
+    const handleChangeErrors = React.useCallback((errors: ChangeError[]) => {
+        setChangeErrors(errors);
+        setShowErrorModal(true);
+    }, []);
+
+    const changeManager = useChangeManager(connection, {
+        onSuccess: handleChangeManagerSuccess,
+        onErrors: handleChangeErrors
+    });
     const {
         pendingChanges, setPendingChanges,
         showChangelog, setShowChangelog,
@@ -201,7 +249,8 @@ export const MainInterface: React.FC<MainInterfaceProps> = ({ connection: initia
         executeConfirmChanges,
         executeConfirmSelected,
         executeDiscardChanges,
-        executeDiscardSelected
+        executeDiscardSelected,
+        retryWithFKDisabled
     } = changeManager;
 
     // Wrapper to execute confirm with the required arguments
@@ -253,9 +302,6 @@ export const MainInterface: React.FC<MainInterfaceProps> = ({ connection: initia
         }
     }, [handleRevertChange, tabs, fetchTableData]);
 
-    // TableCreator state persistence per tab
-    const [tableCreatorStates, setTableCreatorStates] = useState<Record<string, TableCreatorState>>({});
-    const [originalSchemas, setOriginalSchemas] = useState<Record<string, TableCreatorState>>({});
 
     const {
         handleInsertRow,
@@ -269,7 +315,10 @@ export const MainInterface: React.FC<MainInterfaceProps> = ({ connection: initia
         setPendingChanges,
         selectedIndices,
         setSelectedIndices,
-        connection
+        connection,
+        enableChangeLog,
+        addLog,
+        fetchTableData
     });
 
     const {
@@ -278,7 +327,8 @@ export const MainInterface: React.FC<MainInterfaceProps> = ({ connection: initia
         handleSaveFunction,
         handleUpdateFunction,
         handleCopy,
-        handleExport
+        handleExport,
+        handleExportQueryToFile
     } = usePersistenceActions({
         activeTab,
         tabQueries,
@@ -290,7 +340,8 @@ export const MainInterface: React.FC<MainInterfaceProps> = ({ connection: initia
         setTabs,
         addToast,
         logs,
-        selectedIndices
+        selectedIndices,
+        defaultExportPath
     });
 
     const handleDeleteQuery = deleteQuery;
@@ -434,7 +485,7 @@ export const MainInterface: React.FC<MainInterfaceProps> = ({ connection: initia
         ));
     };
 
-    const { handleGetTableSchema, handleEditTableSchema } = useSchemaOperations({
+    const { handleGetTableSchema, handleEditTableSchema, refreshEditTableSchema } = useSchemaOperations({
         connection,
         tabs,
         setTabs,
@@ -444,6 +495,11 @@ export const MainInterface: React.FC<MainInterfaceProps> = ({ connection: initia
         setOriginalSchemas,
         addLog
     });
+
+    // Update ref with actual function (avoids circular dependency)
+    React.useEffect(() => {
+        refreshEditTableSchemaRef.current = refreshEditTableSchema;
+    }, [refreshEditTableSchema]);
 
     const closeTab = (e: React.MouseEvent, id: string) => {
         closeTabState(e, id); // Call hook's close logic
@@ -550,19 +606,7 @@ export const MainInterface: React.FC<MainInterfaceProps> = ({ connection: initia
         onSwitchConnection(conn);
     };
 
-    const handleExportQuery = () => {
-        const query = tabQueries[activeTabId] || '';
-        if (!query.trim()) return;
-        const blob = new Blob([query], { type: 'text/sql' });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = `query-${Date.now()}.sql`;
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        URL.revokeObjectURL(url);
-    };
+    const handleExportQuery = handleExportQueryToFile;
 
     const handleOpenLogs = () => {
         const logTabId = 'system-logs';
@@ -601,146 +645,163 @@ export const MainInterface: React.FC<MainInterfaceProps> = ({ connection: initia
     // MainLayout computes it.
 
     return (
-        <MainLayout
-            // System / UI
-            theme={theme}
-            setTheme={setTheme}
-            availableThemes={availableThemes}
-            sidebarOpen={sidebarOpen}
-            setSidebarOpen={setSidebarOpen}
-            zoomLevel={zoom}
-            setZoom={setZoom}
+        <>
+            <MainLayout
+                // System / UI
+                theme={theme}
+                setTheme={setTheme}
+                availableThemes={availableThemes}
+                sidebarOpen={sidebarOpen}
+                setSidebarOpen={setSidebarOpen}
+                zoomLevel={zoom}
+                setZoom={setZoom}
+                enableChangeLog={enableChangeLog}
+                setEnableChangeLog={setEnableChangeLog}
+                defaultExportPath={defaultExportPath}
+                setDefaultExportPath={setDefaultExportPath}
 
-            // Navbar State
-            showDbMenu={showDbMenu}
-            setShowDbMenu={setShowDbMenu}
-            setShowPreferences={setShowPreferences}
-            showChangelog={showChangelog}
-            setShowChangelog={setShowChangelog}
+                // Navbar State
+                showDbMenu={showDbMenu}
+                setShowDbMenu={setShowDbMenu}
+                setShowPreferences={setShowPreferences}
+                showChangelog={showChangelog}
+                setShowChangelog={setShowChangelog}
 
-            // Data
-            connection={connection}
-            tabs={tabs}
-            activeTabId={activeTabId}
-            activeTab={activeTab}
+                // Data
+                connection={connection}
+                tabs={tabs}
+                activeTabId={activeTabId}
+                activeTab={activeTab}
 
-            // Navbar Actions
-            handleAddTableTab={() => handleAddTableTab(currentDbName)}
-            handleAddQuery={handleAddQuery}
-            handleOpenLogs={handleOpenLogs}
-            handleOpenEditWindow={handleOpenInsertSidebar}
-            handleOpenSchema={handleOpenSchema}
-            onRefresh={handleRefresh}
-            onRefreshConnection={fetchTables}
+                // Navbar Actions
+                handleAddTableTab={() => handleAddTableTab(currentDbName)}
+                handleAddQuery={handleAddQuery}
+                handleOpenLogs={handleOpenLogs}
+                handleOpenEditWindow={handleOpenInsertSidebar}
+                handleOpenSchema={handleOpenSchema}
+                onRefresh={handleRefresh}
+                onRefreshConnection={fetchTables}
 
-            // Sidebar Props
-            tables={tables}
-            tags={tags}
-            tableTags={tableTags}
-            onSwitchConnection={handleSwitchConnectionWrapper}
-            onSwitchDatabase={handleSwitchDatabase}
-            onTableClick={handleTableClick}
-            onAddConnection={() => setShowNewConnModal(true)}
-            onGetTableSchema={handleGetTableSchema}
-            onEditTableSchema={handleEditTableSchema}
-            onDuplicateTable={handleDuplicateTable}
-            onTruncateTable={handleTruncateTable}
-            onDropTable={handleDropTable}
-            savedQueries={savedQueries}
-            savedFunctions={savedFunctions}
-            savedConnections={savedConnections}
-            onQueryClick={handleOpenSavedQuery}
-            onFunctionClick={handleExecuteFunction}
-            onDeleteQuery={handleDeleteQuery}
-            onDeleteFunction={handleDeleteFunction}
-            onEditFunction={handleEditFunction}
+                // Sidebar Props
+                tables={tables}
+                tags={tags}
+                tableTags={tableTags}
+                onSwitchConnection={handleSwitchConnectionWrapper}
+                onSwitchDatabase={handleSwitchDatabase}
+                onTableClick={handleTableClick}
+                onAddConnection={() => setShowNewConnModal(true)}
+                onGetTableSchema={handleGetTableSchema}
+                onEditTableSchema={handleEditTableSchema}
+                onDuplicateTable={handleDuplicateTable}
+                onTruncateTable={handleTruncateTable}
+                onDropTable={handleDropTable}
+                savedQueries={savedQueries}
+                savedFunctions={savedFunctions}
+                savedConnections={savedConnections}
+                onQueryClick={handleOpenSavedQuery}
+                onFunctionClick={handleExecuteFunction}
+                onDeleteQuery={handleDeleteQuery}
+                onDeleteFunction={handleDeleteFunction}
+                onEditFunction={handleEditFunction}
 
-            // TabBar Props
-            setActiveTabId={setActiveTabId}
-            closeTab={closeTab}
-            pinTab={pinTab}
-            handleDragEnd={handleDragEnd}
-            currentDbName={currentDbName}
+                // TabBar Props
+                setActiveTabId={setActiveTabId}
+                closeTab={closeTab}
+                pinTab={pinTab}
+                handleDragEnd={handleDragEnd}
+                currentDbName={currentDbName}
 
-            // MainViewContent Props
-            results={results}
-            selectedIndices={selectedIndices}
-            setSelectedIndices={setSelectedIndices}
-            paginationMap={paginationMap}
-            setPaginationMap={setPaginationMap}
-            pendingChanges={pendingChanges}
-            setPendingChanges={setPendingChanges}
-            highlightRowIndex={highlightRowIndex}
-            tableSchemas={tableSchemas}
-            activeDropdown={activeDropdown}
-            setActiveDropdown={setActiveDropdown}
-            logs={logs}
-            tableCreatorStates={tableCreatorStates}
-            originalSchemas={originalSchemas}
-            setTableCreatorStates={setTableCreatorStates}
-            tabQueries={tabQueries}
-            setTabQueries={setTabQueries}
-            resultsVisible={resultsVisible}
-            resultsHeight={resultsHeight}
-            isResizing={isResizing}
-            toggleResults={toggleResults}
-            startResizing={startResizing}
-            handleInsertRow={handleInsertRow}
-            handleDeleteRows={handleDeleteRows}
-            handleCopy={handleCopy}
-            handleExport={handleExport}
-            fetchTableData={fetchTableData}
-            setSortState={setSortState}
-            handleCellEdit={handleCellEdit}
-            handleRowDelete={handleRowDelete}
-            handleRunQuery={runQuery}
-            handleTableCreated={handleTableCreated}
-            handleSaveQuery={() => setSaveModal({ type: 'query' })}
-            handleSaveFunction={() => setSaveModal({ type: 'function' })}
-            handleUpdateQuery={tabs.find(t => t.id === activeTabId)?.savedQueryId ? handleUpdateQuery : undefined}
-            handleUpdateFunction={tabs.find(t => t.id === activeTabId)?.savedFunctionId ? handleUpdateFunction : undefined}
-            handleExportQuery={handleExportQuery}
-            handleSort={handleSort}
-            setIsCapturing={setIsCapturing}
-            addToast={addToast}
+                // MainViewContent Props
+                results={results}
+                selectedIndices={selectedIndices}
+                setSelectedIndices={setSelectedIndices}
+                paginationMap={paginationMap}
+                setPaginationMap={setPaginationMap}
+                pendingChanges={pendingChanges}
+                setPendingChanges={setPendingChanges}
+                highlightRowIndex={highlightRowIndex}
+                tableSchemas={tableSchemas}
+                activeDropdown={activeDropdown}
+                setActiveDropdown={setActiveDropdown}
+                logs={logs}
+                tableCreatorStates={tableCreatorStates}
+                originalSchemas={originalSchemas}
+                setTableCreatorStates={setTableCreatorStates}
+                tabQueries={tabQueries}
+                setTabQueries={setTabQueries}
+                resultsVisible={resultsVisible}
+                resultsHeight={resultsHeight}
+                isResizing={isResizing}
+                toggleResults={toggleResults}
+                startResizing={startResizing}
+                handleInsertRow={handleInsertRow}
+                handleDeleteRows={handleDeleteRows}
+                handleCopy={handleCopy}
+                handleExport={handleExport}
+                fetchTableData={fetchTableData}
+                setSortState={setSortState}
+                handleCellEdit={handleCellEdit}
+                handleRowDelete={handleRowDelete}
+                handleRunQuery={runQuery}
+                handleTableCreated={handleTableCreated}
+                handleSaveQuery={() => setSaveModal({ type: 'query' })}
+                handleSaveFunction={() => setSaveModal({ type: 'function' })}
+                handleUpdateQuery={tabs.find(t => t.id === activeTabId)?.savedQueryId ? handleUpdateQuery : undefined}
+                handleUpdateFunction={tabs.find(t => t.id === activeTabId)?.savedFunctionId ? handleUpdateFunction : undefined}
+                handleExportQuery={handleExportQuery}
+                handleSort={handleSort}
+                setIsCapturing={setIsCapturing}
+                addToast={addToast}
 
-            // Changelog Actions
-            handleConfirmChanges={handleConfirmChanges}
-            handleDiscardChanges={handleDiscardChanges}
-            handleExecuteConfirm={handleExecuteConfirm}
-            handleExecuteDiscard={handleExecuteDiscard}
-            handleConfirmSelected={handleConfirmSelected}
-            handleDiscardSelected={handleDiscardSelected}
-            handleRevertChange={handleRevertChangeWrapper}
-            handleNavigateToChange={handleNavigateToChangeWrapper}
-            changelogConfirm={changeManager.changelogConfirm}
-            setChangelogConfirm={changeManager.setChangelogConfirm}
+                // Changelog Actions
+                handleConfirmChanges={handleConfirmChanges}
+                handleDiscardChanges={handleDiscardChanges}
+                handleExecuteConfirm={handleExecuteConfirm}
+                handleExecuteDiscard={handleExecuteDiscard}
+                handleConfirmSelected={handleConfirmSelected}
+                handleDiscardSelected={handleDiscardSelected}
+                handleRevertChange={handleRevertChangeWrapper}
+                handleNavigateToChange={handleNavigateToChangeWrapper}
+                changelogConfirm={changeManager.changelogConfirm}
+                setChangelogConfirm={changeManager.setChangelogConfirm}
 
-            // Modals props
-            tableConfirmModal={tableConfirmModal}
-            setTableConfirmModal={setTableConfirmModal}
-            confirmTableOperation={confirmTableOperation}
-            duplicateTableModal={duplicateTableModal}
-            setDuplicateTableModal={setDuplicateTableModal}
-            confirmDuplicateTable={confirmDuplicateTable}
+                // Modals props
+                tableConfirmModal={tableConfirmModal}
+                setTableConfirmModal={setTableConfirmModal}
+                confirmTableOperation={confirmTableOperation}
+                duplicateTableModal={duplicateTableModal}
+                setDuplicateTableModal={setDuplicateTableModal}
+                confirmDuplicateTable={confirmDuplicateTable}
 
-            // ModalManager Props
-            saveModal={saveModal}
-            setSaveModal={setSaveModal}
-            showNewConnModal={showNewConnModal}
-            setShowNewConnModal={setShowNewConnModal}
-            showEditWindow={showEditWindow}
-            setShowEditWindow={setShowEditWindow}
-            panelColumns={panelColumns}
-            handlePanelSubmit={handlePanelSubmit}
-            saveQuery={handleSaveQuery}
-            saveFunction={handleSaveFunction}
-            showPreferences={showPreferences}
+                // ModalManager Props
+                saveModal={saveModal}
+                setSaveModal={setSaveModal}
+                showNewConnModal={showNewConnModal}
+                setShowNewConnModal={setShowNewConnModal}
+                showEditWindow={showEditWindow}
+                setShowEditWindow={setShowEditWindow}
+                panelColumns={panelColumns}
+                handlePanelSubmit={handlePanelSubmit}
+                saveQuery={handleSaveQuery}
+                saveFunction={handleSaveFunction}
+                showPreferences={showPreferences}
 
-            // Misc
-            isCapturing={isCapturing}
-            toasts={toasts}
-            onDismissToast={dismissToast}
-        />
+                // Misc
+                isCapturing={isCapturing}
+                toasts={toasts}
+                onDismissToast={dismissToast}
+            />
+
+            {/* Error Summary Modal */}
+            <ErrorSummaryModal
+                isOpen={showErrorModal}
+                onClose={() => setShowErrorModal(false)}
+                errors={changeErrors}
+                onRetryWithFKDisabled={(errors) => {
+                    setShowErrorModal(false);
+                    retryWithFKDisabled(errors, addLog);
+                }}
+            />
+        </>
     );
 };

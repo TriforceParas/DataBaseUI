@@ -170,6 +170,13 @@ export const MainViewContent: React.FC<MainViewContentProps> = ({
                 setActiveDropdown={setActiveDropdown}
                 onCopy={onCopy}
                 onExport={onExport}
+                onRefresh={() => {
+                    // Reset pagination to page 1 on refresh
+                    setPaginationMap(prev => ({
+                        ...prev,
+                        [activeTab.id]: { ...prev[activeTab.id], page: 1 }
+                    }));
+                }}
             />
         );
     }

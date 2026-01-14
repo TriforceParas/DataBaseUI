@@ -95,8 +95,42 @@ export const useSchemaOperations = ({
         }
     }, [connection, tabs, setTabs, setActiveTabId, setTableCreatorStates, setOriginalSchemas]);
 
+    // Refresh schema for an existing edit tab after changes are confirmed
+    const refreshEditTableSchema = useCallback(async (tabId: string, tableName: string) => {
+        try {
+            // Re-fetch schema from database
+            const schema = await api.getTableSchema(connection.connection_string, tableName);
+
+            // Convert ColumnSchema to ColumnDef format
+            const columns = schema.map((col: ColumnSchema) => ({
+                name: col.name,
+                type: col.type_name.toUpperCase().replace(/\(.*\)/, ''),
+                length: col.type_name.match(/\((\d+)\)/)?.[1] || '',
+                defaultValue: col.default_value || '',
+                isNullable: col.is_nullable,
+                isPrimaryKey: col.is_primary_key,
+                isAutoIncrement: col.is_auto_increment,
+                isUnique: col.is_unique
+            }));
+
+            const newState: TableCreatorState = {
+                tableName,
+                columns,
+                foreignKeys: []
+            };
+
+            // Update both current and original state with fresh data from database
+            setTableCreatorStates(prev => ({ ...prev, [tabId]: newState }));
+            setOriginalSchemas(prev => ({ ...prev, [tabId]: JSON.parse(JSON.stringify(newState)) }));
+        } catch (e) {
+            console.error('Failed to refresh table schema:', e);
+        }
+    }, [connection, setTableCreatorStates, setOriginalSchemas]);
+
     return {
         handleGetTableSchema,
-        handleEditTableSchema
+        handleEditTableSchema,
+        refreshEditTableSchema
     };
 };
+

@@ -65,6 +65,27 @@ export const TableCreator: React.FC<TableCreatorProps> = ({ connectionString, on
 
     const isFirstRender = useRef(true);
 
+    // Track original columns reference to detect when parent updates it (after schema confirmation)
+    const prevOriginalColumnsRef = useRef(originalColumns);
+
+    // Reset deletedColumns and sync state when originalColumns changes (after schema changes are confirmed)
+    useEffect(() => {
+        if (mode === 'edit' && originalColumns && prevOriginalColumnsRef.current !== originalColumns) {
+            // originalColumns changed - schema was likely confirmed
+
+            // If we have columns marked for deletion, remove them from the local state now
+            if (deletedColumns.size > 0) {
+                setColumns(prev => prev.filter(c => !deletedColumns.has(c.name)));
+            }
+
+            setDeletedColumns(new Set());
+            prevOriginalColumnsRef.current = originalColumns;
+        } else if (mode === 'edit' && originalColumns && !prevOriginalColumnsRef.current) {
+            // Initial load of originalColumns - just sync ref
+            prevOriginalColumnsRef.current = originalColumns;
+        }
+    }, [originalColumns, mode, deletedColumns]);
+
     useEffect(() => {
         // Skip first render if we have initial state (to avoid unnecessary update)
         if (isFirstRender.current) {

@@ -52,8 +52,8 @@ export const TagManager: React.FC<TagManagerProps> = ({ onSuccess, onCancel, edi
                 await invoke('create_tag', {
                     name,
                     color,
-                    connection_id: connection?.id,
-                    database_name: dbName
+                    connectionId: connection?.id,
+                    databaseName: dbName
                 });
             }
             onSuccess();

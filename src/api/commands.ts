@@ -96,11 +96,11 @@ export const deleteFunction = (id: number) =>
  * TAGS
  */
 
-export const getTags = () =>
-    invoke<Tag[]>('get_tags');
+export const getTags = (connectionId?: number, databaseName?: string) =>
+    invoke<Tag[]>('get_tags', { connectionId, databaseName });
 
-export const createTag = (name: string, color: string) =>
-    invoke<number>('create_tag', { name, color });
+export const createTag = (name: string, color: string, connectionId?: number, databaseName?: string) =>
+    invoke<number>('create_tag', { name, color, connectionId, databaseName });
 
 export const updateTag = (id: number, name: string, color: string) =>
     invoke<void>('update_tag', { id, name, color });
@@ -114,8 +114,8 @@ export const assignTag = (connectionId: number, tableName: string, tagId: number
 export const removeTagFromTable = (connectionId: number, tableName: string, tagId: number) =>
     invoke<void>('remove_tag_from_table', { connectionId, tableName, tagId });
 
-export const getTableTags = (connectionId: number) =>
-    invoke<TableTag[]>('get_table_tags', { connectionId });
+export const getTableTags = (connectionId: number, databaseName: string) =>
+    invoke<TableTag[]>('get_table_tags', { connectionId, databaseName });
 
 /**
  * WINDOW MANAGEMENT

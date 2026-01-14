@@ -33,5 +33,18 @@ export default defineConfig(async () => ({
     globals: true,
     environment: 'jsdom',
     setupFiles: './vitest.setup.ts',
+    coverage: {
+      provider: 'v8',
+      reporter: ['text', 'lcov', 'clover'], // SonarQube loves lcov
+      extension: ['.ts', '.tsx'],           // Explicitly include these
+      include: ['src/**/*'],                // Look in the src folder
+      exclude: [
+        '**/node_modules/**',
+        'src/main.tsx',
+        'src/vite-env.d.ts',
+        '**/*.test.tsx'
+      ],
+      all: true,
+    },
   },
 }));

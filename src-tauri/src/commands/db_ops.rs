@@ -261,9 +261,10 @@ fn parse_sqlite_schema_row(row: &AnyRow) -> ColumnSchema {
         // Adapting to boolean:
         // is_nullable: true if 0
         is_primary_key: row.try_get::<i32, _>(5).unwrap_or(0) == 1,
-        is_auto_increment: false, // SQLite doesn't explicitly expose AI in pragma easily without parsing sql
-        is_unique: false,         // Requires index check
+        is_auto_increment: false,
+        is_unique: false,
         default_value: row.try_get::<Option<String>, _>(4).ok().flatten(),
+        foreign_key: None, // Will be populated later for SQLite
     }
 }
 
@@ -272,16 +273,33 @@ fn parse_standard_schema_row(row: &AnyRow) -> ColumnSchema {
     let is_nullable_str: String = row.try_get(2).unwrap_or_default();
     let col_key: String = row.try_get(4).unwrap_or_default();
     let user_default: Option<String> = row.try_get(3).ok();
-    let extra: String = row.try_get(5).unwrap_or_default(); // Extra info like auto_increment
+    let extra: String = row.try_get(5).unwrap_or_default();
+
+    let ref_table: Option<String> = row.try_get(6).ok();
+    let ref_col: Option<String> = row.try_get(7).ok();
+
+    let foreign_key = if let (Some(t), Some(c)) = (ref_table, ref_col) {
+        if !t.is_empty() && !c.is_empty() {
+            Some(crate::models::ForeignKey {
+                referenced_table: t,
+                referenced_column: c,
+            })
+        } else {
+            None
+        }
+    } else {
+        None
+    };
 
     ColumnSchema {
         name: row.try_get(0).unwrap_or_default(),
         type_name: row.try_get(1).unwrap_or_default(),
         is_nullable: is_nullable_str == "YES",
-        is_primary_key: col_key == "PRI",
+        is_primary_key: col_key == "PRI" || col_key == "PRIMARY KEY",
         is_auto_increment: extra.contains("auto_increment") || extra.contains("nextval"),
-        is_unique: col_key == "UNI",
+        is_unique: col_key == "UNI" || col_key == "UNIQUE",
         default_value: user_default,
+        foreign_key,
     }
 }
 
@@ -295,13 +313,47 @@ pub async fn get_table_schema(
 
     let query = match db_type {
         "postgres" => format!(
-            "SELECT column_name, data_type, is_nullable, column_default, '' as column_key, '' as extra
-             FROM information_schema.columns WHERE table_name = '{}' ORDER BY ordinal_position",
+            "SELECT 
+                c.column_name, 
+                c.data_type, 
+                c.is_nullable, 
+                c.column_default,
+                CASE WHEN tc.constraint_type = 'PRIMARY KEY' THEN 'PRI' ELSE '' END as column_key,
+                '' as extra,
+                ccu.table_name AS referenced_table,
+                ccu.column_name AS referenced_column
+            FROM 
+                information_schema.columns c
+            LEFT JOIN 
+                information_schema.key_column_usage kcu ON c.table_name = kcu.table_name AND c.column_name = kcu.column_name AND c.table_schema = kcu.table_schema
+            LEFT JOIN 
+                information_schema.table_constraints tc ON kcu.constraint_name = tc.constraint_name AND kcu.table_schema = tc.table_schema
+            LEFT JOIN 
+                information_schema.constraint_column_usage ccu ON tc.constraint_name = ccu.constraint_name AND tc.table_schema = ccu.table_schema AND tc.constraint_type = 'FOREIGN KEY'
+            WHERE 
+                c.table_name = '{}' AND c.table_schema = 'public'
+            ORDER BY 
+                c.ordinal_position",
             table_name
         ),
         "mysql" => format!(
-            "SELECT COLUMN_NAME, DATA_TYPE, IS_NULLABLE, COLUMN_DEFAULT, COLUMN_KEY, EXTRA
-             FROM information_schema.COLUMNS WHERE TABLE_NAME = '{}' ORDER BY ORDINAL_POSITION",
+            "SELECT 
+                c.COLUMN_NAME, 
+                c.DATA_TYPE, 
+                c.IS_NULLABLE, 
+                c.COLUMN_DEFAULT, 
+                c.COLUMN_KEY, 
+                c.EXTRA,
+                k.REFERENCED_TABLE_NAME,
+                k.REFERENCED_COLUMN_NAME
+            FROM 
+                information_schema.COLUMNS c
+            LEFT JOIN 
+                information_schema.KEY_COLUMN_USAGE k ON c.TABLE_NAME = k.TABLE_NAME AND c.COLUMN_NAME = k.COLUMN_NAME AND c.TABLE_SCHEMA = k.TABLE_SCHEMA AND k.REFERENCED_TABLE_NAME IS NOT NULL
+            WHERE 
+                c.TABLE_NAME = '{}' AND c.TABLE_SCHEMA = DATABASE()
+            ORDER BY 
+                c.ORDINAL_POSITION",
             table_name
         ),
         "sqlite" => format!("PRAGMA table_info('{}')", table_name),
@@ -313,7 +365,7 @@ pub async fn get_table_schema(
         .await
         .map_err(|e| format!("Failed to fetch schema: {}", e))?;
 
-    let schema = rows
+    let mut schema: Vec<ColumnSchema> = rows
         .iter()
         .map(|row| {
             if db_type == "sqlite" {
@@ -323,6 +375,25 @@ pub async fn get_table_schema(
             }
         })
         .collect();
+
+    // Special handling for SQLite foreign keys as they require a separate PRAGMA
+    if db_type == "sqlite" {
+        let fk_query = format!("PRAGMA foreign_key_list('{}')", table_name);
+        if let Ok(fk_rows) = sqlx::query(&fk_query).fetch_all(&mut conn).await {
+            for fk_row in fk_rows {
+                let from_col: String = fk_row.try_get(3).unwrap_or_default();
+                let to_table: String = fk_row.try_get(2).unwrap_or_default();
+                let to_col: String = fk_row.try_get(4).unwrap_or_default();
+
+                if let Some(col) = schema.iter_mut().find(|c| c.name == from_col) {
+                    col.foreign_key = Some(crate::models::ForeignKey {
+                        referenced_table: to_table,
+                        referenced_column: to_col,
+                    });
+                }
+            }
+        }
+    }
 
     Ok(schema)
 }

@@ -15,6 +15,7 @@ interface UsePersistenceActionsProps {
     addToast: (title: string, message: string, filePath?: string, type?: 'info' | 'success' | 'error') => void;
     logs: SystemLog[];
     selectedIndices: Set<number>;
+    defaultExportPath: string;
 }
 
 export const usePersistenceActions = ({
@@ -28,7 +29,8 @@ export const usePersistenceActions = ({
     setTabs,
     addToast,
     logs,
-    selectedIndices
+    selectedIndices,
+    defaultExportPath
 }: UsePersistenceActionsProps) => {
 
     const handleSaveQuery = useCallback(async (name: string) => {
@@ -127,9 +129,29 @@ export const usePersistenceActions = ({
             fileName,
             text,
             (filePath) => addToast('Export Saved', 'Click to open folder', filePath, 'success'),
-            (err) => addToast('Export Failed', err, undefined, 'error')
+            (err) => addToast('Export Failed', err, undefined, 'error'),
+            defaultExportPath
         );
-    }, [activeTab, results, logs, selectedIndices, addToast]);
+    }, [activeTab, results, logs, selectedIndices, addToast, defaultExportPath]);
+
+    const handleExportQueryToFile = useCallback(async () => {
+        if (!activeTab || activeTab.type !== 'query') return; // Enforce query type? Or maybe log/function too?
+        // Logic says "export schemas or sql queries"
+        // Let's assume text buffer is in tabQueries
+        const query = tabQueries[activeTab.id] || '';
+        if (!query.trim()) return;
+
+        const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+        const fileName = `${activeTab.title || 'query'}_${timestamp}.sql`;
+
+        await saveExportFile(
+            fileName,
+            query,
+            (filePath) => addToast('Query Saved', 'Click to open folder', filePath, 'success'),
+            (err) => addToast('Export Failed', err, undefined, 'error'),
+            defaultExportPath
+        );
+    }, [activeTab, tabQueries, addToast, defaultExportPath]);
 
     return {
         handleSaveQuery,
@@ -137,6 +159,7 @@ export const usePersistenceActions = ({
         handleSaveFunction,
         handleUpdateFunction,
         handleCopy,
-        handleExport
+        handleExport,
+        handleExportQueryToFile
     };
 };

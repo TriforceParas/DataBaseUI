@@ -15,6 +15,10 @@ interface UseAppSystemReturn {
     setIsCapturing: React.Dispatch<React.SetStateAction<boolean>>;
     handleZoom: (delta: number) => void;
     availableThemes: { id: string, name: string, type: string, colors: { bg: string, text: string, accent: string } }[];
+    enableChangeLog: boolean;
+    setEnableChangeLog: React.Dispatch<React.SetStateAction<boolean>>;
+    defaultExportPath: string;
+    setDefaultExportPath: React.Dispatch<React.SetStateAction<string>>;
 }
 
 export const useAppSystem = (connection: Connection): UseAppSystemReturn => {
@@ -27,6 +31,13 @@ export const useAppSystem = (connection: Connection): UseAppSystemReturn => {
     const [zoom, setZoom] = useState(() => {
         const saved = localStorage.getItem('app-zoom');
         return saved ? parseFloat(saved) : 1;
+    });
+    const [enableChangeLog, setEnableChangeLog] = useState(() => {
+        const saved = localStorage.getItem('app-enable-changelog');
+        return saved === null ? true : saved === 'true';
+    });
+    const [defaultExportPath, setDefaultExportPath] = useState(() => {
+        return localStorage.getItem('app-default-export-path') || '';
     });
 
     // Window Management
@@ -49,6 +60,15 @@ export const useAppSystem = (connection: Connection): UseAppSystemReturn => {
     useEffect(() => {
         localStorage.setItem('app-zoom', zoom.toString());
     }, [zoom]);
+
+    // Save preferences
+    useEffect(() => {
+        localStorage.setItem('app-enable-changelog', String(enableChangeLog));
+    }, [enableChangeLog]);
+
+    useEffect(() => {
+        localStorage.setItem('app-default-export-path', defaultExportPath);
+    }, [defaultExportPath]);
 
     // Close dropdowns on outside click
     useEffect(() => {
@@ -110,6 +130,10 @@ export const useAppSystem = (connection: Connection): UseAppSystemReturn => {
                 text: t.colors['text-primary'],
                 accent: t.colors['accent-primary']
             }
-        }))
+        })),
+        enableChangeLog,
+        setEnableChangeLog,
+        defaultExportPath,
+        setDefaultExportPath
     };
 };

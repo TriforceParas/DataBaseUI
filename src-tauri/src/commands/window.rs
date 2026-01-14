@@ -5,13 +5,13 @@ pub async fn open_connection_window<R: tauri::Runtime>(
     app: tauri::AppHandle<R>,
     connection_id: i64,
 ) -> Result<(), String> {
-    let label = format!("connection-{}", connection_id);
+    // Use timestamp to generate unique window labels, allowing multiple windows per connection
+    let timestamp = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_millis())
+        .unwrap_or(0);
+    let label = format!("connection-{}-{}", connection_id, timestamp);
     let url = format!("index.html?connection_id={}", connection_id);
-
-    if let Some(win) = app.get_webview_window(&label) {
-        let _ = win.set_focus();
-        return Ok(());
-    }
 
     WebviewWindowBuilder::new(&app, &label, WebviewUrl::App(url.into()))
         .title("Connection")
@@ -23,6 +23,7 @@ pub async fn open_connection_window<R: tauri::Runtime>(
 
     Ok(())
 }
+
 
 #[tauri::command]
 pub async fn open_loading_window<R: tauri::Runtime>(

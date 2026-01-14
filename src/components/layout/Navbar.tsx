@@ -26,6 +26,7 @@ interface NavbarProps {
     onSwitchConnection: (conn: Connection) => void;
     searchQuery: string;
     onSearchChange: (query: string) => void;
+    enableChangeLog: boolean;
 }
 
 export const Navbar: React.FC<NavbarProps> = ({
@@ -48,7 +49,8 @@ export const Navbar: React.FC<NavbarProps> = ({
     savedConnections,
     onSwitchConnection,
     searchQuery,
-    onSearchChange
+    onSearchChange,
+    enableChangeLog
 }) => {
     const [showConnectionMenu, setShowConnectionMenu] = useState(false);
     const [isSearchActive, setIsSearchActive] = useState(false);
@@ -359,41 +361,43 @@ export const Navbar: React.FC<NavbarProps> = ({
 
             {/* RIGHT SECTION - Changes, Logs, Schema, Edit, Window Controls */}
             <div style={{ display: 'flex', alignItems: 'center', height: '100%', flexShrink: 0 }}>
-                <button
-                    className={`${styles.iconBtn} ${totalChanges > 0 ? styles.changesBtnPending : ''}`}
-                    onClick={() => {
-                        if (showChangelog) {
-                            // Just close changelog
-                            setShowChangelog(false);
-                        } else {
-                            // Close edit pane first, then open changelog
-                            if (showEditWindow) {
-                                handleOpenEditWindow();
+                {enableChangeLog && (
+                    <button
+                        className={`${styles.iconBtn} ${totalChanges > 0 ? styles.changesBtnPending : ''}`}
+                        onClick={() => {
+                            if (showChangelog) {
+                                // Just close changelog
+                                setShowChangelog(false);
+                            } else {
+                                // Close edit pane first, then open changelog
+                                if (showEditWindow) {
+                                    handleOpenEditWindow();
+                                }
+                                setShowChangelog(true);
                             }
-                            setShowChangelog(true);
-                        }
-                    }}
-                    title="Pending Changes"
-                    style={{
-                        width: 'auto',
-                        padding: '0.25rem 0.6rem',
-                        gap: '0.5rem',
-                        borderRadius: '6px',
-                        backgroundColor: showChangelog ? 'var(--bg-tertiary)' : 'transparent',
-                        border: '1px solid var(--border-color)',
-                        flexShrink: 0,
-                        marginRight: '0.5rem',
-                        height: '28px'
-                    }}
-                >
-                    <span style={{ fontSize: '0.85rem', fontWeight: 500 }}>Changes</span>
-                    {totalChanges > 0 && <span style={{ fontSize: '0.85rem', opacity: 0.8 }}>{totalChanges}</span>}
-                    <div style={{
-                        width: 6, height: 6, borderRadius: '50%',
-                        backgroundColor: totalChanges > 0 ? '#f59e0b' : '#10b981',
-                        opacity: 1
-                    }} />
-                </button>
+                        }}
+                        title="Pending Changes"
+                        style={{
+                            width: 'auto',
+                            padding: '0.25rem 0.6rem',
+                            gap: '0.5rem',
+                            borderRadius: '6px',
+                            backgroundColor: showChangelog ? 'var(--bg-tertiary)' : 'transparent',
+                            border: '1px solid var(--border-color)',
+                            flexShrink: 0,
+                            marginRight: '0.5rem',
+                            height: '28px'
+                        }}
+                    >
+                        <span style={{ fontSize: '0.85rem', fontWeight: 500 }}>Changes</span>
+                        {totalChanges > 0 && <span style={{ fontSize: '0.85rem', opacity: 0.8 }}>{totalChanges}</span>}
+                        <div style={{
+                            width: 6, height: 6, borderRadius: '50%',
+                            backgroundColor: totalChanges > 0 ? '#f59e0b' : '#10b981',
+                            opacity: 1
+                        }} />
+                    </button>
+                )}
                 <div className={styles.verticalDivider} style={{ marginRight: 0 }}></div>
                 <div style={{ display: 'flex', alignItems: 'center', height: '100%', flexShrink: 0, gap: '0.5rem', padding: '0 0.25rem' }}>
                     <button className={styles.iconBtn} onClick={handleOpenLogs} title="Logs">

@@ -16,12 +16,17 @@ interface MainLayoutProps {
     setSidebarOpen: (open: boolean) => void;
     zoomLevel: number;
     setZoom: React.Dispatch<React.SetStateAction<number>>;
+    enableChangeLog: boolean;
+    setEnableChangeLog: React.Dispatch<React.SetStateAction<boolean>>;
+    defaultExportPath: string;
+    setDefaultExportPath: React.Dispatch<React.SetStateAction<string>>;
 
     // Navbar State
     showDbMenu: boolean;
     setShowDbMenu: (show: boolean) => void;
     setShowPreferences: (show: boolean) => void;
     showChangelog: boolean;
+
     setShowChangelog: React.Dispatch<React.SetStateAction<boolean>>;
 
     // Data
@@ -219,7 +224,11 @@ export const MainLayout: React.FC<MainLayoutProps> = (props) => {
                         setTheme: props.setTheme,
                         zoom: props.zoomLevel,
                         setZoom: props.setZoom,
-                        availableThemes: props.availableThemes
+                        availableThemes: props.availableThemes,
+                        enableChangeLog: props.enableChangeLog,
+                        setEnableChangeLog: props.setEnableChangeLog,
+                        defaultExportPath: props.defaultExportPath,
+                        setDefaultExportPath: props.setDefaultExportPath
                     }}
                     newConnection={{
                         isOpen: props.showNewConnModal,
@@ -280,6 +289,7 @@ export const MainLayout: React.FC<MainLayoutProps> = (props) => {
                         onSwitchConnection={props.onSwitchConnection}
                         searchQuery={searchQuery}
                         onSearchChange={setSearchQuery}
+                        enableChangeLog={props.enableChangeLog}
                     />
                 )}
 

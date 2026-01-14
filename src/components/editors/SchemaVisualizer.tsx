@@ -30,7 +30,7 @@ const getLayoutedElements = (nodes: Node[], edges: Edge[], direction = 'LR') => 
     dagreGraph.setGraph({
         rankdir: direction,
         nodesep: 80,
-        ranksep: 120,
+        ranksep: 150,
         marginx: 50,
         marginy: 50
     });
@@ -75,8 +75,7 @@ const categorizeColumns = (columns: ColumnSchema[], expanded: boolean) => {
 
     columns.forEach(col => {
         const isPK = col.is_primary_key;
-        // Heuristic for FKs since backend doesn't support it yet
-        const isFK = (col.name.endsWith('_id') && col.name !== 'id');
+        const isFK = !!col.foreign_key;
 
         if (isPK) pks.push(col);
         else if (isFK) fks.push(col);
@@ -102,8 +101,7 @@ const TableHandles = ({ columns }: { columns: ColumnSchema[] }) => {
         <>
             {columns.map((col, idx) => {
                 const isPK = col.is_primary_key;
-                // Heuristic for FKs
-                const isFK = (col.name.endsWith('_id') && col.name !== 'id');
+                const isFK = !!col.foreign_key;
                 const topOffset = 44 + (idx * 28) + (28 / 2);
 
                 return (
@@ -114,7 +112,7 @@ const TableHandles = ({ columns }: { columns: ColumnSchema[] }) => {
                             id={`${col.name}-target`}
                             style={{
                                 top: topOffset,
-                                left: -5,
+                                left: -1,
                                 background: isPK ? '#eab308' : '#64748b',
                                 width: 8,
                                 height: 8,
@@ -122,14 +120,14 @@ const TableHandles = ({ columns }: { columns: ColumnSchema[] }) => {
                                 opacity: isPK ? 1 : 0.3
                             }}
                         />
-                        {isFK && col.name !== 'id' && (
+                        {isFK && (
                             <Handle
                                 type="source"
                                 position={Position.Right}
                                 id={`${col.name}-source`}
                                 style={{
                                     top: topOffset,
-                                    right: -5,
+                                    right: -1,
                                     background: '#3b82f6',
                                     width: 8,
                                     height: 8,
@@ -146,8 +144,7 @@ const TableHandles = ({ columns }: { columns: ColumnSchema[] }) => {
 
 const ColumnRow = ({ col, isLast }: { col: ColumnSchema, isLast: boolean }) => {
     const isPK = col.is_primary_key;
-    // Heuristic for FKs
-    const isFK = (col.name.endsWith('_id') && col.name !== 'id');
+    const isFK = !!col.foreign_key;
 
     return (
         <div
@@ -294,43 +291,24 @@ const calculateNodesAndEdges = (tables: string[], tableSchemas: Record<string, C
     tables.forEach(tableName => {
         const schema = tableSchemas[tableName] || [];
         schema.forEach(col => {
-            // Heuristic: column ending with _id might be a FK
-            if (col.name.endsWith('_id') && col.name !== 'id') {
-                const referencedTable = col.name.replace('_id', '');
-                const matchedTable = tables.find(t =>
-                    t.toLowerCase() === referencedTable.toLowerCase() ||
-                    t.toLowerCase() === referencedTable.toLowerCase() + 's' ||
-                    t.toLowerCase() + 's' === referencedTable.toLowerCase()
-                );
+            if (col.foreign_key) {
+                const { referenced_table, referenced_column } = col.foreign_key;
 
-                // Prevent self-reference if this is just the PK naming convention
-                if (matchedTable === tableName && col.is_primary_key) {
-                    return;
-                }
+                // Find the actual table name (handling case sensitivity if needed)
+                const matchedTable = tables.find(t => t.toLowerCase() === referenced_table.toLowerCase());
 
                 if (matchedTable) {
-                    const targetSchema = tableSchemas[matchedTable] || [];
-                    const singularName = matchedTable.toLowerCase().endsWith('s') ? matchedTable.slice(0, -1) : matchedTable;
-
-                    const pkColumn =
-                        targetSchema.find(c => c.is_primary_key) ||
-                        targetSchema.find(c => c.name.toLowerCase() === 'id') ||
-                        targetSchema.find(c => c.name.toLowerCase() === `${matchedTable}_id`.toLowerCase()) ||
-                        targetSchema.find(c => c.name.toLowerCase() === `${singularName}_id`.toLowerCase());
-
-                    if (pkColumn) {
-                        rawEdges.push({
-                            id: `${tableName}-${col.name}-${matchedTable}`,
-                            source: tableName,
-                            sourceHandle: `${col.name}-source`,
-                            target: matchedTable,
-                            targetHandle: `${pkColumn.name}-target`,
-                            type: 'smoothstep',
-                            animated: true,
-                            style: { stroke: '#3b82f6', strokeWidth: 2 },
-                            markerEnd: { type: MarkerType.ArrowClosed, color: '#3b82f6' },
-                        });
-                    }
+                    rawEdges.push({
+                        id: `${tableName}-${col.name}-${matchedTable}-${referenced_column}`,
+                        source: tableName,
+                        sourceHandle: `${col.name}-source`,
+                        target: matchedTable,
+                        targetHandle: `${referenced_column}-target`,
+                        type: 'default',
+                        animated: true,
+                        style: { stroke: '#3b82f6', strokeWidth: 2 },
+                        markerEnd: { type: MarkerType.ArrowClosed, color: '#3b82f6' },
+                    } as Edge);
                 }
             }
         });

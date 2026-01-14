@@ -14,6 +14,7 @@ dist-ssr
 
 # Editor directories and files
 .vscode/*
+.scannerwork/
 !.vscode/extensions.json
 .idea
 .DS_Store
@@ -45,3 +46,4 @@ Desktop.ini
 *.sqlite3
 
 *.txt
+coverage/

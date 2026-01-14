@@ -43,12 +43,25 @@ export const useDatabaseRegistry = (connection: Connection): UseDatabaseRegistry
 
     const loadTags = useCallback(async () => {
         try {
-            const t = await api.getTags();
+            // Extract DB name from connection string if possible, or use empty string/default
+            let dbName = '';
+            try {
+                const url = new URL(connection.connection_string);
+                if (url.protocol.includes('sqlite')) dbName = connection.connection_string;
+                else dbName = url.pathname.replace('/', '');
+            } catch {
+                const parts = connection.connection_string.split('/');
+                dbName = parts.length > 0 ? parts[parts.length - 1] : '';
+            }
+
+            const t = await api.getTags(connection.id, dbName);
             setTags(t);
-            const tt = await api.getTableTags(connection.id);
+
+
+            const tt = await api.getTableTags(connection.id, dbName);
             setTableTags(tt);
         } catch (e) { console.error(e); }
-    }, [connection.id]);
+    }, [connection.id, connection.connection_string]);
 
     // Auto-load on connection change
     useEffect(() => {

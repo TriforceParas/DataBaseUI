@@ -14,6 +14,8 @@ pub struct Tag {
     pub id: i64,
     pub name: String,
     pub color: String,
+    pub connection_id: Option<i64>,
+    pub database_name: Option<String>,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, FromRow)]
@@ -22,6 +24,12 @@ pub struct TableTag {
     pub connection_id: i64,
     pub database_name: String,
     pub tag_id: i64,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug)]
+pub struct ForeignKey {
+    pub referenced_table: String,
+    pub referenced_column: String,
 }
 
 #[derive(Serialize, Clone, Debug)]
@@ -39,6 +47,7 @@ pub struct ColumnSchema {
     pub is_auto_increment: bool,
     pub is_unique: bool,
     pub default_value: Option<String>,
+    pub foreign_key: Option<ForeignKey>,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, FromRow)]

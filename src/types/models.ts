@@ -32,6 +32,11 @@ export interface SavedFunction {
     connection_id: number;
 }
 
+export interface ForeignKey {
+    referenced_table: string;
+    referenced_column: string;
+}
+
 export interface ColumnSchema {
     name: string;
     type_name: string;
@@ -40,4 +45,5 @@ export interface ColumnSchema {
     is_auto_increment: boolean;
     is_unique: boolean;
     default_value: string | null;
+    foreign_key?: ForeignKey;
 }

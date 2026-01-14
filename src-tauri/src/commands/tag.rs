@@ -7,13 +7,19 @@ pub async fn create_tag(
     state: State<'_, AppState>,
     name: String,
     color: String,
+    connection_id: Option<i64>,
+    database_name: Option<String>,
 ) -> Result<i64, String> {
-    let result = sqlx::query("INSERT INTO tags (name, color) VALUES (?, ?)")
-        .bind(name)
-        .bind(color)
-        .execute(&state.db)
-        .await
-        .map_err(|e| format!("Failed to create tag: {}", e))?;
+    let result = sqlx::query(
+        "INSERT INTO tags (name, color, connection_id, database_name) VALUES (?, ?, ?, ?)",
+    )
+    .bind(name)
+    .bind(color)
+    .bind(connection_id)
+    .bind(database_name)
+    .execute(&state.db)
+    .await
+    .map_err(|e| format!("Failed to create tag: {}", e))?;
     Ok(result.last_insert_rowid())
 }
 
@@ -58,16 +64,14 @@ pub async fn get_tags(
     connection_id: Option<i64>,
     database_name: Option<String>,
 ) -> Result<Vec<Tag>, String> {
-    // Show only tags that match both connection_id AND database_name
+    // Show only tags that exactly match the connection_id AND database_name
+    // No fallback to NULL - tags are strictly per-database per-connection
     let query_str = "SELECT id, name, color, connection_id, database_name FROM tags 
-        WHERE (connection_id = ? OR (connection_id IS NULL AND ? IS NULL))
-        AND (database_name = ? OR (database_name IS NULL AND ? IS NULL))
+        WHERE connection_id = ? AND database_name = ?
         ORDER BY name ASC";
 
     sqlx::query_as::<_, Tag>(query_str)
         .bind(connection_id)
-        .bind(connection_id)
-        .bind(&database_name)
         .bind(&database_name)
         .fetch_all(&state.db)
         .await

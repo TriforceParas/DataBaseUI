@@ -14,6 +14,10 @@ interface ModalManagerProps {
         zoom: number;
         setZoom: React.Dispatch<React.SetStateAction<number>>;
         availableThemes: { id: string, name: string, type: string, colors: { bg: string, text: string, accent: string } }[];
+        enableChangeLog: boolean;
+        setEnableChangeLog: (val: boolean) => void;
+        defaultExportPath: string;
+        setDefaultExportPath: (val: string) => void;
     };
     newConnection: {
         isOpen: boolean;
@@ -64,6 +68,10 @@ export const ModalManager: React.FC<ModalManagerProps> = ({
                 zoom={preferences.zoom}
                 setZoom={preferences.setZoom}
                 availableThemes={preferences.availableThemes}
+                enableChangeLog={preferences.enableChangeLog}
+                setEnableChangeLog={preferences.setEnableChangeLog}
+                defaultExportPath={preferences.defaultExportPath}
+                setDefaultExportPath={preferences.setDefaultExportPath}
             />
 
             <NewConnectionModal

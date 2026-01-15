@@ -205,7 +205,7 @@ pub async fn get_columns(
     let mut conn = connect_to_db(&connection_string).await?;
 
     let (query, col_idx) = match db_type {
-        "postgres" => (format!("SELECT column_name FROM information_schema.columns WHERE table_name = '{}' AND table_schema = 'public'", table_name.replace('\'', "''")), 0),
+        "postgres" => (format!("SELECT column_name::TEXT FROM information_schema.columns WHERE table_name = '{}' AND table_schema = 'public'", table_name.replace('\'', "''")), 0),
         "mysql" => (format!("SHOW COLUMNS FROM {}", escape_identifier(&table_name, db_type)), 0),
         "sqlite" => (format!("PRAGMA table_info({})", escape_identifier(&table_name, db_type)), 1),
         _ => return Ok(vec![]),
@@ -231,7 +231,7 @@ pub async fn get_tables(connection_string: String) -> Result<Vec<String>, String
 
     let query = match db_type {
         "postgres" => {
-            "SELECT table_name FROM information_schema.tables WHERE table_schema = 'public'"
+            "SELECT table_name::TEXT FROM information_schema.tables WHERE table_schema = 'public'"
         }
         "mysql" => "SHOW TABLES",
         "sqlite" => "SELECT name FROM sqlite_master WHERE type='table'",
@@ -480,7 +480,7 @@ pub async fn get_databases(connection_string: String) -> Result<Vec<String>, Str
     let mut conn = connect_to_db(&connection_string).await?;
 
     let query = match db_type {
-        "postgres" => "SELECT datname FROM pg_database WHERE datistemplate = false AND datallowconn = true",
+        "postgres" => "SELECT datname::TEXT FROM pg_database WHERE datistemplate = false AND datallowconn = true",
         "mysql" => "SHOW DATABASES",
         "sqlite" => "SELECT file FROM pragma_database_list WHERE name='main'", 
         _ => return Ok(vec![]), 

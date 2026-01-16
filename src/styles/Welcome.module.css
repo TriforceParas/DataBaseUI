@@ -12,7 +12,8 @@
 }
 
 .leftPanel {
-    flex: 1;
+    width: 255px;
+    flex-shrink: 0;
     display: flex;
     flex-direction: column;
     justify-content: center;
@@ -41,10 +42,12 @@
 
 .rightPanel {
     flex: 1;
+    min-width: 0;
+    /* Ensures content doesn't overflow container */
     display: flex;
     flex-direction: column;
-    padding: 2rem;
-    /* Consistent padding */
+    padding: 2rem 0 2rem 3rem;
+    /* Increased left padding to 3rem for symmetry with right side */
     background-color: var(--bg-primary);
     position: relative;
 }
@@ -56,7 +59,8 @@
     align-items: center;
     margin-bottom: 2rem;
     margin-top: 2rem;
-    /* Space for window controls */
+    padding-right: 3rem;
+    /* Substantial space for window controls/scrollbar */
 }
 
 .sectionTitle {
@@ -90,6 +94,28 @@
     gap: 1rem;
     flex: 1;
     overflow-y: auto;
+    padding-right: 3rem;
+    /* Clean gap between cards and scrollbar */
+}
+
+/* Custom Scrollbar for Welcome Screen */
+.connectionList::-webkit-scrollbar {
+    width: 8px;
+}
+
+.connectionList::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.connectionList::-webkit-scrollbar-thumb {
+    background: var(--bg-tertiary);
+    border-radius: 10px;
+    border: 2px solid var(--bg-primary);
+    /* Creates a floating effect */
+}
+
+.connectionList::-webkit-scrollbar-thumb:hover {
+    background: var(--text-tertiary);
 }
 
 /* Updated Card Style using Vars */
@@ -125,6 +151,8 @@
 
 .cardDetails {
     flex: 1;
+    min-width: 0;
+    /* Required for ellipsis to work in flex children */
     display: flex;
     flex-direction: column;
     gap: 4px;
@@ -152,9 +180,19 @@
     justify-content: space-between;
     align-items: center;
     margin-top: auto;
-    padding-top: 1rem;
+    padding-top: 1.5rem;
+    padding-bottom: 0;
+    /* Remove redundant padding, use container padding */
+    padding-right: 3rem;
     color: var(--text-secondary);
     font-size: 0.85rem;
+}
+
+.version {
+    display: flex;
+    align-items: center;
+    height: 16px;
+    /* Match icon height for perfect vertical alignment */
 }
 
 .footerRight {
@@ -169,11 +207,11 @@
     gap: 0.5rem;
     cursor: pointer;
     color: var(--accent-secondary);
-    /* Or keep yellow/gold if distinct */
+    transition: color 0.08s ease-out;
 }
 
 .testConnection:hover {
-    text-decoration: underline;
+    color: var(--accent-primary);
 }
 
 /* Form Styles */
@@ -282,4 +320,54 @@
     padding: 0.5rem 1rem;
     border-radius: 6px;
     cursor: pointer;
+}
+
+.updateSpinner {
+    display: inline-block;
+    width: 14px;
+    height: 14px;
+    border: 2px solid var(--text-secondary);
+    border-top-color: var(--accent-primary);
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+    margin-left: 10px;
+    vertical-align: middle;
+}
+
+@keyframes spin {
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+.updateBtn {
+    margin-left: 12px;
+    background-color: var(--accent-primary);
+    color: white;
+    border: none;
+    padding: 3px 10px;
+    border-radius: 4px;
+    font-size: 0.75rem;
+    cursor: pointer;
+    font-weight: 500;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    animation: fadeIn 0.3s ease-out;
+}
+
+.updateBtn:hover {
+    filter: brightness(1.1);
+}
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(2px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
 }

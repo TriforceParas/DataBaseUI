@@ -1,3 +1,10 @@
+/**
+ * App Navigation Hook
+ * 
+ * Handles navigation between tables, tabs, and connections.
+ * Manages preview/pin tab logic and unsaved changes warnings.
+ */
+
 import { useCallback } from 'react';
 import { Connection, Tab, PendingChange, QueryResult } from '../types/index';
 
@@ -31,33 +38,27 @@ export const useAppNavigation = ({
     onSwitchConnection
 }: UseAppNavigationProps): UseAppNavigationReturn => {
 
-    // Single click opens table in preview mode
     const handleTableClick = useCallback((tableName: string) => {
-        // Check if already exists as a pinned tab
         const existingPinned = tabs.find(t => t.title === tableName && t.type === 'table' && !t.isPreview);
         if (existingPinned) {
             setActiveTabId(existingPinned.id);
             return;
         }
 
-        // Check if this table is already the preview tab
         const existingPreview = tabs.find(t => t.title === tableName && t.type === 'table' && t.isPreview);
         if (existingPreview) {
             setActiveTabId(existingPreview.id);
             return;
         }
 
-        // Find any existing preview tab (to replace it)
         const previewTab = tabs.find(t => t.isPreview);
 
         if (previewTab) {
-            // Replace the preview tab with the new table
             setTabs(tabs.map(t =>
                 t.id === previewTab.id
                     ? { ...t, id: `table-${tableName}`, title: tableName, isPreview: true }
                     : t
             ));
-            // Clear results for old preview tab
             const newResults = { ...results };
             delete newResults[previewTab.id];
             setResults(newResults);
@@ -70,14 +71,12 @@ export const useAppNavigation = ({
         }
     }, [tabs, setTabs, setActiveTabId, results, setResults]);
 
-    // Pin tab (remove preview mode) - called on double-click
     const pinTab = useCallback((tabId: string) => {
         setTabs(tabs.map(t =>
             t.id === tabId ? { ...t, isPreview: false } : t
         ));
     }, [tabs, setTabs]);
 
-    // Open logs tab
     const handleOpenLogs = useCallback(() => {
         const existingLogTab = tabs.find(t => t.type === 'logs');
         if (existingLogTab) {
@@ -89,7 +88,6 @@ export const useAppNavigation = ({
         }
     }, [tabs, setTabs, setActiveTabId]);
 
-    // Wrapper for switching connections with unsaved changes check
     const handleSwitchConnectionWrapper = useCallback((conn: Connection) => {
         const hasChanges = Object.values(pendingChanges).some(list => list.length > 0);
         if (hasChanges) {
@@ -100,7 +98,6 @@ export const useAppNavigation = ({
         onSwitchConnection(conn);
     }, [pendingChanges, onSwitchConnection]);
 
-    // Navigate to a change in the changelog
     const handleNavigateToChangeWrapper = useCallback((tabId: string, rowIndex: number) => {
         const existingTab = tabs.find(t => t.id === tabId);
         if (existingTab) {

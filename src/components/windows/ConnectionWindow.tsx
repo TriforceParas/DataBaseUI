@@ -3,13 +3,14 @@ import { invoke } from '@tauri-apps/api/core';
 import { getCurrentWindow } from '@tauri-apps/api/window';
 import { Connection, Credential, DbType } from '../../types';
 import styles from '../../styles/Welcome.module.css';
-import { RiCheckLine } from 'react-icons/ri';
+import { RiCheckLine, RiFolderOpenLine } from 'react-icons/ri';
 import { CiFloppyDisk } from 'react-icons/ci';
 import { IoFlaskOutline } from 'react-icons/io5';
 import { openErrorWindow, openVaultWindow } from '../../utils/windowManager';
 import { DiMysql } from 'react-icons/di';
 import { BiLogoPostgresql } from 'react-icons/bi';
 import { SiSqlite } from 'react-icons/si';
+import mainLayoutStyles from '../../styles/MainLayout.module.css';
 
 export const ConnectionWindow: React.FC = () => {
     // Parse connection ID from URL
@@ -70,8 +71,6 @@ export const ConnectionWindow: React.FC = () => {
 
     const loadConnection = async (id: number) => {
         try {
-            // Need a command to get connection by ID or list and find
-            // Using list_connections for simplicity for now
             const conns = await invoke<Connection[]>('list_connections');
             const target = conns.find(c => c.id === id);
             if (target) {
@@ -100,8 +99,6 @@ export const ConnectionWindow: React.FC = () => {
         if (credentialId) {
             const cred = credentials.find(c => c.id === credentialId);
             if (cred) {
-                // Note: For testing, this is unsafe if cred is logged
-                // Backend should ideally handle 'verify_with_creds'
                 url += `${cred.username}@`;
             }
         }
@@ -277,13 +274,35 @@ export const ConnectionWindow: React.FC = () => {
                 ) : (
                     <div style={{ marginBottom: '1rem' }}>
                         <label style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginBottom: '0.25rem', display: 'block' }}>Database File Path</label>
-                        <input
-                            type="text"
-                            value={host}
-                            onChange={e => { setHost(e.target.value); resetStatus(); }}
-                            placeholder="/path/to/database.db"
-                            style={{ width: '100%', padding: '0.75rem', border: '1px solid var(--border-color)', borderRadius: '6px', background: 'var(--bg-tertiary)', color: 'var(--text-primary)' }}
-                        />
+                        <div style={{ display: 'flex', gap: '0.5rem' }}>
+                            <input
+                                type="text"
+                                value={host}
+                                onChange={e => { setHost(e.target.value); resetStatus(); }}
+                                placeholder="/path/to/database.db"
+                                style={{ flex: 1, padding: '0.75rem', border: '1px solid var(--border-color)', borderRadius: '6px', background: 'var(--bg-tertiary)', color: 'var(--text-primary)' }}
+                            />
+                            <button
+                                className={mainLayoutStyles.browseBtn}
+                                onClick={async () => {
+                                    const { open } = await import('@tauri-apps/plugin-dialog');
+                                    const selected = await open({
+                                        multiple: false,
+                                        filters: [{
+                                            name: 'SQLite Database',
+                                            extensions: ['db', 'sqlite', 'sqlite3']
+                                        }]
+                                    });
+                                    if (selected) {
+                                        setHost(selected as string);
+                                        resetStatus();
+                                    }
+                                }}
+                            >
+                                <RiFolderOpenLine size={18} />
+                                Browse
+                            </button>
+                        </div>
                     </div>
                 )}
 

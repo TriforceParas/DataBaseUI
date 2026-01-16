@@ -1,3 +1,9 @@
+/**
+ * Database Model Types
+ * 
+ * Core domain models for connections, credentials, tags, and schema.
+ */
+
 export type DbType = 'mysql' | 'postgres' | 'sqlite';
 
 export interface Connection {

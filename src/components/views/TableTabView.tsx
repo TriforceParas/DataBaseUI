@@ -1,8 +1,9 @@
-import React from 'react';
+import React, { useState, useRef } from 'react';
 import { Icons } from '../../assets/icons';
 import styles from '../../styles/MainLayout.module.css';
 import { DataGrid } from '../datagrid/DataGrid';
 import { Tab, TableDataState, PendingChange, PaginationState, ColumnSchema } from '../../types/index';
+import { FilterModal, FilterCondition } from '../modals/FilterModal';
 
 interface TableTabViewProps {
     activeTab: Tab;
@@ -15,6 +16,10 @@ interface TableTabViewProps {
     tableSchemas: Record<string, ColumnSchema[]>;
     activeDropdown: 'copy' | 'export' | 'pageSize' | null;
     setActiveDropdown: (val: 'copy' | 'export' | 'pageSize' | null) => void;
+
+    // Filter State
+    filters: FilterCondition[];
+    onFiltersChange: (filters: FilterCondition[]) => void;
 
     // Actions
     onInsertRow: () => void;
@@ -41,6 +46,8 @@ export const TableTabView: React.FC<TableTabViewProps> = ({
     tableSchemas,
     activeDropdown,
     setActiveDropdown,
+    filters,
+    onFiltersChange,
     onInsertRow,
     onRefresh,
     onDeleteRows,
@@ -55,6 +62,14 @@ export const TableTabView: React.FC<TableTabViewProps> = ({
 }) => {
     const pag = paginationMap[activeTab.id] || { page: 1, pageSize: 20, total: 0 };
     const totalPages = Math.ceil(pag.total / pag.pageSize) || 1;
+    const [showFilterModal, setShowFilterModal] = useState(false);
+    const filterButtonRef = useRef<HTMLButtonElement>(null);
+
+    // Get columns for filter modal
+    const columns = results[activeTab.id]?.data?.columns ||
+        tableSchemas[activeTab.title]?.map(c => c.name) || [];
+
+    const activeFilterCount = filters.filter(f => f.enabled && f.column).length;
 
     return (
         <>
@@ -67,7 +82,37 @@ export const TableTabView: React.FC<TableTabViewProps> = ({
                     <Icons.RefreshCw size={14} />
                 </button>
                 <div className={styles.verticalDivider} style={{ height: 16 }}></div>
-                <button className={styles.toolbarBtn} title="Filter"><Icons.Filter size={14} /></button>
+                <button
+                    ref={filterButtonRef}
+                    className={styles.toolbarBtn}
+                    title="Filter"
+                    onClick={() => setShowFilterModal(!showFilterModal)}
+                    style={{
+                        position: 'relative',
+                        backgroundColor: activeFilterCount > 0 || showFilterModal ? 'var(--bg-tertiary)' : 'transparent'
+                    }}
+                >
+                    <Icons.Filter size={14} />
+                    {activeFilterCount > 0 && (
+                        <span style={{
+                            position: 'absolute',
+                            top: '-4px',
+                            right: '-4px',
+                            backgroundColor: 'var(--accent-primary)',
+                            color: '#fff',
+                            fontSize: '0.65rem',
+                            fontWeight: 600,
+                            minWidth: '14px',
+                            height: '14px',
+                            borderRadius: '50%',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center'
+                        }}>
+                            {activeFilterCount}
+                        </span>
+                    )}
+                </button>
 
                 {selectedIndices.size > 0 && (
                     <>
@@ -182,6 +227,16 @@ export const TableTabView: React.FC<TableTabViewProps> = ({
                     />
                 </div>
             </div>
+
+            {/* Filter Panel */}
+            <FilterModal
+                isOpen={showFilterModal}
+                onClose={() => setShowFilterModal(false)}
+                columns={columns}
+                filters={filters}
+                onApply={onFiltersChange}
+                anchorRef={filterButtonRef}
+            />
         </>
     );
 };

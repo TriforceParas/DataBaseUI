@@ -1,3 +1,9 @@
+/**
+ * Table Operations Hook
+ * 
+ * Handles destructive table operations: truncate, drop, and duplicate.
+ * Manages confirmation modals for safety on destructive actions.
+ */
 
 import { useState, useCallback } from 'react';
 import { invoke } from '@tauri-apps/api/core';
@@ -12,25 +18,24 @@ interface UseTableOperationsProps {
 }
 
 export const useTableOperations = ({ connection, onRefreshTables, onTableDropped, addLog }: UseTableOperationsProps) => {
-    // Table Operation Confirmation Modal State
     const [tableConfirmModal, setTableConfirmModal] = useState<{
         type: 'truncate' | 'drop';
         tableName: string;
     } | null>(null);
 
-    // Duplicate Table Modal State
     const [duplicateTableModal, setDuplicateTableModal] = useState<string | null>(null);
 
     const getConnectionString = useCallback(async (): Promise<string> => {
-        return await invoke<string>('get_connection_string', { connectionId: connection.id });
-    }, [connection.id]);
+        return await invoke<string>('get_connection_string', { 
+            connectionId: connection.id,
+            databaseName: connection.database_name 
+        });
+    }, [connection.id, connection.database_name]);
 
-    // Duplicate Table - Show modal
     const handleDuplicateTable = (tableName: string) => {
         setDuplicateTableModal(tableName);
     };
 
-    // Confirm Duplicate Table
     const confirmDuplicateTable = async (newName: string, includeData: boolean) => {
         if (!duplicateTableModal) return;
 
@@ -52,17 +57,14 @@ export const useTableOperations = ({ connection, onRefreshTables, onTableDropped
         setDuplicateTableModal(null);
     };
 
-    // Truncate Table - Show confirmation modal
     const handleTruncateTable = (tableName: string) => {
         setTableConfirmModal({ type: 'truncate', tableName });
     };
 
-    // Drop Table - Show confirmation modal
     const handleDropTable = (tableName: string) => {
         setTableConfirmModal({ type: 'drop', tableName });
     };
 
-    // Confirm table operation
     const confirmTableOperation = async () => {
         if (!tableConfirmModal) return;
 
@@ -74,7 +76,6 @@ export const useTableOperations = ({ connection, onRefreshTables, onTableDropped
                 addLog(`TRUNCATE TABLE ${tableConfirmModal.tableName}`, 'Success', tableConfirmModal.tableName, undefined, 0, 'System');
             } else if (tableConfirmModal.type === 'drop') {
                 await api.dropTable(connectionString, tableConfirmModal.tableName);
-                // Close any tabs for this table
                 onTableDropped(tableConfirmModal.tableName);
                 onRefreshTables();
                 addLog(`DROP TABLE ${tableConfirmModal.tableName}`, 'Success', tableConfirmModal.tableName, undefined, 0, 'System');

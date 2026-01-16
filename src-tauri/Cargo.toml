@@ -32,3 +32,5 @@ rust_decimal = "1.33"
 tokio = { version = "1", features = ["full"] }
 keyring = { version = "3", features = ["apple-native", "windows-native", "sync-secret-service"] }
 uuid = { version = "1", features = ["v4"] }
+tauri-plugin-updater = "2"
+tauri-plugin-process = "2"

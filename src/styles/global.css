@@ -34,6 +34,9 @@ body {
     /* Enable 3D transform context for GPU acceleration */
     -webkit-transform-style: preserve-3d;
     transform-style: preserve-3d;
+    /* Prevent text selection globally (fixes Ctrl+A and drag selection) */
+    user-select: none;
+    -webkit-user-select: none;
 }
 
 /* Reduce motion for users who prefer it and improve performance */
@@ -64,6 +67,9 @@ textarea {
     color: inherit;
     background: transparent;
     border: none;
+    /* Allow text selection in inputs */
+    user-select: text;
+    -webkit-user-select: text;
 }
 
 /* Scrollbar */

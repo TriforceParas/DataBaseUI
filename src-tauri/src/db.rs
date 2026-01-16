@@ -1,9 +1,92 @@
-use sqlx::{migrate::MigrateDatabase, sqlite::SqlitePoolOptions, Pool, Sqlite, Row};
+use sqlx::{migrate::MigrateDatabase, sqlite::SqlitePoolOptions, Pool, Sqlite, MySql, Postgres};
 use std::fs;
 use tauri::{AppHandle, Manager, Runtime};
 
+use std::collections::HashMap;
+use std::sync::RwLock;
+
+#[derive(Clone, Debug)]
+pub enum PoolWrapper {
+    Mysql(Pool<MySql>),
+    Postgres(Pool<Postgres>),
+    Sqlite(Pool<Sqlite>),
+}
+
+impl PoolWrapper {
+    pub async fn new(connection_string: &str) -> Result<Self, String> {
+        if connection_string.starts_with("mysql") {
+            let pool = sqlx::MySqlPool::connect(connection_string).await.map_err(|e| e.to_string())?;
+            Ok(PoolWrapper::Mysql(pool))
+        } else if connection_string.starts_with("postgres") {
+            let pool = sqlx::PgPool::connect(connection_string).await.map_err(|e| e.to_string())?;
+            Ok(PoolWrapper::Postgres(pool))
+        } else {
+            // Assume sqlite or try sqlite
+            let pool = sqlx::SqlitePool::connect(connection_string).await.map_err(|e| e.to_string())?;
+            Ok(PoolWrapper::Sqlite(pool))
+        }
+    }
+}
+
+
+#[derive(Clone, Debug)]
+pub struct Session {
+    #[allow(dead_code)]
+    pub id: String,
+    pub connection_id: i64,
+    pub database_name: Option<String>,
+    pub pool: PoolWrapper,
+    #[allow(dead_code)]
+    pub created_at: chrono::DateTime<chrono::Utc>,
+}
+
+pub struct SessionManager {
+    sessions: RwLock<HashMap<String, Session>>,
+}
+
+impl SessionManager {
+    pub fn new() -> Self {
+        Self {
+            sessions: RwLock::new(HashMap::new()),
+        }
+    }
+
+    pub fn create_session(&self, connection_id: i64, database_name: Option<String>, pool: PoolWrapper) -> String {
+        let id = format!("session:{}", uuid::Uuid::new_v4());
+        let session = Session {
+            id: id.clone(),
+            connection_id,
+            database_name,
+            pool,
+            created_at: chrono::Utc::now(),
+        };
+        self.sessions.write().unwrap().insert(id.clone(), session);
+        id
+    }
+
+    pub fn get_session(&self, id: &str) -> Option<Session> {
+        self.sessions.read().unwrap().get(id).cloned()
+    }
+
+    #[allow(dead_code)]
+    pub fn remove_session(&self, id: &str) {
+        self.sessions.write().unwrap().remove(id);
+    }
+}
+
+pub async fn get_connection(state: &AppState, connection_string: &str) -> Result<PoolWrapper, String> {
+    if connection_string.starts_with("session:") {
+        if let Some(session) = state.sessions.get_session(connection_string) {
+            return Ok(session.pool);
+        }
+        return Err("Session expired or invalid".to_string());
+    }
+    PoolWrapper::new(connection_string).await
+}
+
 pub struct AppState {
     pub db: Pool<Sqlite>,
+    pub sessions: SessionManager,
 }
 
 pub async fn init_db<R: Runtime>(app: &AppHandle<R>) -> Result<Pool<Sqlite>, String> {
@@ -437,6 +520,23 @@ pub async fn init_db<R: Runtime>(app: &AppHandle<R>) -> Result<Pool<Sqlite>, Str
             database_name TEXT,
             created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
             FOREIGN KEY(connection_id) REFERENCES connections(id) ON DELETE CASCADE
+        );",
+    )
+    .await?;
+
+    // Create table_filters table to store filter configurations per table
+    create_table_schema(
+        &pool,
+        "table_filters",
+        "CREATE TABLE IF NOT EXISTS table_filters (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            connection_id INTEGER NOT NULL,
+            database_name TEXT NOT NULL,
+            table_name TEXT NOT NULL,
+            filters_json TEXT NOT NULL,
+            updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY(connection_id) REFERENCES connections(id) ON DELETE CASCADE,
+            UNIQUE(connection_id, database_name, table_name)
         );",
     )
     .await?;

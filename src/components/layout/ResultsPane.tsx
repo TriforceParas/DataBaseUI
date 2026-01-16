@@ -22,14 +22,8 @@ interface ResultsPaneProps {
     onPageSizeChange: (newSize: number) => void;
     onSort: (column: string) => void;
 
-    // Selection & Data Grid Props
     selectedIndices: Set<number>;
     setSelectedIndices: (action: Set<number> | ((prev: Set<number>) => Set<number>)) => void;
-
-    // Dropdown state logic (passed down or managed here? Passed down for now to keep it dumb if possible, 
-    // but Dropdowns logic is complex. Let's simplify and pass activeDropdown if needed, or keeping it internal to DataGrid if possible?)
-    // Actually DataGrid handles most cell rendering. 
-    // The Toolbar above DataGrid needs handlers.
 
     activeDropdown: 'copy' | 'export' | 'pageSize' | null;
     setActiveDropdown: (val: 'copy' | 'export' | 'pageSize' | null) => void;

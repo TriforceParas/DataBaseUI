@@ -1,3 +1,9 @@
+/**
+ * UI State Types
+ * 
+ * Types for tab management, pagination, and data display state.
+ */
+
 import { QueryResult } from './api';
 
 export interface TabResult {

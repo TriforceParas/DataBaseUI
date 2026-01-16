@@ -9,6 +9,10 @@ import * as api from "./api";
 import { ConnectionWindow } from "./components/windows/ConnectionWindow";
 import { VaultWindow } from "./components/windows/VaultWindow";
 import { ErrorWindow } from "./components/windows/ErrorWindow";
+import { CredentialPromptWindow } from "./components/windows/CredentialPromptWindow";
+import { UpdateNotificationWindow } from "./components/windows/UpdateNotificationWindow";
+import { openCredentialPromptWindow, openErrorWindow } from "./utils/windowManager";
+import { invoke } from "@tauri-apps/api/core";
 
 function App() {
   const [activeConnection, setActiveConnection] = useState<Connection | null>(null);
@@ -34,6 +38,13 @@ function App() {
   if (windowMode === 'error') {
     return <ErrorWindow />;
   }
+  if (windowMode === 'credential-prompt') {
+    return <CredentialPromptWindow />;
+  }
+  if (windowMode === 'update-notification') {
+    return <UpdateNotificationWindow />;
+  } // Added routing for update notification
+
 
   // Loading Screen Mode
   const isLoadingMode = params.get('mode') === 'loading';
@@ -41,7 +52,6 @@ function App() {
     return <FullscreenLoader isVisible={true} message="Generating High-Quality Screenshot..." />;
   }
 
-  // Main Window Logic
   useEffect(() => {
     const init = async () => {
       // Check for connection_id to auto-open main interface (e.g. from reload)
@@ -78,9 +88,21 @@ function App() {
         <MainInterface
           key={activeConnection.id}
           connection={activeConnection}
-          onSwitchConnection={() => {
-            // In multi-window mode, switching might mean opening another window or resetting state
-            // For now, we allow resetting to welcome screen (if single window) or just closing
+          onSwitchConnection={async (conn) => {
+            // Check if credential is required but missing (except for SQLite)
+            if (conn.db_type !== 'sqlite' && !conn.credential_id) {
+              openCredentialPromptWindow(conn.id, conn.name);
+              return;
+            }
+
+            try {
+              await invoke('verify_connection_by_id', { connectionId: conn.id });
+              setActiveConnection(conn);
+            } catch (e) {
+              console.error("Failed to connect:", e);
+              const errorMsg = typeof e === 'string' ? e : `Failed to connect: ${JSON.stringify(e)}`;
+              openErrorWindow('Connection Failed', errorMsg);
+            }
           }}
         />
       ) : (

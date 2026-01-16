@@ -15,14 +15,7 @@ pub struct Connection {
     pub created_at: String,
 }
 
-/// Legacy Connection model for migration
-#[derive(Serialize, Deserialize, Clone, Debug, FromRow)]
-pub struct ConnectionLegacy {
-    pub id: i64,
-    pub name: String,
-    pub connection_string: String,
-    pub created_at: String,
-}
+
 
 /// Credential entry - stored in app DB, actual password in OS keyring
 #[derive(Serialize, Deserialize, Clone, Debug, FromRow)]
@@ -50,7 +43,7 @@ pub struct TableTag {
     pub tag_id: i64,
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug)]
+#[derive(Serialize, Deserialize, Clone, Debug, Default)]
 pub struct ForeignKey {
     pub referenced_table: String,
     pub referenced_column: String,
@@ -62,7 +55,7 @@ pub struct QueryResult {
     pub rows: Vec<Vec<String>>,
 }
 
-#[derive(Serialize, Clone, Debug)]
+#[derive(Serialize, Deserialize, Clone, Debug, Default)]
 pub struct ColumnSchema {
     pub name: String,
     pub type_name: String,

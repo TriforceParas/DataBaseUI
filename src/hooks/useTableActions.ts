@@ -1,8 +1,38 @@
+/**
+ * Table Actions Hook
+ * 
+ * Handles row-level operations on table data:
+ * - Insert new rows
+ * - Edit cell values
+ * - Delete rows (single or batch)
+ * 
+ * Supports both immediate execution and changelog mode.
+ */
+
 import { useCallback, useRef } from 'react';
 import { invoke } from '@tauri-apps/api/core';
-import { Connection, PendingChange, QueryResult, Tab } from '../types/index';
-import { buildDeleteSql, buildUpdateSql } from '../utils/dataHandlers';
+import { Connection, PendingChange, QueryResult, Tab, ColumnSchema, RowIdentifier, CellUpdate, BatchChange } from '../types/index';
 import * as api from '../api';
+
+/** Builds a row identifier using primary key columns, or all columns if no PK exists */
+const getRowIdentifier = (row: any[], columns: string[], schema: ColumnSchema[]): RowIdentifier => {
+    const pkCols = schema.filter(c => c.is_primary_key);
+    const targetCols = pkCols.length > 0 ? pkCols : schema;
+
+    const resultCols: string[] = [];
+    const resultVals: (string | null)[] = [];
+
+    targetCols.forEach(col => {
+        const idx = columns.indexOf(col.name);
+        if (idx !== -1) {
+            resultCols.push(col.name);
+            const val = row[idx];
+            resultVals.push(val === null ? null : String(val));
+        }
+    });
+
+    return { columns: resultCols, values: resultVals };
+};
 
 interface UseTableActionsProps {
     activeTab: Tab | undefined;
@@ -12,9 +42,11 @@ interface UseTableActionsProps {
     selectedIndices: Set<number>;
     setSelectedIndices: (action: Set<number> | ((prev: Set<number>) => Set<number>)) => void;
     connection: Connection;
+    sessionId?: string | null;
     enableChangeLog: boolean;
     addLog: (query: string, status: 'Success' | 'Error', table?: string, error?: string, rows?: number, user?: string) => void;
     fetchTableData: (tableId: string, tableName: string) => Promise<void>;
+    tableSchemas: Record<string, ColumnSchema[]>;
 }
 
 export const useTableActions = ({
@@ -25,25 +57,30 @@ export const useTableActions = ({
     selectedIndices,
     setSelectedIndices,
     connection,
+    sessionId,
     enableChangeLog,
     addLog,
-    fetchTableData
+    fetchTableData,
+    tableSchemas
 }: UseTableActionsProps) => {
 
     const connectionStringRef = useRef<string | null>(null);
 
     const getConnectionString = useCallback(async (): Promise<string> => {
+        if (sessionId) return sessionId;
         if (connectionStringRef.current) return connectionStringRef.current;
-        const connStr = await invoke<string>('get_connection_string', { connectionId: connection.id });
+        const connStr = await invoke<string>('get_connection_string', {
+            connectionId: connection.id,
+            databaseName: connection.database_name
+        });
         connectionStringRef.current = connStr;
         return connStr;
-    }, [connection.id]);
+    }, [connection.id, connection.database_name, sessionId]);
 
     const handleInsertRow = useCallback(() => {
         if (!activeTab || activeTab.type !== 'table') return;
         const currentData = results[activeTab.id]?.data!;
         if (!currentData) return;
-
         const newRowArray = currentData.columns.map(() => '');
 
         const newChange: PendingChange = {
@@ -63,7 +100,8 @@ export const useTableActions = ({
         setSelectedIndices((prev: Set<number>) => new Set([...prev, newIdx]));
     }, [activeTab, results, pendingChanges, setPendingChanges, setSelectedIndices]);
 
-    const handleCellEdit = useCallback(async (rowIndex: number, column: string, value: any) => {
+    const handleCellEdit = useCallback(async (rowIndex: number, columnRaw: string, value: any) => {
+        const column = columnRaw.trim();
         if (!activeTab || activeTab.type !== 'table') return;
         const currentData = results[activeTab.id]?.data;
         if (!currentData) return;
@@ -98,22 +136,32 @@ export const useTableActions = ({
         const row = existingRows[rowIndex];
         const oldValue = row[colIdx];
 
-        if (String(oldValue) === String(value)) return;
+        if (String(oldValue) === String(value)) {
+            const existingUpdate = pendingChanges[tabId]?.find(c => c.type === 'UPDATE' && c.rowIndex === rowIndex && c.column === column);
+            if (!existingUpdate) return;
+        }
 
-        const isMysql = connection.db_type === 'mysql';
-        const generatedSql = buildUpdateSql(activeTab.title, column, value, row, currentData.columns, isMysql);
+        const schema = tableSchemas[activeTab.title] || [];
+        const identifier = getRowIdentifier(row, currentData.columns, schema);
+        const updates: CellUpdate[] = [{
+            column,
+            value: value === null ? null : String(value)
+        }];
+
+        // Display string for logs (approximate)
+        const displaySql = `UPDATE ${activeTab.title} SET ${column} = ${value} ...`;
 
         if (!enableChangeLog) {
             // Execute Immediately
             try {
                 const connectionString = await getConnectionString();
-                await api.executeQuery(connectionString, generatedSql);
-                addLog(generatedSql, 'Success', activeTab.title, undefined, 1);
+                await api.updateRecord(connectionString, activeTab.title, identifier, updates);
+                addLog(displaySql, 'Success', activeTab.title, undefined, 1);
                 await fetchTableData(activeTab.id, activeTab.title);
             } catch (e) {
                 const errorMsg = String(e);
                 console.error("Immediate update failed:", e);
-                addLog(generatedSql, 'Error', activeTab.title, errorMsg, 0);
+                addLog(displaySql, 'Error', activeTab.title, errorMsg, 0);
                 alert(`Update failed: ${errorMsg}`);
             }
             return;
@@ -135,7 +183,9 @@ export const useTableActions = ({
             if (existingIdx !== -1) {
                 newChanges[existingIdx] = {
                     ...newChanges[existingIdx],
-                    newValue: value
+                    newValue: value,
+                    updates: updates,
+                    identifier: identifier
                 };
             } else {
                 newChanges.push({
@@ -146,12 +196,14 @@ export const useTableActions = ({
                     column,
                     oldValue,
                     newValue: value,
-                    generatedSql
+                    generatedSql: displaySql, // Backward compat for UI display if needed
+                    identifier,
+                    updates
                 });
             }
             return { ...prev, [tabId]: newChanges };
         });
-    }, [activeTab, results, connection.id, connection.db_type, setPendingChanges, enableChangeLog, addLog, fetchTableData, getConnectionString]);
+    }, [activeTab, results, connection.id, connection.db_type, setPendingChanges, enableChangeLog, addLog, fetchTableData, getConnectionString, tableSchemas]);
 
     const handleRowDelete = useCallback(async (rowIndex: number) => {
         if (!activeTab || activeTab.type !== 'table') return;
@@ -185,17 +237,18 @@ export const useTableActions = ({
         const rowData = displayRows[rowIndex];
 
         if (rowData) {
-            const isMysql = connection.db_type === 'mysql';
             const data = results[activeTab.id]?.data!;
-            const generatedSql = buildDeleteSql(activeTab.title, rowData, data.columns, isMysql);
+            const schema = tableSchemas[activeTab.title] || [];
+            const identifier = getRowIdentifier(rowData, data.columns, schema);
+            const displaySql = `DELETE...`;
 
             if (!enableChangeLog) {
                 // Execute Immediately
                 if (confirm(`Are you sure you want to delete this row directly from ${activeTab.title}?`)) {
                     try {
                         const connectionString = await getConnectionString();
-                        await api.executeQuery(connectionString, generatedSql);
-                        addLog(generatedSql, 'Success', activeTab.title, undefined, 1);
+                        await api.deleteRecord(connectionString, activeTab.title, identifier);
+                        addLog(displaySql, 'Success', activeTab.title, undefined, 1);
                         await fetchTableData(activeTab.id, activeTab.title);
                         setSelectedIndices(prev => {
                             const newSet = new Set(prev);
@@ -205,7 +258,7 @@ export const useTableActions = ({
                     } catch (e) {
                         const errorMsg = String(e);
                         console.error("Immediate delete failed:", e);
-                        addLog(generatedSql, 'Error', activeTab.title, errorMsg, 0);
+                        addLog(displaySql, 'Error', activeTab.title, errorMsg, 0);
                         alert(`Delete failed: ${errorMsg}`);
                     }
                 }
@@ -217,25 +270,26 @@ export const useTableActions = ({
                 tableName: activeTab.title,
                 rowIndex,
                 rowData,
-                generatedSql
+                generatedSql: displaySql,
+                identifier
             };
             setPendingChanges(prev => ({
                 ...prev,
                 [activeTab.id]: [...(prev[activeTab.id] || []), newChange]
             }));
         }
-    }, [activeTab, results, pendingChanges, setPendingChanges, setSelectedIndices, enableChangeLog, connection.id, connection.db_type, addLog, fetchTableData, getConnectionString]);
+    }, [activeTab, results, pendingChanges, setPendingChanges, setSelectedIndices, enableChangeLog, connection.id, connection.db_type, addLog, fetchTableData, getConnectionString, tableSchemas]);
 
     const handleDeleteRows = useCallback(async () => {
         if (!activeTab || activeTab.type !== 'table' || !results[activeTab.id]?.data) return;
         const currentData = results[activeTab.id].data!;
 
         const cols = currentData.columns;
-        const isMysql = connection.db_type === 'mysql';
+        const schema = tableSchemas[activeTab.title] || [];
         const existingRowsCount = currentData.rows.length;
         const newChanges: PendingChange[] = [];
         const insertIndicesToRemove: number[] = [];
-        const queriesToExecute: string[] = [];
+        const batchDeletes: BatchChange[] = [];
 
         selectedIndices.forEach(idx => {
             if (idx >= existingRowsCount) {
@@ -246,41 +300,40 @@ export const useTableActions = ({
             const row = currentData.rows[idx];
             const existing = pendingChanges[activeTab.id]?.find(c => c.type === 'DELETE' && c.rowIndex === idx);
             if (!existing && row) {
-                const generatedSql = buildDeleteSql(activeTab.title, row, cols, isMysql);
+                const identifier = getRowIdentifier(row, cols, schema);
 
                 if (!enableChangeLog) {
-                    queriesToExecute.push(generatedSql);
+                    batchDeletes.push({
+                        operation: 'DELETE',
+                        table_name: activeTab.title,
+                        identifier
+                    });
                 } else {
                     newChanges.push({
                         type: 'DELETE',
                         tableName: activeTab.title,
                         rowIndex: idx,
                         rowData: row,
-                        generatedSql
+                        generatedSql: 'DELETE...',
+                        identifier
                     });
                 }
             }
         });
 
-        if (!enableChangeLog && queriesToExecute.length > 0) {
-            if (confirm(`Are you sure you want to delete ${queriesToExecute.length} rows directly from ${activeTab.title}?`)) {
-                let successCount = 0;
-                const connectionString = await getConnectionString();
-                for (const sql of queriesToExecute) {
-                    try {
-                        await api.executeQuery(connectionString, sql);
-                        addLog(sql, 'Success', activeTab.title, undefined, 1);
-                        successCount++;
-                    } catch (e) {
-                        const errorMsg = String(e);
-                        addLog(sql, 'Error', activeTab.title, errorMsg, 0);
-                        console.error("Immediate delete error:", e);
-                    }
-                }
-                if (successCount > 0) {
+        if (!enableChangeLog && batchDeletes.length > 0) {
+            if (confirm(`Are you sure you want to delete ${batchDeletes.length} rows directly from ${activeTab.title}?`)) {
+                try {
+                    const connectionString = await getConnectionString();
+                    const affected = await api.applyBatchChanges(connectionString, batchDeletes);
+                    addLog(`Batch Delete ${affected} rows`, 'Success', activeTab.title, undefined, Number(affected));
                     await fetchTableData(activeTab.id, activeTab.title);
+                    setSelectedIndices(new Set());
+                } catch (e) {
+                    const errorMsg = String(e);
+                    addLog('Batch Delete Failed', 'Error', activeTab.title, errorMsg, 0);
+                    console.error("Immediate delete error:", e);
                 }
-                setSelectedIndices(new Set());
             }
         }
 
@@ -304,7 +357,7 @@ export const useTableActions = ({
             if (enableChangeLog) {
                 setSelectedIndices(new Set());
             } else {
-                if (queriesToExecute.length === 0) setSelectedIndices(new Set());
+                if (batchDeletes.length === 0) setSelectedIndices(new Set());
             }
         } else if (enableChangeLog && newChanges.length > 0) {
             setPendingChanges(prev => ({
@@ -314,7 +367,7 @@ export const useTableActions = ({
             setSelectedIndices(new Set());
         }
 
-    }, [activeTab, results, connection.id, connection.db_type, selectedIndices, pendingChanges, setPendingChanges, setSelectedIndices, enableChangeLog, addLog, fetchTableData, getConnectionString]);
+    }, [activeTab, results, connection.id, connection.db_type, selectedIndices, pendingChanges, setPendingChanges, setSelectedIndices, enableChangeLog, addLog, fetchTableData, getConnectionString, tableSchemas]);
 
     return {
         handleInsertRow,

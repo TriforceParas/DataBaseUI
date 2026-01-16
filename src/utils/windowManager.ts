@@ -1,10 +1,16 @@
+/**
+ * Window Management Utilities
+ * 
+ * Handles creation and management of Tauri windows for connections,
+ * credential prompts, errors, and vault views.
+ */
+
 import { WebviewWindow } from '@tauri-apps/api/webviewWindow';
 
 export const openConnectionWindow = async (connectionId?: number) => {
     const label = connectionId ? `connection-${connectionId}` : 'connection-new';
     const url = connectionId ? `/?window=connection&id=${connectionId}` : '/?window=connection';
 
-    // Check if window exists
     const existing = await WebviewWindow.getByLabel(label);
     if (existing) {
         await existing.setFocus();
@@ -20,12 +26,8 @@ export const openConnectionWindow = async (connectionId?: number) => {
         center: true
     });
 
-    webview.once('tauri://created', function () {
-        // Window created
-    });
-
+    webview.once('tauri://created', function () {});
     webview.once('tauri://error', function (e) {
-        // Error creating window
         console.error("Error creating window", e);
     });
 };
@@ -60,6 +62,24 @@ export const openErrorWindow = async (title: string, message: string) => {
         height: 300,
         resizable: false,
         center: true,
-        alwaysOnTop: true // Make sure it pops up over other windows
+        alwaysOnTop: true
+    });
+};
+
+export const openCredentialPromptWindow = async (connectionId: number, name: string) => {
+    const label = `credential-prompt-${connectionId}`;
+    const existing = await WebviewWindow.getByLabel(label);
+    if (existing) {
+        await existing.setFocus();
+        return;
+    }
+
+    new WebviewWindow(label, {
+        url: `/?window=credential-prompt&connectionId=${connectionId}&name=${encodeURIComponent(name)}`,
+        title: 'Authentication Required',
+        width: 400,
+        height: 500,
+        resizable: false,
+        center: true
     });
 };

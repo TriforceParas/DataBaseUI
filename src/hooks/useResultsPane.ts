@@ -1,3 +1,9 @@
+/**
+ * Results Pane Hook
+ * 
+ * Manages the resizable results pane UI state including
+ * height, visibility, and drag-to-resize functionality.
+ */
 
 import { useState, useEffect, useCallback } from 'react';
 

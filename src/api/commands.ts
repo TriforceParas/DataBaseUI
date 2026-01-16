@@ -1,3 +1,10 @@
+/**
+ * Tauri Backend Command Bindings
+ * 
+ * This module provides TypeScript wrappers for all Rust backend commands.
+ * Commands are organized by feature area for maintainability.
+ */
+
 import { invoke } from '@tauri-apps/api/core';
 import {
     Connection,
@@ -6,12 +13,15 @@ import {
     QueryResult,
     ColumnSchema,
     SavedQuery,
-    SavedFunction
+    SavedFunction,
+    RowIdentifier,
+    CellUpdate,
+    BatchChange
 } from '../types/index';
 
-/**
- * DATABASE CONNECTIONS
- */
+// ============================================================================
+// Connection Management
+// ============================================================================
 
 export const listConnections = () =>
     invoke<Connection[]>('list_connections');
@@ -28,15 +38,56 @@ export const updateConnection = (id: number, name: string, connectionString: str
 export const deleteConnection = (id: number) =>
     invoke<void>('delete_connection', { id });
 
-export const openConnectionWindow = (connectionId: number) =>
-    invoke<void>('open_connection_window', { connectionId });
+export const openConnectionWindow = (connectionId: number, username?: string, password?: string) =>
+    invoke<void>('open_connection_window', { connectionId, username, password });
 
-/**
- * SCHEMA & DATA
- */
+// ============================================================================
+// Session Management
+// ============================================================================
+
+export const createSession = (connectionId: number, databaseName?: string) =>
+    invoke<string>('create_session', { connectionId, databaseName });
+
+// ============================================================================
+// Schema & Data Operations
+// ============================================================================
+
+export interface FilterConditionAPI {
+    id: string;
+    enabled: boolean;
+    column: string;
+    operator: string;
+    value: string;
+}
+
+export interface SortStateAPI {
+    column: string;
+    direction: string;
+}
+
+export interface TableDataResponse {
+    data: QueryResult;
+    total_count: number;
+}
 
 export const getTables = (connectionString: string) =>
     invoke<string[]>('get_tables', { connectionString });
+
+export const getTableData = (
+    connectionString: string,
+    tableName: string,
+    page: number,
+    pageSize: number,
+    filters: FilterConditionAPI[],
+    sort?: SortStateAPI | null
+) => invoke<TableDataResponse>('get_table_data', {
+    connectionString,
+    tableName,
+    page,
+    pageSize,
+    filters,
+    sort: sort || null
+});
 
 export const getColumns = (connectionString: string, tableName: string) =>
     invoke<string[]>('get_columns', { connectionString, tableName });
@@ -60,9 +111,37 @@ export const duplicateTable = (params: {
     includeData: boolean
 }) => invoke<void>('duplicate_table', params);
 
-/**
- * SAVED QUERIES
- */
+// ============================================================================
+// CRUD Operations
+// ============================================================================
+
+export const updateRecord = (
+    connectionString: string,
+    tableName: string,
+    identifier: RowIdentifier,
+    updates: CellUpdate[]
+) => invoke<number>('update_record', { connectionString, tableName, identifier, updates });
+
+export const deleteRecord = (
+    connectionString: string,
+    tableName: string,
+    identifier: RowIdentifier
+) => invoke<number>('delete_record', { connectionString, tableName, identifier });
+
+export const insertRecord = (
+    connectionString: string,
+    tableName: string,
+    values: Record<string, string | null>
+) => invoke<number>('insert_record', { connectionString, tableName, values });
+
+export const applyBatchChanges = (
+    connectionString: string,
+    changes: BatchChange[]
+) => invoke<number>('apply_batch_changes', { connectionString, changes });
+
+// ============================================================================
+// Saved Queries
+// ============================================================================
 
 export const listQueries = (connectionId: number, databaseName?: string) =>
     invoke<SavedQuery[]>('list_queries', { connectionId, databaseName });
@@ -76,9 +155,9 @@ export const updateQuery = (id: number, name: string, query: string) =>
 export const deleteQuery = (id: number) =>
     invoke<void>('delete_query', { id });
 
-/**
- * SAVED FUNCTIONS
- */
+// ============================================================================
+// Saved Functions
+// ============================================================================
 
 export const listFunctions = (connectionId: number, databaseName?: string) =>
     invoke<SavedFunction[]>('list_functions', { connectionId, databaseName });
@@ -92,9 +171,9 @@ export const updateFunction = (id: number, name: string, functionBody: string) =
 export const deleteFunction = (id: number) =>
     invoke<void>('delete_function', { id });
 
-/**
- * TAGS
- */
+// ============================================================================
+// Tags
+// ============================================================================
 
 export const getTags = (connectionId?: number, databaseName?: string) =>
     invoke<Tag[]>('get_tags', { connectionId, databaseName });
@@ -117,12 +196,29 @@ export const removeTagFromTable = (connectionId: number, tableName: string, tagI
 export const getTableTags = (connectionId: number, databaseName: string) =>
     invoke<TableTag[]>('get_table_tags', { connectionId, databaseName });
 
-/**
- * WINDOW MANAGEMENT
- */
+// ============================================================================
+// Window Management
+// ============================================================================
 
 export const openLoadingWindow = () =>
     invoke<void>('open_loading_window');
 
 export const closeLoadingWindow = () =>
     invoke<void>('close_loading_window');
+
+// ============================================================================
+// Table Filters (Persistence)
+// ============================================================================
+
+export const saveTableFilters = (
+    connectionId: number,
+    databaseName: string,
+    tableName: string,
+    filters: FilterConditionAPI[]
+) => invoke<void>('save_table_filters', { connectionId, databaseName, tableName, filters });
+
+export const getTableFilters = (connectionId: number, databaseName: string, tableName: string) =>
+    invoke<FilterConditionAPI[]>('get_table_filters', { connectionId, databaseName, tableName });
+
+export const deleteTableFilters = (connectionId: number, databaseName: string, tableName: string) =>
+    invoke<void>('delete_table_filters', { connectionId, databaseName, tableName });

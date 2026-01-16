@@ -3,6 +3,7 @@ import { ToastContainer, ToastMessage } from '../common/Toast';
 import { TableConfirmModal, DuplicateTableModal, ModalManager } from '../modals';
 import { Navbar, TabBar, Sidebar, ChangelogSidebar, EditPaneSidebar } from '.';
 import { MainViewContent } from '../views';
+import { FilterCondition } from '../modals/FilterModal';
 import styles from '../../styles/MainLayout.module.css';
 import { Connection, PendingChange, TabItem, Tag, TableTag, SavedQuery, SavedFunction, LogEntry, TableDataState, PaginationState, ColumnSchema, SortState } from '../../types/index';
 import { TableCreatorState } from '../editors';
@@ -100,7 +101,7 @@ interface MainLayoutProps {
     handleDeleteRows: () => void;
     handleCopy: (format: 'CSV' | 'JSON') => void;
     handleExport: (format: 'CSV' | 'JSON') => void;
-    fetchTableData: (id: string, table: string, page?: number, pageSize?: number) => Promise<void>;
+    fetchTableData: (id: string, table: string, page?: number, pageSize?: number, filtersOverride?: any[]) => Promise<void>;
     setSortState: React.Dispatch<React.SetStateAction<SortState | null>>;
     handleCellEdit: (rowIndex: number, column: string, value: any) => void;
     handleRowDelete: (rowIndex: number) => void;
@@ -114,6 +115,10 @@ interface MainLayoutProps {
     handleSort: (column: string) => void;
     setIsCapturing: React.Dispatch<React.SetStateAction<boolean>>;
     addToast: (title: string, message: string, filePath?: string, type?: 'success' | 'error' | 'info') => void;
+
+    // Filter props
+    filtersMap: Record<string, FilterCondition[]>;
+    updateFilters: (tabId: string, tableName: string, filters: FilterCondition[]) => void;
 
     // Changelog Actions
     handleConfirmChanges: () => void;
@@ -151,6 +156,8 @@ interface MainLayoutProps {
     isCapturing: boolean;
     toasts: ToastMessage[];
     onDismissToast: (id: string) => void;
+    sessionId: string | null;
+    refreshTrigger: number;
 }
 
 export const MainLayout: React.FC<MainLayoutProps> = (props) => {
@@ -160,21 +167,7 @@ export const MainLayout: React.FC<MainLayoutProps> = (props) => {
         [props.pendingChanges]
     );
 
-    // Search state for filtering sidebar items
     const [searchQuery, setSearchQuery] = useState('');
-
-
-    // NOTE: For handleOpenEditWindow, we should ideally rely on the prop passed from parent
-    // if the parent encapsulates the logic. 
-    // Wait, I missed adding handleOpenEditWindow to Props!
-    // I check usage in MainInterface: handleOpenInsertSidebar is passed to Navbar.
-    // So I should add handleOpenEditWindow to Props and just call it.
-
-    // Re-defining handleOpenEditWindow in MainLayout is redundant if we pass it.
-    // I'll add it to props.
-
-    // Oops, I didn't add it to interface above. I added showEditWindow/setShowEditWindow.
-    // I should add handleOpenEditWindow to Interface.
 
     return (
         <div
@@ -242,12 +235,6 @@ export const MainLayout: React.FC<MainLayoutProps> = (props) => {
                         onConfirm: props.confirmDuplicateTable
                     }}
                     changelogConfirm={{
-                        // Changelog modal state/handlers normally passed? 
-                        // Access from MainInterface showed it passed changelogConfirm state.
-                        // I need to add changelogConfirm state to Props.
-                        // Or just handle confirm/discard via existing props?
-                        // MainInterface used `changelogConfirm` state.
-                        // I'll add changelogConfirm to Props (as `any` for now).
                         modal: props.changelogConfirm,
                         setModal: props.setChangelogConfirm,
                         pendingChangesCount: totalChanges,
@@ -291,7 +278,6 @@ export const MainLayout: React.FC<MainLayoutProps> = (props) => {
                 <div className={styles.body}>
                     <Sidebar
                         sidebarOpen={props.sidebarOpen}
-                        tables={props.tables}
                         onSwitchConnection={props.onSwitchConnection}
                         onSwitchDatabase={props.onSwitchDatabase}
                         onTableClick={props.onTableClick}
@@ -309,8 +295,10 @@ export const MainLayout: React.FC<MainLayoutProps> = (props) => {
                         onDeleteFunction={props.onDeleteFunction}
                         onEditFunction={props.onEditFunction}
                         connection={props.connection}
+                        sessionId={props.sessionId}
                         savedConnections={props.savedConnections}
                         searchQuery={searchQuery}
+                        refreshTrigger={props.refreshTrigger}
                     />
 
                     <div className={styles.content}>
@@ -378,6 +366,8 @@ export const MainLayout: React.FC<MainLayoutProps> = (props) => {
                                 handleRefresh={props.onRefresh}
                                 setIsCapturing={props.setIsCapturing}
                                 addToast={props.addToast}
+                                filtersMap={props.filtersMap}
+                                updateFilters={props.updateFilters}
                             />
                         </div>
                     </div>

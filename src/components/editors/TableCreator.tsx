@@ -47,6 +47,60 @@ const DEFAULT_STATE: TableCreatorState = {
     foreignKeys: []
 };
 
+// Database-specific column types
+const COLUMN_TYPES = {
+    mysql: [
+        { value: 'INT', label: 'INT' },
+        { value: 'BIGINT', label: 'BIGINT' },
+        { value: 'SMALLINT', label: 'SMALLINT' },
+        { value: 'TINYINT', label: 'TINYINT' },
+        { value: 'VARCHAR', label: 'VARCHAR' },
+        { value: 'CHAR', label: 'CHAR' },
+        { value: 'TEXT', label: 'TEXT' },
+        { value: 'MEDIUMTEXT', label: 'MEDIUMTEXT' },
+        { value: 'LONGTEXT', label: 'LONGTEXT' },
+        { value: 'DECIMAL', label: 'DECIMAL' },
+        { value: 'FLOAT', label: 'FLOAT' },
+        { value: 'DOUBLE', label: 'DOUBLE' },
+        { value: 'BOOLEAN', label: 'BOOLEAN' },
+        { value: 'DATE', label: 'DATE' },
+        { value: 'DATETIME', label: 'DATETIME' },
+        { value: 'TIMESTAMP', label: 'TIMESTAMP' },
+        { value: 'TIME', label: 'TIME' },
+        { value: 'BLOB', label: 'BLOB' },
+        { value: 'JSON', label: 'JSON' },
+    ],
+    postgres: [
+        { value: 'INTEGER', label: 'INTEGER' },
+        { value: 'BIGINT', label: 'BIGINT' },
+        { value: 'SMALLINT', label: 'SMALLINT' },
+        { value: 'SERIAL', label: 'SERIAL' },
+        { value: 'BIGSERIAL', label: 'BIGSERIAL' },
+        { value: 'VARCHAR', label: 'VARCHAR' },
+        { value: 'CHAR', label: 'CHAR' },
+        { value: 'TEXT', label: 'TEXT' },
+        { value: 'NUMERIC', label: 'NUMERIC' },
+        { value: 'REAL', label: 'REAL' },
+        { value: 'DOUBLE PRECISION', label: 'DOUBLE PRECISION' },
+        { value: 'BOOLEAN', label: 'BOOLEAN' },
+        { value: 'DATE', label: 'DATE' },
+        { value: 'TIMESTAMP', label: 'TIMESTAMP' },
+        { value: 'TIMESTAMPTZ', label: 'TIMESTAMPTZ' },
+        { value: 'TIME', label: 'TIME' },
+        { value: 'BYTEA', label: 'BYTEA' },
+        { value: 'JSON', label: 'JSON' },
+        { value: 'JSONB', label: 'JSONB' },
+        { value: 'UUID', label: 'UUID' },
+    ],
+    sqlite: [
+        { value: 'INTEGER', label: 'INTEGER' },
+        { value: 'TEXT', label: 'TEXT' },
+        { value: 'REAL', label: 'REAL' },
+        { value: 'BLOB', label: 'BLOB' },
+        { value: 'NUMERIC', label: 'NUMERIC' },
+    ]
+};
+
 export const TableCreator: React.FC<TableCreatorProps> = ({ connection, onSuccess, mode = 'create', initialState, onStateChange, originalColumns, onSchemaChange }) => {
     const [tableName, setTableName] = useState(initialState?.tableName ?? DEFAULT_STATE.tableName);
     const [columns, setColumns] = useState<ColumnDef[]>(initialState?.columns ?? DEFAULT_STATE.columns);
@@ -68,12 +122,8 @@ export const TableCreator: React.FC<TableCreatorProps> = ({ connection, onSucces
     // Track original columns reference to detect when parent updates it (after schema confirmation)
     const prevOriginalColumnsRef = useRef(originalColumns);
 
-    // Reset deletedColumns and sync state when originalColumns changes (after schema changes are confirmed)
     useEffect(() => {
         if (mode === 'edit' && originalColumns && prevOriginalColumnsRef.current !== originalColumns) {
-            // originalColumns changed - schema was likely confirmed
-
-            // If we have columns marked for deletion, remove them from the local state now
             if (deletedColumns.size > 0) {
                 setColumns(prev => prev.filter(c => !deletedColumns.has(c.name)));
             }
@@ -81,13 +131,11 @@ export const TableCreator: React.FC<TableCreatorProps> = ({ connection, onSucces
             setDeletedColumns(new Set());
             prevOriginalColumnsRef.current = originalColumns;
         } else if (mode === 'edit' && originalColumns && !prevOriginalColumnsRef.current) {
-            // Initial load of originalColumns - just sync ref
             prevOriginalColumnsRef.current = originalColumns;
         }
     }, [originalColumns, mode, deletedColumns]);
 
     useEffect(() => {
-        // Skip first render if we have initial state (to avoid unnecessary update)
         if (isFirstRender.current) {
             isFirstRender.current = false;
             return;
@@ -103,11 +151,9 @@ export const TableCreator: React.FC<TableCreatorProps> = ({ connection, onSucces
 
     const removeColumn = (idx: number) => {
         const col = columns[idx];
-        // In edit mode, if this is an original column, mark it for deletion instead of removing
         if (mode === 'edit' && originalColumns?.find(oc => oc.name === col.name)) {
             setDeletedColumns(prev => new Set([...prev, col.name]));
         } else {
-            // New column - just remove it
             const newCols = [...columns];
             newCols.splice(idx, 1);
             setColumns(newCols);
@@ -145,8 +191,11 @@ export const TableCreator: React.FC<TableCreatorProps> = ({ connection, onSucces
     };
 
     const getConnectionString = useCallback(async (): Promise<string> => {
-        return await invoke<string>('get_connection_string', { connectionId: connection.id });
-    }, [connection.id]);
+        return await invoke<string>('get_connection_string', {
+            connectionId: connection.id,
+            databaseName: connection.database_name
+        });
+    }, [connection.id, connection.database_name]);
 
     useEffect(() => {
         const fetchTables = async () => {
@@ -159,7 +208,7 @@ export const TableCreator: React.FC<TableCreatorProps> = ({ connection, onSucces
             }
         };
         fetchTables();
-    }, [connection.id, getConnectionString]);
+    }, [connection.id, connection.database_name, getConnectionString]);
 
     const fetchColumnsForTable = async (tableName: string) => {
         if (refTableColumns[tableName]) return;
@@ -212,7 +261,9 @@ export const TableCreator: React.FC<TableCreatorProps> = ({ connection, onSucces
         const buildColumnDef = (col: ColumnDef) => {
             // Ensure type is not empty - default to TEXT if missing
             let typeStr = col.type || 'TEXT';
-            if ((typeStr === 'VARCHAR' || typeStr === 'CHAR') && col.length && col.length !== 'N/A') {
+
+            // Add length/precision for applicable types
+            if (['VARCHAR', 'CHAR', 'DECIMAL', 'NUMERIC'].includes(typeStr) && col.length && col.length !== 'N/A') {
                 typeStr = `${typeStr}(${col.length})`;
             }
 
@@ -223,6 +274,7 @@ export const TableCreator: React.FC<TableCreatorProps> = ({ connection, onSucces
                 if (col.defaultValue === 'AUTO_INCREMENT') {
                     if (dialect === 'mysql') def += " AUTO_INCREMENT";
                     else if (dialect === 'sqlite' && col.type === 'INTEGER') def += " AUTOINCREMENT";
+                    // PostgreSQL uses SERIAL types handled in type itself
                 }
             }
 
@@ -231,7 +283,7 @@ export const TableCreator: React.FC<TableCreatorProps> = ({ connection, onSucces
 
             if (col.defaultValue && col.defaultValue !== '' && col.defaultValue !== 'AUTO_INCREMENT') {
                 const isNum = !isNaN(Number(col.defaultValue));
-                const isSqlFunc = ['CURRENT_TIMESTAMP', 'NULL', 'TRUE', 'FALSE'].includes(col.defaultValue);
+                const isSqlFunc = ['CURRENT_TIMESTAMP', 'NULL', 'TRUE', 'FALSE', 'gen_random_uuid()'].includes(col.defaultValue);
                 def += ` DEFAULT ${isNum || isSqlFunc ? col.defaultValue : `'${col.defaultValue}'`}`;
             }
 
@@ -282,6 +334,9 @@ export const TableCreator: React.FC<TableCreatorProps> = ({ connection, onSucces
                 });
 
                 if (pendingChanges.length === 0) {
+                    if (onSchemaChange) {
+                        onSchemaChange([]);
+                    }
                     setError("No changes detected");
                     return;
                 }
@@ -292,18 +347,51 @@ export const TableCreator: React.FC<TableCreatorProps> = ({ connection, onSucces
                 }
                 // Don't call onSuccess() - keep tab open
             } else {
-                // Create mode: Generate CREATE TABLE statement
-                const colDefs = columns.map(buildColumnDef).join(', ');
+                // Create mode: Use backend create_table command
+                const mappedColumns = columns.map(col => {
+                    let typeName = col.type || 'TEXT';
 
-                const fkDefs = foreignKeys.filter(fk => fk.column && fk.refTable && fk.refColumn).map(fk => {
-                    return `FOREIGN KEY (${q}${fk.column}${q}) REFERENCES ${q}${fk.refTable}${q}(${q}${fk.refColumn}${q}) ON DELETE ${fk.onDelete} ON UPDATE ${fk.onUpdate}`;
+                    // Add precision/length for applicable types
+                    if (['VARCHAR', 'CHAR', 'DECIMAL', 'NUMERIC'].includes(typeName) && col.length && col.length !== 'N/A') {
+                        typeName = `${typeName}(${col.length})`;
+                    }
+
+                    // For PostgreSQL, SERIAL/BIGSERIAL types imply auto-increment
+                    const isSerialType = ['SERIAL', 'BIGSERIAL', 'SMALLSERIAL'].includes(col.type.toUpperCase());
+                    const isAutoIncrement = connection.db_type === 'postgres'
+                        ? isSerialType
+                        : col.isAutoIncrement || col.defaultValue === 'AUTO_INCREMENT';
+
+                    return {
+                        name: col.name,
+                        type_name: typeName,
+                        is_nullable: col.isNullable,
+                        is_primary_key: col.isPrimaryKey,
+                        is_auto_increment: isAutoIncrement,
+                        is_unique: col.isUnique,
+                        default_value: col.defaultValue || null,
+                        foreign_key: null
+                    };
                 });
 
-                const allDefs = [colDefs, ...fkDefs].join(', ');
+                const mappedFKs = foreignKeys
+                    .filter(fk => fk.column && fk.refTable && fk.refColumn)
+                    .map(fk => ({
+                        column: fk.column,
+                        refTable: fk.refTable,
+                        refColumn: fk.refColumn,
+                        onDelete: fk.onDelete,
+                        onUpdate: fk.onUpdate
+                    }));
 
-                const query = `CREATE TABLE ${q}${tableName}${q} (${allDefs})`;
                 const connectionString = await getConnectionString();
-                await invoke('execute_query', { connectionString, query });
+                await invoke('create_table', {
+                    connectionString,
+                    tableName,
+                    columns: mappedColumns,
+                    foreignKeys: mappedFKs
+                });
+
                 onSuccess();
             }
         } catch (e) {
@@ -313,7 +401,7 @@ export const TableCreator: React.FC<TableCreatorProps> = ({ connection, onSucces
     };
 
     // Helper to check if value is a preset
-    const isPreset = (val: string) => ['', 'NULL', 'CURRENT_TIMESTAMP', 'AUTO_INCREMENT', 'TRUE', 'FALSE'].includes(val);
+    const isPreset = (val: string) => ['', 'NULL', 'CURRENT_TIMESTAMP', 'AUTO_INCREMENT', 'TRUE', 'FALSE', 'gen_random_uuid()'].includes(val);
 
     return (
         <div className={styles.container}>
@@ -389,16 +477,9 @@ export const TableCreator: React.FC<TableCreatorProps> = ({ connection, onSucces
                                         value={col.type}
                                         onChange={e => updateColumn(idx, 'type', e.target.value)}
                                     >
-                                        <option value="INTEGER">int4</option>
-                                        <option value="serial">serial</option>
-                                        <option value="TEXT">text</option>
-                                        <option value="VARCHAR">varchar</option>
-                                        <option value="CHAR">char</option>
-                                        <option value="BOOLEAN">bool</option>
-                                        <option value="jsonb">jsonb</option>
-                                        <option value="timestamp">timestamp</option>
-                                        <option value="date">date</option>
-                                        <option value="DECIMAL">decimal</option>
+                                        {COLUMN_TYPES[connection.db_type].map(typeOpt => (
+                                            <option key={typeOpt.value} value={typeOpt.value}>{typeOpt.label}</option>
+                                        ))}
                                     </select>
 
                                     {/* Parameters (Length/Size) */}
@@ -406,8 +487,8 @@ export const TableCreator: React.FC<TableCreatorProps> = ({ connection, onSucces
                                         className={styles.rowInput}
                                         value={col.length}
                                         onChange={e => updateColumn(idx, 'length', e.target.value)}
-                                        placeholder={['VARCHAR', 'CHAR', 'DECIMAL'].includes(col.type) ? "1-255" : "N/A"}
-                                        disabled={!['VARCHAR', 'CHAR', 'DECIMAL'].includes(col.type)}
+                                        placeholder={['VARCHAR', 'CHAR', 'DECIMAL', 'NUMERIC'].includes(col.type) ? "precision" : "N/A"}
+                                        disabled={!['VARCHAR', 'CHAR', 'DECIMAL', 'NUMERIC'].includes(col.type)}
                                     />
 
                                     {/* Default Value */}
@@ -427,9 +508,16 @@ export const TableCreator: React.FC<TableCreatorProps> = ({ connection, onSucces
                                             >
                                                 <option value="">None</option>
                                                 {col.isNullable && <option value="NULL">NULL</option>}
-                                                {col.isPrimaryKey && <option value="AUTO_INCREMENT">AUTO_INCREMENT</option>}
-                                                {['timestamp', 'date', 'datetime'].includes(col.type.toLowerCase()) && (
+                                                {/* AUTO_INCREMENT for MySQL/SQLite only - PostgreSQL uses SERIAL types */}
+                                                {col.isPrimaryKey && connection.db_type !== 'postgres' && (
+                                                    <option value="AUTO_INCREMENT">AUTO_INCREMENT</option>
+                                                )}
+                                                {['timestamp', 'date', 'datetime', 'timestamptz'].includes(col.type.toLowerCase()) && (
                                                     <option value="CURRENT_TIMESTAMP">CURRENT_TIMESTAMP</option>
+                                                )}
+                                                {/* PostgreSQL-specific: gen_random_uuid() for UUID columns */}
+                                                {connection.db_type === 'postgres' && col.type.toUpperCase() === 'UUID' && (
+                                                    <option value="gen_random_uuid()">gen_random_uuid()</option>
                                                 )}
                                                 <option value="_CUSTOM_">Value...</option>
                                             </select>

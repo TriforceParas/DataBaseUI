@@ -169,15 +169,15 @@ export const ChangelogSidebar: React.FC<ChangelogSidebarProps> = ({
                                     const getColor = () => {
                                         if (isUpdate) return updateColor;
                                         if (isInsert || isAddColumn) return insertColor;
-                                        if (isDropColumn) return deleteColor;
-                                        return deleteColor;
+                                        if (change.type === 'DELETE' || isDropColumn) return deleteColor;
+                                        return 'var(--text-secondary)';
                                     };
 
                                     const getBgColor = () => {
                                         if (isUpdate) return 'rgba(245, 158, 11, 0.2)';
                                         if (isInsert || isAddColumn) return 'rgba(34, 197, 94, 0.2)';
-                                        if (isDropColumn) return 'rgba(255, 77, 77, 0.2)';
-                                        return 'rgba(255, 77, 77, 0.2)';
+                                        if (change.type === 'DELETE' || isDropColumn) return 'rgba(255, 77, 77, 0.2)';
+                                        return 'transparent';
                                     };
 
                                     const getBadge = () => {
@@ -185,7 +185,8 @@ export const ChangelogSidebar: React.FC<ChangelogSidebarProps> = ({
                                         if (isInsert) return 'I';
                                         if (isAddColumn) return '+C';
                                         if (isDropColumn) return '-C';
-                                        return 'D';
+                                        if (change.type === 'DELETE') return 'D';
+                                        return '?';
                                     };
 
                                     return (
@@ -278,7 +279,7 @@ export const ChangelogSidebar: React.FC<ChangelogSidebarProps> = ({
                                                         <span style={{ marginRight: '0.5rem', opacity: 0.6, width: '10px', display: 'inline-block' }}>+</span>
                                                         <span style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-all' }}>New Row</span>
                                                     </div>
-                                                ) : (
+                                                ) : isUpdate ? (
                                                     <>
                                                         <div style={{
                                                             color: '#ff6b6b',
@@ -288,20 +289,33 @@ export const ChangelogSidebar: React.FC<ChangelogSidebarProps> = ({
                                                             alignItems: 'center'
                                                         }}>
                                                             <span style={{ marginRight: '0.5rem', opacity: 0.6, width: '10px', display: 'inline-block' }}>-</span>
-                                                            <span style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-all' }}>{isUpdate ? String(change.oldValue) : 'Deleted Row'}</span>
+                                                            <span style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-all' }}>{String(change.oldValue)}</span>
                                                         </div>
-                                                        {isUpdate && (
-                                                            <div style={{
-                                                                color: '#34d399',
-                                                                fontFamily: 'monospace',
-                                                                display: 'flex',
-                                                                alignItems: 'center'
-                                                            }}>
-                                                                <span style={{ marginRight: '0.5rem', opacity: 0.6, width: '10px', display: 'inline-block' }}>+</span>
-                                                                <span style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-all' }}>{String(change.newValue)}</span>
-                                                            </div>
-                                                        )}
+                                                        <div style={{
+                                                            color: '#34d399',
+                                                            fontFamily: 'monospace',
+                                                            display: 'flex',
+                                                            alignItems: 'center'
+                                                        }}>
+                                                            <span style={{ marginRight: '0.5rem', opacity: 0.6, width: '10px', display: 'inline-block' }}>+</span>
+                                                            <span style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-all' }}>{String(change.newValue)}</span>
+                                                        </div>
                                                     </>
+                                                ) : change.type === 'DELETE' ? (
+                                                    <div style={{
+                                                        color: '#ff6b6b',
+                                                        marginBottom: '4px',
+                                                        fontFamily: 'monospace',
+                                                        display: 'flex',
+                                                        alignItems: 'center'
+                                                    }}>
+                                                        <span style={{ marginRight: '0.5rem', opacity: 0.6, width: '10px', display: 'inline-block' }}>-</span>
+                                                        <span style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-all' }}>Deleted Row</span>
+                                                    </div>
+                                                ) : (
+                                                    <div style={{ color: 'var(--text-secondary)', fontSize: '0.75rem', fontStyle: 'italic' }}>
+                                                        {change.type === 'ADD_COLUMN' ? 'New Column' : change.type === 'DROP_COLUMN' ? 'Drop Column' : change.type}
+                                                    </div>
                                                 )}
                                             </div>
                                         </div>

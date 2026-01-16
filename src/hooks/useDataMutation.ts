@@ -1,3 +1,10 @@
+/**
+ * Data Mutation Hook
+ * 
+ * Handles data editing panel submissions for both INSERT and UPDATE operations.
+ * Converts panel data to pending changes for batch commit.
+ */
+
 import { useCallback, useRef } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import * as api from '../api';
@@ -35,15 +42,17 @@ export const useDataMutation = ({
 
     const getConnectionString = useCallback(async (): Promise<string> => {
         if (connectionStringRef.current) return connectionStringRef.current;
-        const connStr = await invoke<string>('get_connection_string', { connectionId: connection.id });
+        const connStr = await invoke<string>('get_connection_string', { 
+            connectionId: connection.id,
+            databaseName: connection.database_name 
+        });
         connectionStringRef.current = connStr;
         return connStr;
-    }, [connection.id]);
+    }, [connection.id, connection.database_name]);
 
     const handlePanelSubmit = useCallback(async (data: Record<string, any>[]) => {
         if (!activeTab || activeTab.type !== 'table') return;
 
-        // Determine if we are in "Edit Mode" (existing selection)
         const isEditMode = selectedIndices.size > 0;
 
         if (isEditMode) {
@@ -52,14 +61,13 @@ export const useDataMutation = ({
             if (!currentData) return;
 
             const cols = currentData.columns;
-            const idColIdx = cols.findIndex(c => c.toLowerCase() === 'id' || c.toLowerCase().includes('uuid')); // naive PK hint
+            const idColIdx = cols.findIndex(c => c.toLowerCase() === 'id' || c.toLowerCase().includes('uuid'));
             const idColName = idColIdx !== -1 ? cols[idColIdx] : null;
             const isMysql = connection.db_type === 'mysql';
             const q = isMysql ? '`' : '"';
 
             const safeVal = (v: any) => {
                 if (v === null || v === 'NULL' || v === undefined) return 'NULL';
-                // Be more conservative with numbers to avoid dropping leading zeros on strings
                 if (typeof v === 'number') return v;
                 if (typeof v === 'string' && v.trim() !== '' && !isNaN(Number(v)) && !v.startsWith('0')) return v;
                 return `'${String(v).replace(/'/g, "''")}'`;
@@ -71,7 +79,6 @@ export const useDataMutation = ({
                 const rowIndex = indices[i];
                 if (rowIndex === undefined) return;
 
-                // Case 1: Updating an existing database row
                 if (rowIndex < currentData.rows.length) {
                     const oldRow = currentData.rows[rowIndex];
                     Object.keys(newRow).forEach(col => {
@@ -120,11 +127,9 @@ export const useDataMutation = ({
 
             setShowEditWindow(false);
             setEditData(undefined);
-            // Selection is kept as requested
             return;
         }
 
-        // INSERT (Immediate)
         const connectionString = await getConnectionString();
         const isMysql = connection.db_type === 'mysql';
         const q = isMysql ? '`' : '"';

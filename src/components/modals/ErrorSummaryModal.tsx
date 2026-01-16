@@ -18,18 +18,8 @@ interface ErrorSummaryModalProps {
     onRetryWithFKDisabled?: (errors: ChangeError[]) => void;
 }
 
-export const ErrorSummaryModal: React.FC<ErrorSummaryModalProps> = ({
-    isOpen,
-    onClose,
-    errors,
-    onRetry,
-    onRetryWithFKDisabled
-}) => {
-    // Handle conditional rendering at component level
-    if (!isOpen || errors.length === 0) return null;
-
-    const fkErrors = errors.filter(e => e.isForeignKeyError);
-    const otherErrors = errors.filter(e => !e.isForeignKeyError);
+const ErrorItem = ({ error, type }: { error: ChangeError, type: 'fk' | 'other' }) => {
+    const borderColor = type === 'fk' ? '#ef4444' : '#f59e0b';
 
     const getChangeDescription = (change: PendingChange): string => {
         switch (change.type) {
@@ -49,79 +39,105 @@ export const ErrorSummaryModal: React.FC<ErrorSummaryModalProps> = ({
     };
 
     return (
-        <BaseModal onClose={onClose} title="Some Changes Failed" maxWidth="560px">
+        <div style={{
+            padding: '12px',
+            background: 'var(--bg-primary)',
+            border: '1px solid var(--border-color)',
+            borderLeft: `4px solid ${borderColor}`,
+            borderRadius: '4px',
+            marginBottom: '8px'
+        }}>
             <div style={{
                 display: 'flex',
-                flexDirection: 'column',
-                gap: '1rem',
-                maxHeight: '60vh',
-                overflow: 'auto'
+                alignItems: 'center',
+                gap: '8px',
+                marginBottom: '4px',
+                fontWeight: 600,
+                fontSize: '0.9rem',
+                color: 'var(--text-primary)'
             }}>
-                <p style={{
-                    color: 'var(--text-secondary)',
-                    fontSize: '0.9rem',
-                    margin: 0
-                }}>
-                    {errors.length} change(s) could not be applied. Successfully applied changes have been saved.
-                </p>
+                <span style={{ opacity: 0.8 }}>{getChangeDescription(error.change)}</span>
+            </div>
+            <div style={{
+                fontFamily: "'JetBrains Mono', monospace",
+                fontSize: '0.8rem',
+                color: 'var(--text-secondary)',
+                wordBreak: 'break-word',
+                whiteSpace: 'pre-wrap',
+                marginTop: '4px',
+                paddingTop: '4px',
+                borderTop: '1px solid var(--border-color)'
+            }}>
+                {error.error}
+            </div>
+        </div>
+    );
+};
+
+export const ErrorSummaryModal: React.FC<ErrorSummaryModalProps> = ({
+    isOpen,
+    onClose,
+    errors,
+    onRetry,
+    onRetryWithFKDisabled
+}) => {
+    if (!isOpen || errors.length === 0) return null;
+
+    const fkErrors = errors.filter(e => e.isForeignKeyError);
+    const otherErrors = errors.filter(e => !e.isForeignKeyError);
+
+    return (
+        <BaseModal onClose={onClose} title="Change Application Errors" maxWidth="600px">
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem', maxHeight: '65vh', overflowY: 'auto', paddingRight: '4px' }}>
+
+                <div style={{ display: 'flex', alignItems: 'flex-start', gap: '12px', padding: '12px', background: 'var(--bg-tertiary)', borderRadius: '6px' }}>
+                    <div style={{ color: '#ef4444', marginTop: '2px' }}><RiErrorWarningLine size={20} /></div>
+                    <div>
+                        <div style={{ fontWeight: 600, color: 'var(--text-primary)', marginBottom: '4px' }}>
+                            {errors.length} {errors.length === 1 ? 'change' : 'changes'} failed
+                        </div>
+                        <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', lineHeight: '1.4' }}>
+                            Some changes could not be applied to the database. Successful changes have been saved.
+                            Review the errors below.
+                        </div>
+                    </div>
+                </div>
 
                 {/* FK Errors Section */}
                 {fkErrors.length > 0 && (
-                    <div style={{
-                        padding: '1rem',
-                        background: 'rgba(239, 68, 68, 0.1)',
-                        border: '1px solid rgba(239, 68, 68, 0.3)',
-                        borderRadius: '8px'
-                    }}>
-                        <div style={{
+                    <div>
+                        <h4 style={{
+                            fontSize: '0.9rem',
+                            fontWeight: 600,
+                            color: 'var(--text-primary)',
+                            marginBottom: '10px',
                             display: 'flex',
                             alignItems: 'center',
-                            gap: '0.5rem',
-                            marginBottom: '0.75rem',
-                            color: '#ef4444',
-                            fontWeight: 600
+                            gap: '8px'
                         }}>
-                            <RiErrorWarningLine size={16} />
-                            Foreign Key Constraint Errors ({fkErrors.length})
-                        </div>
-
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                            <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#ef4444' }}></span>
+                            Foreign Key Constraints ({fkErrors.length})
+                        </h4>
+                        <div>
                             {fkErrors.map((err, idx) => (
-                                <div key={idx} style={{
-                                    padding: '0.5rem',
-                                    background: 'var(--bg-primary)',
-                                    borderRadius: '4px',
-                                    fontSize: '0.85rem'
-                                }}>
-                                    <div style={{ fontWeight: 500, marginBottom: '0.25rem' }}>
-                                        {getChangeDescription(err.change)}
-                                    </div>
-                                    <div style={{
-                                        color: 'var(--text-secondary)',
-                                        fontFamily: 'monospace',
-                                        fontSize: '0.8rem',
-                                        wordBreak: 'break-word'
-                                    }}>
-                                        {err.error}
-                                    </div>
-                                </div>
+                                <ErrorItem key={`fk-${idx}`} error={err} type="fk" />
                             ))}
                         </div>
-
                         {onRetryWithFKDisabled && (
                             <button
                                 className={styles.primaryBtn}
                                 onClick={() => onRetryWithFKDisabled(fkErrors)}
                                 style={{
-                                    marginTop: '0.75rem',
-                                    background: '#ef4444',
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    gap: '0.5rem'
+                                    marginTop: '12px',
+                                    background: 'transparent', // Use transparent for outlined button
+                                    color: '#ef4444',
+                                    border: '1px solid #ef4444',
+                                    width: '100%',
+                                    justifyContent: 'center'
                                 }}
                             >
-                                <RiRefreshLine size={14} />
-                                Retry with FK Checks Disabled
+                                <RiRefreshLine size={16} />
+                                Retry Selection with Integrity Checks Disabled
                             </button>
                         )}
                     </div>
@@ -129,57 +145,41 @@ export const ErrorSummaryModal: React.FC<ErrorSummaryModalProps> = ({
 
                 {/* Other Errors Section */}
                 {otherErrors.length > 0 && (
-                    <div style={{
-                        padding: '1rem',
-                        background: 'rgba(251, 191, 36, 0.1)',
-                        border: '1px solid rgba(251, 191, 36, 0.3)',
-                        borderRadius: '8px'
-                    }}>
-                        <div style={{
+                    <div>
+                        <h4 style={{
+                            fontSize: '0.9rem',
+                            fontWeight: 600,
+                            color: 'var(--text-primary)',
+                            marginBottom: '10px',
                             display: 'flex',
                             alignItems: 'center',
-                            gap: '0.5rem',
-                            marginBottom: '0.75rem',
-                            color: '#fbbf24',
-                            fontWeight: 600
+                            gap: '8px'
                         }}>
-                            <RiErrorWarningLine size={16} />
-                            Other Errors ({otherErrors.length})
-                        </div>
-
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                            <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#f59e0b' }}></span>
+                            General Errors ({otherErrors.length})
+                        </h4>
+                        <div>
                             {otherErrors.map((err, idx) => (
-                                <div key={idx} style={{
-                                    padding: '0.5rem',
-                                    background: 'var(--bg-primary)',
-                                    borderRadius: '4px',
-                                    fontSize: '0.85rem'
-                                }}>
-                                    <div style={{ fontWeight: 500, marginBottom: '0.25rem' }}>
-                                        {getChangeDescription(err.change)}
-                                    </div>
-                                    <div style={{
-                                        color: 'var(--text-secondary)',
-                                        fontFamily: 'monospace',
-                                        fontSize: '0.8rem',
-                                        wordBreak: 'break-word'
-                                    }}>
-                                        {err.error}
-                                    </div>
-                                </div>
+                                <ErrorItem key={`other-${idx}`} error={err} type="other" />
                             ))}
                         </div>
                     </div>
                 )}
             </div>
 
-            <div className={styles.actions}>
+            <div className={styles.actions} style={{ marginTop: '1.5rem', paddingTop: '1rem', borderTop: '1px solid var(--border-color)' }}>
                 {onRetry && (
-                    <button className={styles.retryBtn} onClick={onRetry}>
-                        <RiRefreshLine size={16} /> Retry Failed
+                    <button className={styles.primaryBtn} onClick={onRetry} style={{ background: '#ef4444' }}>
+                        <RiRefreshLine size={16} /> Retry All Failed
                     </button>
                 )}
-                <button className={styles.closeBtn} onClick={onClose}>Close</button>
+                <button
+                    className={styles.secondaryBtn}
+                    onClick={onClose}
+                    style={{ marginLeft: 'auto' }}
+                >
+                    Close
+                </button>
             </div>
         </BaseModal>
     );

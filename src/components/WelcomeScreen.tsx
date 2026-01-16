@@ -4,10 +4,11 @@ import { getCurrentWindow } from '@tauri-apps/api/window';
 import styles from '../styles/Welcome.module.css';
 import { Connection, DbType } from '../types/index';
 import { RiEdit2Line, RiDeleteBin7Line, RiAddLine, RiShieldKeyholeLine } from 'react-icons/ri';
-import { openConnectionWindow, openVaultWindow } from '../utils/windowManager';
+import { openConnectionWindow, openVaultWindow, openCredentialPromptWindow } from '../utils/windowManager';
 import { DiMysql } from 'react-icons/di';
 import { BiLogoPostgresql } from 'react-icons/bi';
 import { SiSqlite } from 'react-icons/si';
+import { checkForUpdates } from '../utils/updateManager';
 
 const getDbIcon = (dbType: DbType) => {
     switch (dbType) {
@@ -38,6 +39,34 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onConnect }) => {
     const [connections, setConnections] = useState<Connection[]>([]);
     const [isConnecting, setIsConnecting] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    const [checkingUpdate, setCheckingUpdate] = useState(false);
+    const [updateAvailable, setUpdateAvailable] = useState(false);
+
+    useEffect(() => {
+        const UPDATE_TIMEOUT_MS = 10000; // 10 seconds
+
+        const check = async () => {
+            setCheckingUpdate(true);
+
+            try {
+                // Race between update check and timeout
+                const updatePromise = checkForUpdates();
+                const timeoutPromise = new Promise<null>((_, reject) =>
+                    setTimeout(() => reject(new Error('Update check timed out')), UPDATE_TIMEOUT_MS)
+                );
+
+                const update = await Promise.race([updatePromise, timeoutPromise]);
+                if (update) {
+                    setUpdateAvailable(true);
+                }
+            } catch (e) {
+                console.error('Update check failed or timed out:', e);
+            } finally {
+                setCheckingUpdate(false);
+            }
+        };
+        check();
+    }, []);
 
     const fetchConnections = async () => {
         try {
@@ -92,6 +121,13 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onConnect }) => {
 
     const handleConnect = async (conn: Connection) => {
         setError(null);
+
+        // Check if credential is required but missing (except for SQLite)
+        if (conn.db_type !== 'sqlite' && !conn.credential_id) {
+            openCredentialPromptWindow(conn.id, conn.name);
+            return;
+        }
+
         setIsConnecting(true);
         try {
             // Check connection first
@@ -173,12 +209,22 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onConnect }) => {
 
                 {/* Footer */}
                 <div className={styles.footer}>
-                    <div>Version 0.1.0</div>
+                    <div className={styles.version}>
+                        Version 0.1.0
+                        {checkingUpdate && <div className={styles.updateSpinner} title="Checking for updates..."></div>}
+                        {!checkingUpdate && updateAvailable && (
+                            <button
+                                className={styles.updateBtn}
+                                onClick={() => checkForUpdates()}
+                            >
+                                Update Available
+                            </button>
+                        )}
+                    </div>
                     <div className={styles.footerRight}>
                         <div
                             className={styles.testConnection}
                             onClick={openVaultWindow}
-                            style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.5rem' }}
                         >
                             <RiShieldKeyholeLine size={16} /> Credential Vault
                         </div>

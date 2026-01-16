@@ -1,6 +1,6 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import styles from '../../styles/MainLayout.module.css';
-import { Connection, Tag, TableTag, SavedQuery, SavedFunction } from '../../types/index';
+import { Connection, Tag, SavedQuery, SavedFunction, SidebarView } from '../../types/index';
 import { Icons } from '../../assets/icons';
 import { invoke } from '@tauri-apps/api/core';
 import { TagManager } from './TagManager';
@@ -14,7 +14,7 @@ import { ContextMenu } from '../common/ContextMenu';
 interface SidebarProps {
     sidebarOpen: boolean;
     connection: Connection;
-    tables: string[];
+    sessionId?: string | null;
     savedConnections: Connection[];
     onSwitchConnection: (conn: Connection) => void;
     onSwitchDatabase: (dbName: string) => void;
@@ -242,7 +242,7 @@ const TagGroup = ({
 
 
 export const Sidebar: React.FC<SidebarProps> = ({
-    sidebarOpen, connection, tables, /* savedConnections, */
+    sidebarOpen, connection, sessionId, /* savedConnections, */
     /* onSwitchConnection, */ onSwitchDatabase, onTableClick, /* onAddConnection, */ refreshTrigger,
     onGetTableSchema, onEditTableSchema, onDuplicateTable, onTruncateTable, onDropTable,
     savedQueries = [], savedFunctions = [], onQueryClick, onFunctionClick, onDeleteQuery, onDeleteFunction, onEditFunction,
@@ -250,7 +250,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
 }) => {
     const [viewMode, setViewMode] = useState<'az' | 'tags'>('az');
     const [showConnDropdown, setShowConnDropdown] = useState(false);
-    const [availableDatabases, setAvailableDatabases] = useState<string[]>([]);
+    const [viewData, setViewData] = useState<SidebarView>({ groups: [], untagged: [], databases: [] });
     const [showDatabaseManager, setShowDatabaseManager] = useState(false);
 
     // Global Context Menu State
@@ -287,8 +287,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
         });
     };
 
-    const [tags, setTags] = useState<Tag[]>([]);
-    const [tableTags, setTableTags] = useState<TableTag[]>([]);
     const [showTagManager, setShowTagManager] = useState(false);
     const [editingTag, setEditingTag] = useState<Tag | undefined>(undefined);
     const [confirmModal, setConfirmModal] = useState<{ tag: Tag } | null>(null);
@@ -325,7 +323,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
         if (!confirmModal) return;
         try {
             await invoke('delete_tag', { id: confirmModal.tag.id });
-            fetchTags();
+            fetchSidebarView(true);
         } catch (e) {
             console.error('Failed to delete tag:', e);
         }
@@ -338,41 +336,77 @@ export const Sidebar: React.FC<SidebarProps> = ({
         useSensor(KeyboardSensor, {} as any)
     );
 
+    // Track ongoing requests and debounce to prevent rapid re-fetches
+    const fetchTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+    const isFetchingRef = useRef(false);
+    const lastFetchParamsRef = useRef<string>('');
 
+    const getCurrentDatabase = useCallback(() => {
+        if (!connection) return undefined;
+        if (connection.db_type === 'sqlite') {
+            return connection.host;
+        }
+        return connection.database_name;
+    }, [connection]);
+
+    const fetchSidebarView = useCallback(async (force = false) => {
+        // Create a unique key for current params to dedupe identical requests
+        const dbName = getCurrentDatabase();
+        const fetchKey = `${connection.id}-${dbName}-${sessionId}-${searchQuery}`;
+
+        // Skip if same params and not forced
+        if (!force && fetchKey === lastFetchParamsRef.current) {
+            return;
+        }
+
+        // Skip if already fetching (prevents overlapping requests)
+        if (isFetchingRef.current) {
+            return;
+        }
+
+        isFetchingRef.current = true;
+        lastFetchParamsRef.current = fetchKey;
+
+        try {
+            const data = await invoke<SidebarView>('get_sidebar_view', {
+                connectionId: connection.id,
+                connectionString: sessionId || undefined,
+                databaseName: dbName,
+                searchQuery
+            });
+            setViewData(data);
+        } catch (e) {
+            console.error("Failed to fetch sidebar view", e);
+        } finally {
+            isFetchingRef.current = false;
+        }
+    }, [connection.id, getCurrentDatabase, sessionId, searchQuery]);
+
+    // Track previous refreshTrigger to detect changes
+    const prevRefreshTriggerRef = useRef(refreshTrigger);
+
+    // Debounced effect for fetching sidebar view
     useEffect(() => {
-        // Always fetch tags so colors are available even in AZ mode
-        fetchTags();
-        fetchTableTags();
-        fetchDatabases();
-    }, [connection, refreshTrigger]);
+        // Clear any pending fetch
+        if (fetchTimeoutRef.current) {
+            clearTimeout(fetchTimeoutRef.current);
+        }
 
-    const fetchTags = async () => {
-        try {
-            const dbName = getCurrentDatabase();
-            const t = await invoke<Tag[]>('get_tags', { connectionId: connection.id, databaseName: dbName });
-            setTags(t);
-        } catch (e) { console.error(e); }
-    };
+        // Check if refreshTrigger changed (force refresh)
+        const shouldForce = prevRefreshTriggerRef.current !== refreshTrigger;
+        prevRefreshTriggerRef.current = refreshTrigger;
 
-    const fetchTableTags = async () => {
-        try {
-            const dbName = getCurrentDatabase();
-            const tt = await invoke<TableTag[]>('get_table_tags', { connectionId: connection.id, databaseName: dbName });
-            setTableTags(tt);
-        } catch (e) { console.error(e); }
-    };
+        // Debounce the fetch to avoid rapid consecutive calls
+        fetchTimeoutRef.current = setTimeout(() => {
+            fetchSidebarView(shouldForce);
+        }, 50); // Small debounce to batch rapid state changes
 
-    const fetchDatabases = async () => {
-        try {
-            // Get connection string from backend using connection ID
-            const connectionString = await invoke<string>('get_connection_string', { connectionId: connection.id });
-            const dbs = await invoke<string[]>('get_databases', { connectionString });
-            // Filter out system schemas
-            const systemSchemas = ['sys', 'information_schema', 'mysql', 'performance_schema'];
-            const filteredDbs = dbs.filter(db => !systemSchemas.includes(db.toLowerCase()));
-            setAvailableDatabases(filteredDbs);
-        } catch (e) { console.error("Failed to fetch databases", e); }
-    };
+        return () => {
+            if (fetchTimeoutRef.current) {
+                clearTimeout(fetchTimeoutRef.current);
+            }
+        };
+    }, [connection.id, connection.database_name, sessionId, refreshTrigger, searchQuery, fetchSidebarView]);
 
     const handleDragStart = (event: DragStartEvent) => {
         setActiveDragItem(event.active.id as string);
@@ -395,13 +429,35 @@ export const Sidebar: React.FC<SidebarProps> = ({
             const dbName = getCurrentDatabase();
 
             // Optimistic Update
-            setTableTags(prev => {
-                let next = [...prev];
-                // Remove from old
-                if (fromTagId) next = next.filter(t => !(t.table_name === tableName && t.tag_id === fromTagId));
-                // Add to new (Sort will happen automatically via rendering)
-                if (toTagId) next.push({ table_name: tableName, tag_id: toTagId, connection_id: connection.id, database_name: dbName || '', order_index: 0 });
-                return next;
+            setViewData(prev => {
+                let nextGroups = prev.groups.map(g => {
+                    let newTables = g.tables;
+                    // Remove from source if it was a tag
+                    if (fromTagId && g.tag.id === fromTagId) {
+                        newTables = newTables.filter(t => t !== tableName);
+                    }
+                    // Add to dest if it is a tag
+                    if (toTagId && g.tag.id === toTagId) {
+                        if (!newTables.includes(tableName)) {
+                            newTables = [...newTables, tableName].sort();
+                        }
+                    }
+                    return { ...g, tables: newTables };
+                });
+
+                let nextUntagged = prev.untagged;
+                // Remove from source if it was untagged
+                if (!fromTagId) {
+                    nextUntagged = nextUntagged.filter(t => t !== tableName);
+                }
+                // Add to dest if it is untagged
+                if (!toTagId) {
+                    if (!nextUntagged.includes(tableName)) {
+                        nextUntagged = [...nextUntagged, tableName].sort();
+                    }
+                }
+
+                return { ...prev, groups: nextGroups, untagged: nextUntagged };
             });
 
             try {
@@ -421,36 +477,22 @@ export const Sidebar: React.FC<SidebarProps> = ({
                         tagId: toTagId
                     });
                 }
-                fetchTableTags();
+                fetchSidebarView(true);
             } catch (e) {
                 console.error('Error during drag operation:', e);
-                fetchTableTags();
+                fetchSidebarView(true);
             }
         }
     };
 
-    // Grouping Logic
-    const { groups, untagged } = useMemo(() => {
-        let assignedTables = new Set<string>();
-        const groups = tags.map(tag => {
-            const tabs = tableTags
-                .filter(tt => tt.tag_id === tag.id)
-                .map(tt => tt.table_name);
+    const { groups, untagged, databases: availableDatabases } = viewData;
 
-            tabs.forEach(t => assignedTables.add(t));
-            return { tag, tables: tabs };
-        });
-
-        // Untagged
-        const untagged = tables.filter(t => !assignedTables.has(t));
-
-        return { groups, untagged };
-    }, [tags, tableTags, tables]);
-
-    // Filter items based on search query
-    const filteredTables = useMemo(() => searchQuery
-        ? tables.filter(t => t.toLowerCase().includes(searchQuery.toLowerCase()))
-        : tables, [searchQuery, tables]);
+    const filteredTables = useMemo(() => {
+        const all = new Set<string>();
+        groups.forEach(g => g.tables.forEach(t => all.add(t)));
+        untagged.forEach(t => all.add(t));
+        return Array.from(all).sort();
+    }, [viewData]);
 
     const filteredQueries = useMemo(() => searchQuery
         ? savedQueries.filter(q => q.name.toLowerCase().includes(searchQuery.toLowerCase()))
@@ -462,15 +504,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
     const isSearching = searchQuery.length > 0;
 
-    // Extract current database name from connection
-    const getCurrentDatabase = () => {
-        if (!connection) return undefined;
-        if (connection.db_type === 'sqlite') {
-            // For SQLite, return the file path
-            return connection.host;
-        }
-        return connection.database_name || connection.name;
-    };
 
     return (
         <div className={`${styles.sidebar} ${!sidebarOpen ? styles.closed : ''}`}>
@@ -481,8 +514,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 style={{ position: 'relative' }}
             >
                 <div style={{ display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-                    <span style={{ fontWeight: 600, fontSize: '1rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginRight: '0.5rem' }}>
-                        {getCurrentDatabase()}
+                    <span style={{ fontWeight: 600, fontSize: '0.9rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginRight: '0.5rem' }}>
+                        {getCurrentDatabase() || <i style={{ color: 'var(--text-muted)', fontWeight: 400, opacity: 0.8 }}>Select Database</i>}
                     </span>
                 </div>
                 <Icons.ChevronDown size={14} style={{ opacity: 0.5, marginLeft: 'auto' }} />
@@ -506,44 +539,44 @@ export const Sidebar: React.FC<SidebarProps> = ({
                     }} data-conn-dropdown="true">
 
                         {/* Database Selection Section */}
-                        {availableDatabases.length > 0 && (
-                            <>
-                                <div style={{
-                                    padding: '0.5rem',
-                                    fontSize: '0.75rem',
-                                    fontWeight: 600,
-                                    textTransform: 'uppercase',
-                                    color: 'var(--text-muted)',
-                                    backgroundColor: 'var(--bg-tertiary)',
-                                    letterSpacing: '0.05em'
-                                }}>
-                                    Databases
+                        <div style={{
+                            padding: '0.5rem',
+                            fontSize: '0.75rem',
+                            fontWeight: 600,
+                            textTransform: 'uppercase',
+                            color: 'var(--text-muted)',
+                            backgroundColor: 'var(--bg-tertiary)',
+                            letterSpacing: '0.05em'
+                        }}>
+                            Databases
+                        </div>
+                        <div style={{ maxHeight: '150px', overflowY: 'auto' }}>
+                            {availableDatabases.map(db => (
+                                <div
+                                    key={db}
+                                    style={{
+                                        padding: '0.5rem 1rem',
+                                        cursor: 'pointer',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        gap: '0.5rem',
+                                        fontSize: '0.9rem',
+                                        color: (connection.database_name === db)
+                                            ? 'var(--accent-primary)' : 'var(--text-primary)',
+                                    }}
+                                    onClick={(e) => { e.stopPropagation(); onSwitchDatabase(db); setShowConnDropdown(false); }}
+                                >
+                                    <Icons.Database size={14} />
+                                    {db}
                                 </div>
-                                <div style={{ maxHeight: '150px', overflowY: 'auto' }}>
-                                    {availableDatabases.map(db => (
-                                        <div
-                                            key={db}
-                                            style={{
-                                                padding: '0.5rem 1rem',
-                                                cursor: 'pointer',
-                                                display: 'flex',
-                                                alignItems: 'center',
-                                                gap: '0.5rem',
-                                                fontSize: '0.9rem',
-                                                color: (connection.database_name === db)
-                                                    ? 'var(--accent-primary)' : 'var(--text-primary)',
-                                                // Check active logic is naive, but works if we switched using handleSwitchDatabase
-                                            }}
-                                            onClick={(e) => { e.stopPropagation(); onSwitchDatabase(db); setShowConnDropdown(false); }}
-                                        >
-                                            <Icons.Database size={14} />
-                                            {db}
-                                        </div>
-                                    ))}
+                            ))}
+                            {availableDatabases.length === 0 && (
+                                <div style={{ padding: '0.8rem 1rem', fontSize: '0.85rem', color: 'var(--text-muted)', fontStyle: 'italic' }}>
+                                    No databases found
                                 </div>
-                                <div style={{ height: '1px', backgroundColor: 'var(--border-color)', margin: '0.25rem 0' }}></div>
-                            </>
-                        )}
+                            )}
+                        </div>
+                        <div style={{ height: '1px', backgroundColor: 'var(--border-color)', margin: '0.25rem 0' }}></div>
 
                         {/* Database Manager */}
                         <div
@@ -592,8 +625,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
                             <div style={{ marginBottom: '0.5rem' }}>
                                 <div style={{ padding: '0.25rem 0.5rem', fontSize: '0.7rem', textTransform: 'uppercase', color: 'var(--text-muted)', fontWeight: 600 }}>Tables</div>
                                 {filteredTables.map(table => {
-                                    const tt = tableTags.find(t => t.table_name === table);
-                                    const tag = tt ? tags.find(t => t.id === tt.tag_id) : undefined;
+                                    const group = groups.find(g => g.tables.includes(table));
+                                    const tag = group ? group.tag : undefined;
                                     return (
                                         <DraggableTableItem
                                             key={table}
@@ -648,14 +681,14 @@ export const Sidebar: React.FC<SidebarProps> = ({
                     <>
                         <CollapsibleSection
                             title="Tables"
-                            count={tables.length}
+                            count={filteredTables.length}
                             icon={<Icons.Folder size={14} color="var(--text-secondary)" />}
                             isOpen={expandedSections.has('az-tables')}
                             onToggle={() => toggleSection('az-tables')}
                         >
-                            {tables.map(table => {
-                                const tt = tableTags.find(t => t.table_name === table);
-                                const tag = tt ? tags.find(t => t.id === tt.tag_id) : undefined;
+                            {filteredTables.map(table => {
+                                const group = groups.find(g => g.tables.includes(table));
+                                const tag = group ? group.tag : undefined;
                                 return (
                                     <DraggableTableItem
                                         key={table}
@@ -783,7 +816,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                     }}>
                         <div onClick={e => e.stopPropagation()}>
                             <TagManager
-                                onSuccess={() => { setShowTagManager(false); setEditingTag(undefined); fetchTags(); }}
+                                onSuccess={() => { setShowTagManager(false); setEditingTag(undefined); fetchSidebarView(true); }}
                                 onCancel={() => { setShowTagManager(false); setEditingTag(undefined); }}
                                 editTag={editingTag}
                                 connection={connection}
@@ -812,8 +845,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
                         onClose={() => setShowDatabaseManager(false)}
                         connection={connection}
                         onSuccess={() => {
-                            // Refresh databases
-                            fetchDatabases();
+                            // Refresh sidebar
+                            fetchSidebarView(true);
                         }}
                         onDatabaseChange={onSwitchDatabase}
                     />

@@ -108,7 +108,7 @@ export const VaultWindow: React.FC = () => {
             </div>
 
             {/* Main Content */}
-            <div style={{ flex: 1, padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1rem', overflowY: 'hidden' }}>
+            <div style={{ flex: 1, padding: '1.5rem 1.5rem 1.5rem 1.5rem', display: 'flex', flexDirection: 'column', gap: '1rem', overflowY: 'auto' }} className="vault-content">
 
                 {/* Search & Actions */}
                 <div style={{ display: 'flex', gap: '0.75rem' }}>
@@ -150,8 +150,25 @@ export const VaultWindow: React.FC = () => {
                     </button>
                 </div>
 
+                <style>{`
+                    .vault-content::-webkit-scrollbar {
+                        width: 8px;
+                    }
+                    .vault-content::-webkit-scrollbar-track {
+                        background: transparent;
+                    }
+                    .vault-content::-webkit-scrollbar-thumb {
+                        background: #4a5568;
+                        border-radius: 10px;
+                        border: 2px solid #1a1b1e;
+                    }
+                    .vault-content::-webkit-scrollbar-thumb:hover {
+                        background: #718096;
+                    }
+                `}</style>
+
                 {/* List or Form */}
-                <div style={{ flex: 1, overflowY: 'auto' }}>
+                <div style={{ flex: 1 }}>
                     {isAdding ? (
                         <div style={{
                             background: '#2d3748',

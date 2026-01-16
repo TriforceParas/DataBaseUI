@@ -53,7 +53,10 @@ export const SchemaImportExportModal: React.FC<SchemaImportExportModalProps> = (
         setLogs(prev => [...prev, `Starting ${mode} operation...`]);
 
         try {
-            const connectionString = await invoke<string>('get_connection_string', { connectionId: connection.id });
+            const connectionString = await invoke<string>('get_connection_string', { 
+                connectionId: connection.id,
+                databaseName: connection.database_name 
+            });
             const command = mode === 'export' ? 'export_schema' : 'import_schema';
             const result = await invoke<string>(command, {
                 connectionString,

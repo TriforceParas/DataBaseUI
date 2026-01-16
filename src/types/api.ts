@@ -1,3 +1,9 @@
+/**
+ * API Response Types
+ * 
+ * Types for backend API responses, pending changes, and batch operations.
+ */
+
 export interface QueryResult {
     columns: string[];
     rows: any[][];
@@ -13,6 +19,27 @@ export interface PendingChange {
     oldValue?: any;
     newValue?: any;
     generatedSql?: string;
+    identifier?: RowIdentifier;
+    updates?: CellUpdate[];
+    insert_values?: Record<string, string | null>;
+}
+
+export interface RowIdentifier {
+    columns: string[];
+    values: (string | null)[];
+}
+
+export interface CellUpdate {
+    column: string;
+    value: string | null;
+}
+
+export interface BatchChange {
+    operation: 'UPDATE' | 'DELETE' | 'INSERT';
+    table_name: string;
+    identifier?: RowIdentifier;
+    updates?: CellUpdate[];
+    insert_values?: Record<string, string | null>;
 }
 
 export interface LogEntry {
@@ -24,6 +51,17 @@ export interface LogEntry {
     error?: string;
     rows?: number;
     user?: string;
+}
+
+export interface TagGroupView {
+    tag: import('./models').Tag;
+    tables: string[];
+}
+
+export interface SidebarView {
+    groups: TagGroupView[];
+    untagged: string[];
+    databases: string[];
 }
 
 // Alias for compatibility

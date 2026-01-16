@@ -18,6 +18,7 @@ pub fn run() {
             commands::connection::list_connections,
             commands::connection::verify_connection,
             commands::connection::verify_connection_by_id,
+            commands::connection::verify_connection_manual,
             commands::connection::delete_connection,
             commands::connection::update_connection,
             commands::connection::get_connection_string,
@@ -40,6 +41,13 @@ pub fn run() {
             commands::db_ops::create_database,
             commands::db_ops::duplicate_database,
             commands::db_ops::delete_database,
+            commands::db_ops::get_table_data,
+            commands::db_ops::create_table,
+            // CRUD Operations
+            commands::crud::update_record,
+            commands::crud::delete_record,
+            commands::crud::insert_record,
+            commands::crud::apply_batch_changes,
             // Tags
             commands::tag::create_tag,
             commands::tag::update_tag,
@@ -48,6 +56,8 @@ pub fn run() {
             commands::tag::assign_tag,
             commands::tag::remove_tag_from_table,
             commands::tag::get_table_tags,
+            // Sidebar
+            commands::sidebar::get_sidebar_view,
             // Saved Items
             commands::saved::save_query,
             commands::saved::list_queries,
@@ -60,7 +70,13 @@ pub fn run() {
             // Window
             commands::window::open_connection_window,
             commands::window::open_loading_window,
-            commands::window::close_loading_window
+            commands::window::close_loading_window,
+            // Filters
+            commands::filter::save_table_filters,
+            commands::filter::get_table_filters,
+            commands::filter::delete_table_filters,
+            // Session
+            commands::session::create_session,
         ])
         .setup(|app| {
             if cfg!(debug_assertions) {
@@ -71,12 +87,22 @@ pub fn run() {
                 )?;
             }
 
+            // Initialize updater plugin (desktop only)
+            #[cfg(desktop)]
+            app.handle().plugin(tauri_plugin_updater::Builder::new().build())?;
+            
+            // Initialize process plugin for restart after update
+            app.handle().plugin(tauri_plugin_process::init())?;
+
             // Initialize DB
             let handle = app.handle().clone();
             tauri::async_runtime::block_on(async move {
                 match db::init_db(&handle).await {
                     Ok(pool) => {
-                        handle.manage(AppState { db: pool });
+                        handle.manage(AppState { 
+                            db: pool,
+                            sessions: db::SessionManager::new()
+                        });
                     }
                     Err(e) => {
                         log::error!("Failed to initialize database: {}", e);

@@ -13,10 +13,14 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - platform: 'ubuntu-22.04'
+          - platform: 'macos-latest' # macOS x86_64 and aarch64 (Universal)
+            args: '--target universal-apple-darwin'
+          - platform: 'ubuntu-22.04' # Linux DEB, RPM, and AppImage
             args: ''
-          - platform: 'windows-latest'
-            args: ''
+          - platform: 'windows-latest' # Windows x64 MSI and NSIS
+            args: '--target x86_64-pc-windows-msvc'
+          - platform: 'windows-latest' # Windows ARM64 MSI and NSIS
+            args: '--target aarch64-pc-windows-msvc'
 
     runs-on: ${{ matrix.platform }}
     steps:
@@ -34,7 +38,7 @@ jobs:
         if: matrix.platform == 'ubuntu-22.04'
         run: |
           sudo apt-get update
-          sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf libsecret-1-dev libssl-dev
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf libsecret-1-dev libssl-dev rpm
 
       - name: Install frontend dependencies
         run: npm ci
@@ -45,6 +49,12 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
         with:
           tagName: ${{ github.ref_name }}
           releaseName: 'SQL UI v__VERSION__'

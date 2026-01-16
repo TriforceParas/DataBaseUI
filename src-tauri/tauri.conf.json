@@ -29,7 +29,13 @@
   },
   "bundle": {
     "active": true,
-    "targets": "all",
+    "targets": [
+      "deb",
+      "rpm",
+      "appimage",
+      "nsis",
+      "msi"
+    ],
     "createUpdaterArtifacts": true,
     "icon": [
       "icons/icon.png",

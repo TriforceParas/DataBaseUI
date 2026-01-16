@@ -86,6 +86,13 @@ pub fn run() {
                 )?;
             }
 
+            // Initialize updater plugin (desktop only)
+            #[cfg(desktop)]
+            app.handle().plugin(tauri_plugin_updater::Builder::new().build())?;
+            
+            // Initialize process plugin for restart after update
+            app.handle().plugin(tauri_plugin_process::init())?;
+
             // Initialize DB
             let handle = app.handle().clone();
             tauri::async_runtime::block_on(async move {

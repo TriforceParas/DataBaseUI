@@ -8,6 +8,7 @@ import { openConnectionWindow, openVaultWindow, openCredentialPromptWindow } fro
 import { DiMysql } from 'react-icons/di';
 import { BiLogoPostgresql } from 'react-icons/bi';
 import { SiSqlite } from 'react-icons/si';
+import { checkForUpdates } from '../utils/updateManager';
 
 const getDbIcon = (dbType: DbType) => {
     switch (dbType) {
@@ -182,6 +183,13 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onConnect }) => {
                 <div className={styles.footer}>
                     <div className={styles.version}>Version 0.1.0</div>
                     <div className={styles.footerRight}>
+                        <div
+                            className={styles.testConnection}
+                            onClick={checkForUpdates}
+                            style={{ cursor: 'pointer', marginRight: '15px' }}
+                        >
+                            Check for Updates
+                        </div>
                         <div
                             className={styles.testConnection}
                             onClick={openVaultWindow}

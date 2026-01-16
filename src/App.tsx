@@ -10,6 +10,7 @@ import { ConnectionWindow } from "./components/windows/ConnectionWindow";
 import { VaultWindow } from "./components/windows/VaultWindow";
 import { ErrorWindow } from "./components/windows/ErrorWindow";
 import { CredentialPromptWindow } from "./components/windows/CredentialPromptWindow";
+import { UpdateNotificationWindow } from "./components/windows/UpdateNotificationWindow";
 import { openCredentialPromptWindow, openErrorWindow } from "./utils/windowManager";
 import { invoke } from "@tauri-apps/api/core";
 
@@ -40,6 +41,10 @@ function App() {
   if (windowMode === 'credential-prompt') {
     return <CredentialPromptWindow />;
   }
+  if (windowMode === 'update-notification') {
+    return <UpdateNotificationWindow />;
+  } // Added routing for update notification
+
 
   // Loading Screen Mode
   const isLoadingMode = params.get('mode') === 'loading';

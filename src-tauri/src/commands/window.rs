@@ -26,7 +26,7 @@ pub async fn open_connection_window<R: tauri::Runtime>(
         .decorations(false)
         .maximized(true)
         .build()
-        .map_err(|e| e.to_string())?;
+        .map_err(|e: tauri::Error| e.to_string())?;
 
     Ok(())
 }
@@ -54,7 +54,7 @@ pub async fn open_loading_window<R: tauri::Runtime>(
         .center()
         .resizable(false);
 
-    win.build().map_err(|e| e.to_string())?;
+    win.build().map_err(|e: tauri::Error| e.to_string())?;
 
     Ok(())
 }
@@ -64,7 +64,7 @@ pub async fn close_loading_window<R: tauri::Runtime>(
     app: tauri::AppHandle<R>,
 ) -> Result<(), String> {
     if let Some(win) = app.get_webview_window("loading-window") {
-        win.close().map_err(|e| e.to_string())?;
+        win.close().map_err(|e: tauri::Error| e.to_string())?;
     }
     Ok(())
 }

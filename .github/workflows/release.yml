@@ -14,14 +14,18 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - platform: 'macos-latest' # macOS x86_64 and aarch64 (Universal)
+          - platform: 'macos-latest'
             args: '--target universal-apple-darwin'
-          - platform: 'ubuntu-22.04' # Linux DEB, RPM, and AppImage
+            target: 'x86_64-apple-darwin,aarch64-apple-darwin'
+          - platform: 'ubuntu-22.04'
             args: ''
-          - platform: 'windows-latest' # Windows x64 MSI and NSIS
+            target: 'x86_64-unknown-linux-gnu'
+          - platform: 'windows-latest'
             args: '--target x86_64-pc-windows-msvc'
-          - platform: 'windows-latest' # Windows ARM64 MSI and NSIS
+            target: 'x86_64-pc-windows-msvc'
+          - platform: 'windows-latest'
             args: '--target aarch64-pc-windows-msvc'
+            target: 'aarch64-pc-windows-msvc'
 
     runs-on: ${{ matrix.platform }}
     steps:
@@ -33,7 +37,9 @@ jobs:
           node-version: lts/*
 
       - name: Install Rust stable
-        uses: dtolnay/rust-action@stable
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
 
       - name: Install dependencies (ubuntu only)
         if: matrix.platform == 'ubuntu-22.04'

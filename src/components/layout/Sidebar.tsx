@@ -353,20 +353,20 @@ export const Sidebar: React.FC<SidebarProps> = ({
         // Create a unique key for current params to dedupe identical requests
         const dbName = getCurrentDatabase();
         const fetchKey = `${connection.id}-${dbName}-${sessionId}-${searchQuery}`;
-        
+
         // Skip if same params and not forced
         if (!force && fetchKey === lastFetchParamsRef.current) {
             return;
         }
-        
+
         // Skip if already fetching (prevents overlapping requests)
         if (isFetchingRef.current) {
             return;
         }
-        
+
         isFetchingRef.current = true;
         lastFetchParamsRef.current = fetchKey;
-        
+
         try {
             const data = await invoke<SidebarView>('get_sidebar_view', {
                 connectionId: connection.id,
@@ -382,18 +382,25 @@ export const Sidebar: React.FC<SidebarProps> = ({
         }
     }, [connection.id, getCurrentDatabase, sessionId, searchQuery]);
 
+    // Track previous refreshTrigger to detect changes
+    const prevRefreshTriggerRef = useRef(refreshTrigger);
+
     // Debounced effect for fetching sidebar view
     useEffect(() => {
         // Clear any pending fetch
         if (fetchTimeoutRef.current) {
             clearTimeout(fetchTimeoutRef.current);
         }
-        
+
+        // Check if refreshTrigger changed (force refresh)
+        const shouldForce = prevRefreshTriggerRef.current !== refreshTrigger;
+        prevRefreshTriggerRef.current = refreshTrigger;
+
         // Debounce the fetch to avoid rapid consecutive calls
         fetchTimeoutRef.current = setTimeout(() => {
-            fetchSidebarView();
+            fetchSidebarView(shouldForce);
         }, 50); // Small debounce to batch rapid state changes
-        
+
         return () => {
             if (fetchTimeoutRef.current) {
                 clearTimeout(fetchTimeoutRef.current);

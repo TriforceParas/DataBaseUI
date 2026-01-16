@@ -39,6 +39,34 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onConnect }) => {
     const [connections, setConnections] = useState<Connection[]>([]);
     const [isConnecting, setIsConnecting] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    const [checkingUpdate, setCheckingUpdate] = useState(false);
+    const [updateAvailable, setUpdateAvailable] = useState(false);
+
+    useEffect(() => {
+        const UPDATE_TIMEOUT_MS = 10000; // 10 seconds
+
+        const check = async () => {
+            setCheckingUpdate(true);
+
+            try {
+                // Race between update check and timeout
+                const updatePromise = checkForUpdates();
+                const timeoutPromise = new Promise<null>((_, reject) =>
+                    setTimeout(() => reject(new Error('Update check timed out')), UPDATE_TIMEOUT_MS)
+                );
+
+                const update = await Promise.race([updatePromise, timeoutPromise]);
+                if (update) {
+                    setUpdateAvailable(true);
+                }
+            } catch (e) {
+                console.error('Update check failed or timed out:', e);
+            } finally {
+                setCheckingUpdate(false);
+            }
+        };
+        check();
+    }, []);
 
     const fetchConnections = async () => {
         try {
@@ -181,15 +209,19 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onConnect }) => {
 
                 {/* Footer */}
                 <div className={styles.footer}>
-                    <div className={styles.version}>Version 0.1.0</div>
+                    <div className={styles.version}>
+                        Version 0.1.0
+                        {checkingUpdate && <div className={styles.updateSpinner} title="Checking for updates..."></div>}
+                        {!checkingUpdate && updateAvailable && (
+                            <button
+                                className={styles.updateBtn}
+                                onClick={() => checkForUpdates()}
+                            >
+                                Update Available
+                            </button>
+                        )}
+                    </div>
                     <div className={styles.footerRight}>
-                        <div
-                            className={styles.testConnection}
-                            onClick={checkForUpdates}
-                            style={{ cursor: 'pointer', marginRight: '15px' }}
-                        >
-                            Check for Updates
-                        </div>
                         <div
                             className={styles.testConnection}
                             onClick={openVaultWindow}

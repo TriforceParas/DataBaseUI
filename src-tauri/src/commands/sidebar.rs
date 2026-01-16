@@ -142,7 +142,7 @@ pub async fn get_sidebar_view(
         },
         PoolWrapper::Postgres(p) => {
              // Fetch Tables for Postgres
-             let q = "SELECT table_name FROM information_schema.tables WHERE table_schema = 'public'";
+             let q = "SELECT table_name::TEXT FROM information_schema.tables WHERE table_schema = 'public'";
              match sqlx::query(q).fetch_all(p).await {
                   Ok(rows) => rows.iter().map(|r: &sqlx::postgres::PgRow| r.get::<String, _>(0)).collect(),
                   Err(e) => {
@@ -180,7 +180,7 @@ pub async fn get_sidebar_view(
              }
         },
         PoolWrapper::Postgres(p) => {
-             match sqlx::query("SELECT datname FROM pg_database WHERE datistemplate = false").fetch_all(p).await {
+             match sqlx::query("SELECT datname::TEXT FROM pg_database WHERE datistemplate = false").fetch_all(p).await {
                  Ok(rows) => {
                      let db_list: Vec<String> = rows.iter().map(|r: &sqlx::postgres::PgRow| r.get::<String, _>(0)).collect();
                      println!("[Sidebar] Found {} Postgres databases", db_list.len());

@@ -27,6 +27,17 @@ pub struct TableDataResponse {
     pub total_count: i64,
 }
 
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ForeignKeyInput {
+    pub column: String,
+    pub ref_table: String,
+    pub ref_column: String,
+    pub on_delete: String,
+    pub on_update: String,
+}
+
+
 #[tauri::command]
 pub async fn export_schema(
     state: State<'_, AppState>,
@@ -57,7 +68,7 @@ pub async fn export_schema(
     for table in tables {
         match get_table_schema(state.clone(), connection_string.clone(), table.clone()).await {
             Ok(cols) => {
-                let sql = generate_create_table_sql(&table, &cols, db_type);
+                let sql = generate_create_table_sql(&table, &cols, &[], db_type);
                 let file_path = dir.join(format!("{}.sql", table));
                 match fs::write(&file_path, sql) {
                     Ok(_) => {
@@ -359,7 +370,8 @@ pub async fn get_columns(
              Ok(columns)
         },
         PoolWrapper::Postgres(p) => {
-             let query = format!("SELECT column_name FROM information_schema.columns WHERE table_name = '{}' AND table_schema = 'public'", table_name.replace('\'', "''"));
+             // Added ::TEXT cast to fix PostgreSQL type issue
+             let query = format!("SELECT column_name::TEXT FROM information_schema.columns WHERE table_name = '{}' AND table_schema = 'public'", table_name.replace('\'', "''"));
              let rows = sqlx::query(&query).fetch_all(&p).await.map_err(|e| format!("Failed to fetch columns: {}", e))?;
              let columns: Vec<String> = rows.iter().map(|row| row.try_get(0).unwrap_or_default()).collect();
              Ok(columns)
@@ -389,7 +401,8 @@ pub async fn get_tables(
              Ok(tables)
         },
         PoolWrapper::Postgres(p) => {
-             let rows = sqlx::query("SELECT table_name FROM information_schema.tables WHERE table_schema = 'public'")
+             // Added ::TEXT cast to fix PostgreSQL type issue
+             let rows = sqlx::query("SELECT table_name::TEXT FROM information_schema.tables WHERE table_schema = 'public'")
                  .fetch_all(&p).await.map_err(|e| format!("Failed to fetch tables: {}", e))?;
              let tables: Vec<String> = rows.iter().map(|row| row.try_get(0).unwrap_or_default()).collect();
              Ok(tables)
@@ -429,7 +442,7 @@ pub async fn get_table_schema(
         PoolWrapper::Postgres(p) => {
              let query = format!(
             "SELECT 
-                c.column_name, 
+                c.column_name::TEXT, 
                 CASE 
                     WHEN c.data_type = 'character varying' AND c.character_maximum_length IS NOT NULL 
                         THEN 'varchar(' || c.character_maximum_length || ')'
@@ -449,8 +462,8 @@ pub async fn get_table_schema(
                 c.column_default,
                 CASE WHEN tc.constraint_type = 'PRIMARY KEY' THEN 'PRI' ELSE '' END as column_key,
                 CASE WHEN c.column_default LIKE 'nextval%%' THEN 'auto_increment' ELSE '' END as extra,
-                ccu.table_name AS referenced_table,
-                ccu.column_name AS referenced_column
+                ccu.table_name::TEXT AS referenced_table,
+                ccu.column_name::TEXT AS referenced_column
             FROM 
                 information_schema.columns c
             LEFT JOIN 
@@ -687,7 +700,8 @@ pub async fn get_databases(
              Ok(dbs)
         },
         PoolWrapper::Postgres(p) => {
-             let rows = sqlx::query("SELECT datname FROM pg_database WHERE datistemplate = false AND datallowconn = true")
+             // Added ::TEXT cast to fix PostgreSQL type issue
+             let rows = sqlx::query("SELECT datname::TEXT FROM pg_database WHERE datistemplate = false AND datallowconn = true")
                  .fetch_all(&p).await.map_err(|e| format!("Failed to fetch databases: {}", e))?;
              let dbs: Vec<String> = rows.iter().map(|row| row.try_get(0).unwrap_or_default()).collect();
              Ok(dbs)
@@ -701,15 +715,19 @@ pub async fn get_databases(
     }
 }
 
-fn generate_create_table_sql(table_name: &str, columns: &[ColumnSchema], db_type: &str) -> String {
+fn generate_create_table_sql(table_name: &str, columns: &[ColumnSchema], foreign_keys: &[ForeignKeyInput], db_type: &str) -> String {
     let cols_sql: Vec<String> = columns.iter().map(|col| {
         // Handle PostgreSQL SERIAL types
-        let type_str = if db_type == "postgres" && col.is_auto_increment {
-            // Convert integer types to SERIAL equivalents
+        let is_postgres_auto = db_type == "postgres" && (col.is_auto_increment || col.default_value.as_deref() == Some("AUTO_INCREMENT"));
+        
+        // Correctly handling type names for Postgres SERIAL/BIGSERIAL
+        let type_str = if is_postgres_auto {
             match col.type_name.to_lowercase().as_str() {
                 "integer" | "int" | "int4" => "SERIAL".to_string(),
                 "bigint" | "int8" => "BIGSERIAL".to_string(),
                 "smallint" | "int2" => "SMALLSERIAL".to_string(),
+                "serial" => "SERIAL".to_string(),
+                "bigserial" => "BIGSERIAL".to_string(),
                 _ => col.type_name.clone(),
             }
         } else {
@@ -719,17 +737,23 @@ fn generate_create_table_sql(table_name: &str, columns: &[ColumnSchema], db_type
         let col_name = escape_identifier(&col.name, db_type);
         let mut line = format!("{} {}", col_name, type_str);
 
-        // For SERIAL types, don't add NOT NULL (it's implicit)
-        let is_serial = db_type == "postgres" && col.is_auto_increment;
-        if !col.is_nullable && !is_serial {
+        // For SERIAL types, don't add NOT NULL (it's implicit) or DEFAULT
+        if !col.is_nullable && !is_postgres_auto {
             line.push_str(" NOT NULL");
         }
         
-        // Skip default value for SERIAL columns (handled by sequence)
-        if !is_serial {
+        if !is_postgres_auto {
             if let Some(def) = &col.default_value {
-                if !def.starts_with("nextval") && !def.contains("::") { 
-                     line.push_str(&format!(" DEFAULT {}", def));
+                if !def.is_empty() && def != "AUTO_INCREMENT" && !def.starts_with("nextval") && !def.contains("::") { 
+                    // Handle special defaults
+                    let def_val = if def == "CURRENT_TIMESTAMP" || def == "NULL" || def == "TRUE" || def == "FALSE" {
+                        def.clone()
+                    } else if def.chars().all(|c| c.is_numeric() || c == '.') {
+                        def.clone()
+                    } else {
+                        format!("'{}'", def)
+                    };
+                    line.push_str(&format!(" DEFAULT {}", def_val));
                 }
             }
         }
@@ -742,11 +766,30 @@ fn generate_create_table_sql(table_name: &str, columns: &[ColumnSchema], db_type
              line.push_str(" AUTO_INCREMENT");
         }
         
+        if col.is_unique && !col.is_primary_key {
+            line.push_str(" UNIQUE");
+        }
+        
         line
     }).collect();
 
+    let mut defs = cols_sql;
+
+    // Add Foreign Keys
+    for fk in foreign_keys {
+        let fk_clause = format!(
+            "FOREIGN KEY ({}) REFERENCES {}({}) ON DELETE {} ON UPDATE {}",
+            escape_identifier(&fk.column, db_type),
+            escape_identifier(&fk.ref_table, db_type),
+            escape_identifier(&fk.ref_column, db_type),
+            fk.on_delete,
+            fk.on_update
+        );
+        defs.push(fk_clause);
+    }
+
     let q_table_name = escape_identifier(table_name, db_type);
-    format!("CREATE TABLE IF NOT EXISTS {} (\n    {}\n);", q_table_name, cols_sql.join(",\n    "))
+    format!("CREATE TABLE IF NOT EXISTS {} (\n    {}\n);", q_table_name, defs.join(",\n    "))
 }
 
 #[tauri::command]
@@ -791,43 +834,66 @@ pub async fn duplicate_database(
                 .await
                 .map_err(|e| format!("Failed to create target database: {}", e))?;
 
-            // Get tables from source
             let rows = sqlx::query(&format!("SHOW TABLES FROM `{}`", source_database))
                 .fetch_all(&p)
                 .await
-                .map_err(|e| format!("Failed to get tables: {}", e))?;
-
+                .map_err(|e| format!("Failed to fetch tables: {}", e))?;
+            
             for row in rows {
                 let table: String = row.try_get(0).unwrap_or_default();
-                let copy_query = format!(
-                    "CREATE TABLE `{}`.`{}` AS SELECT * FROM `{}`.`{}`",
-                    target_database, table, source_database, table
-                );
-                if let Err(e) = sqlx::query(&copy_query).execute(&p).await {
-                    println!("Failed to copy table {}: {}", table, e); 
-                    // Changed log::warn to println or similar since I don't see log imported directly (though it might be)
-                    // Better to just ignore strictly or collect errors?
-                    // Previous code used log::warn
-                }
+                // Copy table structure and data
+                let query = format!("CREATE TABLE `{}`.`{}` AS SELECT * FROM `{}`.`{}`", 
+                    target_database, table, source_database, table);
+                sqlx::query(&query).execute(&p).await.map_err(|e| format!("Failed to copy table {}: {}", table, e))?;
             }
             Ok(())
         },
         PoolWrapper::Postgres(p) => {
-            // PostgreSQL: Use template
-            let query = format!(
-                "CREATE DATABASE \"{}\" WITH TEMPLATE \"{}\"",
-                target_database, source_database
-            );
-            sqlx::query(&query)
-                .execute(&p)
-                .await
-                .map_err(|e| format!("Failed to duplicate database: {}", e))?;
-            Ok(())
+             // Postgres: Use TEMPLATE to duplicate database
+             // First, we might need to disconnect other sessions, but for a simple UI this is usually okay if not in use.
+             let query = format!("CREATE DATABASE \"{}\" WITH TEMPLATE \"{}\"", target_database, source_database);
+             sqlx::query(&query).execute(&p).await.map_err(|e| format!("Failed to duplicate database: {}", e))?;
+             Ok(())
         },
         PoolWrapper::Sqlite(_) => {
-             Err("SQLite does not support duplicating databases via SQL".to_string())
+             // Copy file? 
+             Err("Duplicate database not supported for SQLite in this mode".to_string())
         }
     }
+}
+
+#[tauri::command]
+pub async fn create_table(
+    state: State<'_, AppState>,
+    connection_string: String,
+    table_name: String,
+    columns: Vec<ColumnSchema>,
+    foreign_keys: Vec<ForeignKeyInput>
+) -> Result<(), String> {
+    let pool = crate::db::get_connection(&state, &connection_string).await.map_err(|e| e.to_string())?;
+
+    let db_type = match pool {
+        PoolWrapper::Mysql(_) => "mysql",
+        PoolWrapper::Postgres(_) => "postgres",
+        PoolWrapper::Sqlite(_) => "sqlite",
+    };
+
+    let sql = generate_create_table_sql(&table_name, &columns, &foreign_keys, db_type);
+
+    match pool {
+        PoolWrapper::Mysql(p) => {
+             sqlx::query(&sql).execute(&p).await.map_err(|e| format!("Failed to create table: {}", e))?;
+        },
+        PoolWrapper::Postgres(p) => {
+             // Execute. Note: SERIAL implies sequence creation automatically.
+             sqlx::query(&sql).execute(&p).await.map_err(|e| format!("Failed to create table: {}", e))?;
+        },
+        PoolWrapper::Sqlite(p) => {
+             sqlx::query(&sql).execute(&p).await.map_err(|e| format!("Failed to create table: {}", e))?;
+        }
+    }
+
+    Ok(())
 }
 
 #[tauri::command]
@@ -930,7 +996,19 @@ pub async fn get_table_data(
                 .await
                 .map_err(|e| format!("Data fetch failed: {}", e))?;
 
-            let result_data = process_rows_with_decimal!(data_rows);
+            let mut result_data = process_rows_with_decimal!(data_rows);
+
+            // If no rows, fetch column names from schema
+            if result_data.columns.is_empty() {
+                let cols_query = format!("DESCRIBE {}", escaped_table);
+                let col_rows: Vec<sqlx::mysql::MySqlRow> = sqlx::query(&cols_query)
+                    .fetch_all(&p)
+                    .await
+                    .unwrap_or_default();
+                result_data.columns = col_rows.iter()
+                    .filter_map(|r| r.try_get::<String, _>(0).ok())
+                    .collect();
+            }
 
             let count_row: (i64,) = sqlx::query_as(&count_query)
                 .fetch_one(&p)
@@ -963,7 +1041,22 @@ pub async fn get_table_data(
                 .await
                 .map_err(|e| format!("Data fetch failed: {}", e))?;
 
-            let result_data = process_rows_with_decimal!(data_rows);
+            let mut result_data = process_rows_with_decimal!(data_rows);
+
+            // If no rows, fetch column names from information_schema
+            if result_data.columns.is_empty() {
+                let cols_query = format!(
+                    "SELECT column_name::TEXT FROM information_schema.columns WHERE table_name = '{}' ORDER BY ordinal_position",
+                    table_name
+                );
+                let col_rows: Vec<sqlx::postgres::PgRow> = sqlx::query(&cols_query)
+                    .fetch_all(&p)
+                    .await
+                    .unwrap_or_default();
+                result_data.columns = col_rows.iter()
+                    .filter_map(|r| r.try_get::<String, _>(0).ok())
+                    .collect();
+            }
 
             let count_row: (i64,) = sqlx::query_as(&count_query)
                 .fetch_one(&p)
@@ -996,7 +1089,21 @@ pub async fn get_table_data(
                 .await
                 .map_err(|e| format!("Data fetch failed: {}", e))?;
 
-            let result_data = process_rows_sqlite!(data_rows);
+            let mut result_data = process_rows_sqlite!(data_rows);
+
+            // If no rows, fetch column names from PRAGMA table_info
+            if result_data.columns.is_empty() {
+                let cols_query = format!("PRAGMA table_info({})", escaped_table);
+                let col_rows: Vec<sqlx::sqlite::SqliteRow> = sqlx::query(&cols_query)
+                    .fetch_all(&p)
+                    .await
+                    .unwrap_or_default();
+                // PRAGMA table_info returns: cid, name, type, notnull, dflt_value, pk
+                // Column name is at index 1
+                result_data.columns = col_rows.iter()
+                    .filter_map(|r| r.try_get::<String, _>(1).ok())
+                    .collect();
+            }
 
             let count_row: (i64,) = sqlx::query_as(&count_query)
                 .fetch_one(&p)
@@ -1010,4 +1117,3 @@ pub async fn get_table_data(
         }
     }
 }
-

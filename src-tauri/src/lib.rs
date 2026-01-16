@@ -42,6 +42,7 @@ pub fn run() {
             commands::db_ops::duplicate_database,
             commands::db_ops::delete_database,
             commands::db_ops::get_table_data,
+            commands::db_ops::create_table,
             // CRUD Operations
             commands::crud::update_record,
             commands::crud::delete_record,

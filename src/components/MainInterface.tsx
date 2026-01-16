@@ -24,8 +24,31 @@ export const MainInterface: React.FC<MainInterfaceProps> = ({ connection: initia
     const { sessionId } = useSession(connection);
 
     const handleSwitchDatabase = (dbName: string) => {
-        // Update connection with new database_name
+        // Confirmation for unsaved changes
+        const hasChanges = Object.values(pendingChanges).some(list => list.length > 0);
+        if (hasChanges) {
+            if (!window.confirm('You have unsaved changes in the current database. Switching will discard them. Continue?')) {
+                return;
+            }
+        }
+
+        // Update connection
         setConnection({ ...connection, database_name: dbName });
+
+        // Clean up workspace
+        setTabs([]);
+        setActiveTabId('');
+        setTabQueries({});
+        setPendingChanges({});
+        setResults({});
+        setSelectedIndicesMap({});
+        setPaginationMap({});
+        setFiltersMap({});
+        setTableSchemas({});
+        setTableCreatorStates({});
+        setOriginalSchemas({});
+        setShowEditWindow(false);
+        setEditData(undefined);
     };
 
 
@@ -48,7 +71,7 @@ export const MainInterface: React.FC<MainInterfaceProps> = ({ connection: initia
     const { toasts, addToast, dismissToast } = useToast();
 
     const registry = useDatabaseRegistry(connection);
-    const { tables, savedConnections, tags, tableTags, fetchTables, fetchConnections } = registry;
+    const { tables, savedConnections, tags, tableTags, refreshTrigger, fetchTables, fetchConnections } = registry;
 
     const { logs, addLog } = useSystemLogs();
 
@@ -80,6 +103,7 @@ export const MainInterface: React.FC<MainInterfaceProps> = ({ connection: initia
         fetchTableData,
         handleRunQuery: runQuery,
         filtersMap,
+        setFiltersMap,
         updateFilters
     } = useTableData({ connection, sessionId, addLog, tableSchemas, setTableSchemas });
 
@@ -542,11 +566,27 @@ export const MainInterface: React.FC<MainInterfaceProps> = ({ connection: initia
     const handleSwitchConnectionWrapper = (conn: Connection) => {
         const hasChanges = Object.values(pendingChanges).some(list => list.length > 0);
         if (hasChanges) {
-            if (!confirm('You have unsaved changes that will be lost. Continue switching connection?')) {
+            if (!window.confirm('You have unsaved changes that will be lost. Continue switching connection?')) {
                 return;
             }
         }
+
         onSwitchConnection(conn);
+
+        // Clean up even if we expect a remount
+        setTabs([]);
+        setActiveTabId('');
+        setTabQueries({});
+        setPendingChanges({});
+        setResults({});
+        setSelectedIndicesMap({});
+        setPaginationMap({});
+        setFiltersMap({});
+        setTableSchemas({});
+        setTableCreatorStates({});
+        setOriginalSchemas({});
+        setShowEditWindow(false);
+        setEditData(undefined);
     };
 
     const handleExportQuery = handleExportQueryToFile;
@@ -740,6 +780,7 @@ export const MainInterface: React.FC<MainInterfaceProps> = ({ connection: initia
                 toasts={toasts}
                 onDismissToast={dismissToast}
                 sessionId={sessionId}
+                refreshTrigger={refreshTrigger}
             />
 
             {/* Error Summary Modal */}

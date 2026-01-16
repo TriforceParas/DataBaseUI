@@ -157,6 +157,7 @@ interface MainLayoutProps {
     toasts: ToastMessage[];
     onDismissToast: (id: string) => void;
     sessionId: string | null;
+    refreshTrigger: number;
 }
 
 export const MainLayout: React.FC<MainLayoutProps> = (props) => {
@@ -297,6 +298,7 @@ export const MainLayout: React.FC<MainLayoutProps> = (props) => {
                         sessionId={props.sessionId}
                         savedConnections={props.savedConnections}
                         searchQuery={searchQuery}
+                        refreshTrigger={props.refreshTrigger}
                     />
 
                     <div className={styles.content}>

@@ -55,7 +55,7 @@ pub struct QueryResult {
     pub rows: Vec<Vec<String>>,
 }
 
-#[derive(Serialize, Clone, Debug, Default)]
+#[derive(Serialize, Deserialize, Clone, Debug, Default)]
 pub struct ColumnSchema {
     pub name: String,
     pub type_name: String,

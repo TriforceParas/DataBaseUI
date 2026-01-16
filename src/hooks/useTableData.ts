@@ -176,6 +176,7 @@ export const useTableData = ({ connection, sessionId, addLog, tableSchemas, setT
         handleRunQuery,
         resetConnectionCache,
         filtersMap,
+        setFiltersMap,
         updateFilters,
         loadFilters
     };

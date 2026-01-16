@@ -69,9 +69,9 @@ export const useTableActions = ({
     const getConnectionString = useCallback(async (): Promise<string> => {
         if (sessionId) return sessionId;
         if (connectionStringRef.current) return connectionStringRef.current;
-        const connStr = await invoke<string>('get_connection_string', { 
+        const connStr = await invoke<string>('get_connection_string', {
             connectionId: connection.id,
-            databaseName: connection.database_name 
+            databaseName: connection.database_name
         });
         connectionStringRef.current = connStr;
         return connStr;
@@ -136,7 +136,10 @@ export const useTableActions = ({
         const row = existingRows[rowIndex];
         const oldValue = row[colIdx];
 
-        if (String(oldValue) === String(value)) return;
+        if (String(oldValue) === String(value)) {
+            const existingUpdate = pendingChanges[tabId]?.find(c => c.type === 'UPDATE' && c.rowIndex === rowIndex && c.column === column);
+            if (!existingUpdate) return;
+        }
 
         const schema = tableSchemas[activeTab.title] || [];
         const identifier = getRowIdentifier(row, currentData.columns, schema);

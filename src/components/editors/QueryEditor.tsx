@@ -89,14 +89,10 @@ export const QueryEditor: React.FC<QueryEditorProps> = ({
         editorRef.current = editor;
         monacoRef.current = monaco;
 
-        // Clean up previous if any
         if (commandRef.current) {
             commandRef.current.dispose();
         }
 
-        // Register Instance-Specific Command
-        // We use a unique ID so this specific editor instance handles its own CodeLens clicks.
-        // This ensures 'editor' and 'onRunQuery' in closure are correct.
         commandRef.current = monaco.editor.addCommand({
             id: commandId,
             run: (_: any, lineNumber: number) => {

@@ -1,7 +1,15 @@
-import { useState, useCallback, useRef } from 'react';
+/**
+ * Change Manager Hook
+ * 
+ * Manages pending database changes (INSERT, UPDATE, DELETE) with support for:
+ * - Batch operations with transactional execution
+ * - Error handling with foreign key constraint detection
+ * - Selective confirm/discard of changes
+ */
+
+import { useState, useCallback, useRef, useEffect } from 'react';
 import { invoke } from '@tauri-apps/api/core';
-import { Connection, PendingChange, QueryResult, Tab } from '../types/index';
-import { generateRowChangeSql } from '../utils/sqlHelpers';
+import { Connection, PendingChange, QueryResult, Tab, BatchChange } from '../types/index';
 import * as api from '../api';
 
 export interface ChangeError {
@@ -13,6 +21,7 @@ export interface ChangeError {
 interface UseChangeManagerOptions {
     onSuccess?: () => void;
     onErrors?: (errors: ChangeError[]) => void;
+    sessionId?: string | null;
 }
 
 interface SelectedChange {
@@ -40,7 +49,7 @@ interface UseChangeManagerReturn {
     retryWithFKDisabled: (errors: ChangeError[], addLog: (query: string, status: 'Success' | 'Error', table?: string, error?: string, rows?: number, user?: string) => void) => Promise<void>;
 }
 
-// Helper to detect foreign key constraint errors
+/** Detects if an error message indicates a foreign key constraint violation */
 const isForeignKeyError = (errorMsg: string): boolean => {
     const msg = errorMsg.toLowerCase();
     return msg.includes('foreign key') ||
@@ -62,12 +71,21 @@ export const useChangeManager = (
 
     const connectionStringRef = useRef<string | null>(null);
 
+    // Reset connection cache when connection changes
+    useEffect(() => {
+        connectionStringRef.current = null;
+    }, [connection.id, connection.database_name]);
+
     const getConnectionString = useCallback(async (): Promise<string> => {
+        if (options?.sessionId) return options.sessionId;
         if (connectionStringRef.current) return connectionStringRef.current;
-        const connStr = await invoke<string>('get_connection_string', { connectionId: connection.id });
+        const connStr = await invoke<string>('get_connection_string', {
+            connectionId: connection.id,
+            databaseName: connection.database_name
+        });
         connectionStringRef.current = connStr;
         return connStr;
-    }, [connection.id]);
+    }, [connection.id, connection.database_name, options?.sessionId]);
 
     const handleRevertChange = useCallback((tabId: string, changeIndex: number) => {
         setPendingChanges(prev => {
@@ -89,7 +107,7 @@ export const useChangeManager = (
         addLog: (query: string, status: 'Success' | 'Error', table?: string, error?: string, rows?: number, user?: string) => void,
         fetchTableData: (tabId: string, tableName: string) => Promise<void>
     ) => {
-        const isMysql = connection.db_type === 'mysql';
+
         const connectionString = await getConnectionString();
         const errors: ChangeError[] = [];
         const successfulTabIds: Set<string> = new Set();
@@ -117,49 +135,73 @@ export const useChangeManager = (
                 }
             }
 
-            // Handle row changes - per-change try/catch
+            // Handle row changes - Use Batch API
             const rowChanges = changes.filter(c => c.type !== 'ADD_COLUMN' && c.type !== 'DROP_COLUMN');
             if (rowChanges.length === 0) continue;
 
-            const res = results[tabId];
-            if (!res || !res.data) continue;
+            const batchChanges: BatchChange[] = rowChanges.map(c => {
+                if (c.type === 'UPDATE') {
+                    return {
+                        operation: 'UPDATE',
+                        table_name: c.tableName,
+                        identifier: c.identifier,
+                        updates: (c.updates || []).map(u => ({ ...u, column: u.column.trim() }))
+                    };
+                } else if (c.type === 'DELETE') {
+                    return {
+                        operation: 'DELETE',
+                        table_name: c.tableName,
+                        identifier: c.identifier
+                    };
+                } else {
+                    // INSERT: Convert rowData array to column->value map
+                    const res = results[tabId];
+                    const cols = res?.data?.columns || [];
+                    const values: Record<string, string | null> = {};
+                    cols.forEach((col, idx) => {
+                        const val = c.rowData[idx];
+                        values[col.trim()] = val === '' ? null : String(val);
+                    });
 
-            const cols = res.data.columns;
+                    return {
+                        operation: 'INSERT',
+                        table_name: c.tableName,
+                        insert_values: values
+                    };
+                }
+            });
 
-            for (const change of rowChanges) {
-                const query = generateRowChangeSql(change, cols, isMysql);
-
-                if (query) {
-                    try {
-                        await api.executeQuery(connectionString, query);
-                        addLog(query, 'Success', change.tableName, undefined, 1);
-                        successfulTabIds.add(tabId);
-                    } catch (e) {
-                        const errorMsg = String(e);
+            if (batchChanges.length > 0) {
+                try {
+                    const affected = await api.applyBatchChanges(connectionString, batchChanges);
+                    addLog(`Batch Applied ${affected} changes`, 'Success', batchChanges[0].table_name, undefined, Number(affected));
+                    successfulTabIds.add(tabId);
+                } catch (e) {
+                    const errorMsg = String(e);
+                    // Batch operations are transactional - all fail together
+                    rowChanges.forEach(c => {
                         errors.push({
-                            change,
+                            change: c,
                             error: errorMsg,
                             isForeignKeyError: isForeignKeyError(errorMsg)
                         });
-                        addLog(query, 'Error', change.tableName, errorMsg, 0);
-                    }
+                    });
+                    addLog('Batch Execution Failed', 'Error', batchChanges[0].table_name, errorMsg, 0);
                 }
             }
         }
 
-        // Refresh data for tabs that had successful changes
+        // Refresh data for successful tabs
         for (const tabId of successfulTabIds) {
             const tab = tabs.find(t => t.id === tabId);
             if (tab) await fetchTableData(tabId, tab.title);
         }
 
-        // Remove only successful changes from pendingChanges
+        // Handle partial success: keep failed changes, clear successful ones
         if (errors.length > 0) {
-            // Keep the failed changes, remove successful ones
             setPendingChanges(prev => {
                 const updated = { ...prev };
                 for (const [tabId, changes] of Object.entries(prev)) {
-                    // Filter to keep only changes that are in errors
                     const errorChanges = changes.filter(c =>
                         errors.some(e =>
                             e.change.tableName === c.tableName &&
@@ -177,19 +219,12 @@ export const useChangeManager = (
                 return updated;
             });
 
-            // Notify about errors
-            if (options?.onErrors) {
-                options.onErrors(errors);
-            }
+            options?.onErrors?.(errors);
         } else {
-            // All successful - clear everything
+            // All successful
             setPendingChanges({});
             setShowChangelog(false);
-
-            // Call onSuccess callback if provided
-            if (options?.onSuccess) {
-                options.onSuccess();
-            }
+            options?.onSuccess?.();
         }
 
         setChangelogConfirm(null);
@@ -259,7 +294,6 @@ export const useChangeManager = (
         addLog: (query: string, status: 'Success' | 'Error', table?: string, error?: string, rows?: number, user?: string) => void,
         fetchTableData: (tabId: string, tableName: string) => Promise<void>
     ) => {
-        const isMysql = connection.db_type === 'mysql';
         const connectionString = await getConnectionString();
         const errors: ChangeError[] = [];
         const successfulIndices: Map<string, Set<number>> = new Map();
@@ -291,30 +325,61 @@ export const useChangeManager = (
                 }
             }
 
-            // Handle row changes
+            // Handle row changes - Batch
             const rowChanges = selectedChanges.filter(c => c.type !== 'ADD_COLUMN' && c.type !== 'DROP_COLUMN');
-            const res = results[tabId];
-            if (res?.data && rowChanges.length > 0) {
-                const cols = res.data.columns;
-                for (const change of rowChanges) {
-                    const originalIdx = indices[selectedChanges.indexOf(change)];
-                    const query = generateRowChangeSql(change, cols, isMysql);
-                    if (query) {
-                        try {
-                            await api.executeQuery(connectionString, query);
-                            addLog(query, 'Success', change.tableName, undefined, 1);
-                            if (!successfulIndices.has(tabId)) successfulIndices.set(tabId, new Set());
-                            successfulIndices.get(tabId)!.add(originalIdx);
-                        } catch (e) {
-                            const errorMsg = String(e);
-                            errors.push({
-                                change,
-                                error: errorMsg,
-                                isForeignKeyError: isForeignKeyError(errorMsg)
-                            });
-                            addLog(query, 'Error', change.tableName, errorMsg, 0);
-                        }
+            if (rowChanges.length > 0) {
+                const batchChanges: BatchChange[] = rowChanges.map(c => {
+                    if (c.type === 'UPDATE') {
+                        return {
+                            operation: 'UPDATE',
+                            table_name: c.tableName,
+                            identifier: c.identifier,
+                            updates: c.updates
+                        };
+                    } else if (c.type === 'DELETE') {
+                        return {
+                            operation: 'DELETE',
+                            table_name: c.tableName,
+                            identifier: c.identifier
+                        };
+                    } else {
+                        // INSERT
+                        const res = results[tabId];
+                        const cols = res?.data?.columns || [];
+                        const values: Record<string, string | null> = {};
+                        cols.forEach((col, idx) => {
+                            const val = c.rowData[idx];
+                            values[col] = val === '' ? null : String(val);
+                        });
+                        return {
+                            operation: 'INSERT',
+                            table_name: c.tableName,
+                            insert_values: values
+                        };
                     }
+                });
+
+                try {
+                    const affected = await api.applyBatchChanges(connectionString, batchChanges);
+                    addLog(`Batch Applied ${affected} selected changes`, 'Success', batchChanges[0].table_name, undefined, Number(affected));
+
+                    if (!successfulIndices.has(tabId)) successfulIndices.set(tabId, new Set());
+                    // Mark all selected indices as success
+                    rowChanges.forEach(c => {
+                        const originalIdx = indices[selectedChanges.indexOf(c)];
+                        successfulIndices.get(tabId)!.add(originalIdx);
+                    });
+
+                } catch (e) {
+                    const errorMsg = String(e);
+                    rowChanges.forEach(c => {
+                        errors.push({
+                            change: c,
+                            error: errorMsg,
+                            isForeignKeyError: isForeignKeyError(errorMsg)
+                        });
+                    });
+                    addLog('Batch Selected Execution Failed', 'Error', batchChanges[0].table_name, errorMsg, 0);
                 }
             }
 

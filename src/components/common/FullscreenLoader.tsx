@@ -46,7 +46,7 @@ export const FullscreenLoader: React.FC<FullscreenLoaderProps> = ({ isVisible, m
                 boxSizing: 'border-box'
             }}>
                 <div style={{ position: 'relative' }}>
-                    <Loader2 className="animate-spin" size={48} style={{ color: 'var(--accent-primary)' }} />
+                    <RiLoader4Line className="animate-spin" size={48} style={{ color: 'var(--accent-primary)' }} />
                     <div style={{
                         position: 'absolute',
                         top: 0,

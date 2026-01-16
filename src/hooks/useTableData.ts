@@ -1,54 +1,57 @@
+/**
+ * Table Data Hook
+ * 
+ * Manages table data fetching, pagination, sorting, filtering, and query execution.
+ * Handles connection string/session resolution and schema caching.
+ */
+
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { invoke } from '@tauri-apps/api/core';
 import { Connection, SortState, TabResult, ColumnSchema } from '../types/index';
+import { FilterCondition } from '../components/modals/FilterModal';
 import * as api from '../api';
 
 interface UseTableDataProps {
     connection: Connection;
+    sessionId?: string | null;
     addLog: (query: string, status: 'Success' | 'Error', table?: string, error?: string, rows?: number, user?: string) => void;
     tableSchemas: Record<string, ColumnSchema[]>;
     setTableSchemas: React.Dispatch<React.SetStateAction<Record<string, ColumnSchema[]>>>;
 }
 
-export const useTableData = ({ connection, addLog, tableSchemas, setTableSchemas }: UseTableDataProps) => {
+export const useTableData = ({ connection, sessionId, addLog, tableSchemas, setTableSchemas }: UseTableDataProps) => {
     const [results, setResults] = useState<Record<string, TabResult>>({});
     const [paginationMap, setPaginationMap] = useState<Record<string, { page: number, pageSize: number, total: number }>>({});
     const [sortState, setSortState] = useState<SortState | null>(null);
+    const [filtersMap, setFiltersMap] = useState<Record<string, FilterCondition[]>>({});
 
-    // Cache connection string to avoid repeated calls
     const connectionStringRef = useRef<string | null>(null);
 
     const getConnectionString = useCallback(async (): Promise<string> => {
+        if (sessionId) return sessionId;
         if (connectionStringRef.current) return connectionStringRef.current;
-        const connStr = await invoke<string>('get_connection_string', {
-            connectionId: connection.id,
-            databaseName: connection.database_name // Pass current database context
-        });
+        const { getConnectionString: getConn } = await import('../utils/connectionHelper');
+        const connStr = await getConn(connection.id, connection.database_name);
         connectionStringRef.current = connStr;
         return connStr;
-    }, [connection.id, connection.database_name]);
+    }, [connection.id, connection.database_name, sessionId]);
 
-    // Reset cache when connection changes (including database switch)
     useEffect(() => {
         connectionStringRef.current = null;
     }, [connection.id, connection.database_name]);
 
-    // Reset cache manually if needed (legacy)
     const resetConnectionCache = useCallback(() => {
         connectionStringRef.current = null;
     }, []);
 
-    // Initial Loading State Helper
     const initTabResult = (tabId: string) => {
         setResults(prev => ({ ...prev, [tabId]: { ...prev[tabId], loading: true, error: null, data: prev[tabId]?.data || null } }));
     };
 
-    // Update Tab Result Helper
     const updateTabResult = (tabId: string, data: Partial<TabResult>) => {
         setResults(prev => ({ ...prev, [tabId]: { ...prev[tabId], ...data } }));
     };
 
-    const fetchTableData = useCallback(async (tabId: string, tableName: string, pageOverride?: number, pageSizeOverride?: number) => {
+    const fetchTableData = useCallback(async (tabId: string, tableName: string, pageOverride?: number, pageSizeOverride?: number, filtersOverride?: FilterCondition[]) => {
         if (tableName.startsWith('Schema: ')) return;
 
         initTabResult(tabId);
@@ -60,32 +63,26 @@ export const useTableData = ({ connection, addLog, tableSchemas, setTableSchemas
         try {
             const connectionString = await getConnectionString();
 
-            // Check if we need to fetch schema (for keys info)
             if (!tableSchemas[tableName]) {
                 api.getTableSchema(connectionString, tableName)
                     .then(schema => {
                         setTableSchemas(prev => ({ ...prev, [tableName]: schema }));
-                    }).catch(err => console.error("Failed to background fetch schema for keys:", err));
+                    }).catch(err => console.error("Failed to background fetch schema:", err));
             }
 
-            const isMysql = connection.db_type === 'mysql';
-            const q = isMysql ? '`' : '"';
-            const offset = (page - 1) * pageSize;
+            const currentFilters = filtersOverride !== undefined ? filtersOverride : (filtersMap[tabId] || []);
 
-            let orderByClause = '';
-            if (sortState) {
-                orderByClause = `ORDER BY ${q}${sortState.column}${q} ${sortState.direction}`;
-            }
+            const response = await api.getTableData(
+                connectionString,
+                tableName,
+                page,
+                pageSize,
+                currentFilters,
+                sortState ? { column: sortState.column, direction: sortState.direction } : null
+            );
 
-            // Construct Query
-            const query = `SELECT * FROM ${q}${tableName}${q} ${orderByClause} LIMIT ${pageSize} OFFSET ${offset}`;
-            const countQuery = `SELECT COUNT(*) as count FROM ${q}${tableName}${q}`;
+            let lastRes = response.data;
 
-            // Execute
-            const res = await api.executeQuery(connectionString, query);
-            let lastRes = res.length > 0 ? res[res.length - 1] : null;
-
-            // Ensure columns are present even for empty tables by using schema
             if ((!lastRes || !lastRes.columns || lastRes.columns.length === 0) && tableSchemas[tableName]) {
                 if (!lastRes) {
                     lastRes = { columns: [], rows: [] };
@@ -95,21 +92,17 @@ export const useTableData = ({ connection, addLog, tableSchemas, setTableSchemas
                 }
             }
 
-            // Get total count (separate call is standard for pagination)
-            const countRes = await api.executeQuery(connectionString, countQuery);
-            const total = countRes.length > 0 && countRes[0].rows.length > 0 ? Number(countRes[0].rows[0][0]) : 0;
+            updateTabResult(tabId, { data: lastRes, allData: [lastRes], loading: false, error: null });
+            setPaginationMap(prev => ({ ...prev, [tabId]: { page, pageSize, total: response.total_count } }));
 
-            updateTabResult(tabId, { data: lastRes, allData: res, loading: false, error: null });
-            setPaginationMap(prev => ({ ...prev, [tabId]: { page, pageSize, total } }));
-
-            addLog(query, 'Success', tableName, undefined, lastRes ? lastRes.rows.length : 0, 'System');
+            addLog(`SELECT * FROM ${tableName}`, 'Success', tableName, undefined, lastRes ? lastRes.rows.length : 0, 'System');
 
         } catch (e) {
             console.error("Failed to fetch table data:", e);
             updateTabResult(tabId, { loading: false, error: String(e) });
             addLog(`SELECT * FROM ${tableName}`, 'Error', tableName, String(e), 0, 'System');
         }
-    }, [connection.id, connection.db_type, paginationMap, sortState, addLog, tableSchemas, setTableSchemas, getConnectionString]);
+    }, [connection.id, paginationMap, sortState, addLog, tableSchemas, setTableSchemas, getConnectionString, filtersMap]);
 
     const handleRunQuery = useCallback(async (tabId: string, query: string) => {
         if (!query.trim()) return;
@@ -128,13 +121,48 @@ export const useTableData = ({ connection, addLog, tableSchemas, setTableSchemas
         }
     }, [addLog, getConnectionString]);
 
-
     const handleSort = useCallback((column: string) => {
         setSortState(prev => ({
             column,
             direction: prev?.column === column && prev.direction === 'ASC' ? 'DESC' : 'ASC'
         }));
     }, []);
+
+    const updateFilters = useCallback(async (tabId: string, tableName: string, filters: FilterCondition[]) => {
+        setFiltersMap(prev => ({ ...prev, [tabId]: filters }));
+
+        const databaseName = connection.database_name || connection.name || '';
+        try {
+            if (filters.length > 0) {
+                await api.saveTableFilters(connection.id, databaseName, tableName, filters);
+            } else {
+                await api.deleteTableFilters(connection.id, databaseName, tableName);
+            }
+        } catch (e) {
+            console.error('Failed to persist filters:', e);
+        }
+    }, [connection.id, connection.database_name, connection.name]);
+
+    const loadFilters = useCallback(async (tabId: string, tableName: string) => {
+        const databaseName = connection.database_name || connection.name || '';
+        try {
+            const filters = await api.getTableFilters(connection.id, databaseName, tableName);
+            if (filters && filters.length > 0) {
+                const mappedFilters: FilterCondition[] = filters.map(f => ({
+                    id: f.id,
+                    enabled: f.enabled,
+                    column: f.column,
+                    operator: f.operator as any,
+                    value: f.value
+                }));
+                setFiltersMap(prev => ({ ...prev, [tabId]: mappedFilters }));
+                return mappedFilters;
+            }
+        } catch (e) {
+            console.error('Failed to load filters:', e);
+        }
+        return [];
+    }, [connection.id, connection.database_name, connection.name]);
 
     return {
         results,
@@ -146,6 +174,9 @@ export const useTableData = ({ connection, addLog, tableSchemas, setTableSchemas
         handleSort,
         fetchTableData,
         handleRunQuery,
-        resetConnectionCache
+        resetConnectionCache,
+        filtersMap,
+        updateFilters,
+        loadFilters
     };
 };

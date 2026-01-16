@@ -1,3 +1,10 @@
+/**
+ * Tab Management Hook
+ * 
+ * Manages editor tabs including creation, activation, closing,
+ * drag-and-drop reordering, and saved query/function tab state.
+ */
+
 import { useState, useCallback } from 'react';
 import { TabItem, SavedQuery } from '../types/index';
 import { DragEndEvent } from '@dnd-kit/core';
@@ -27,26 +34,17 @@ export const useTabs = () => {
         setTabs(prev => {
             const newTabs = prev.filter(t => t.id !== id);
             if (activeTabId === id && newTabs.length > 0) {
-                // Activate the last tab
-                // We need to set activeTabId outside this callback or use effect? 
-                // setState updater doesn't allow side effects on other state easily.
-                // We'll handle activation logic after setting tabs.
-                // Actually, best to calculate next ID here.
                 return newTabs;
             }
             return newTabs;
         });
 
-        // Sync activeTabId if needed (this logic is slightly flawed in loose extracted function, 
-        // better to handle it atomically or use a more robust manager.
-        // For simplicity, we'll replicate the exact logic:
         if (activeTabId === id) {
             setTabs(prev => {
                 const idx = prev.findIndex(t => t.id === id);
                 const newTabs = prev.filter(t => t.id !== id);
                 let nextId = '1';
                 if (newTabs.length > 0) {
-                    // Try to go to previous index, or last
                     const nextIdx = Math.max(0, idx - 1);
                     nextId = newTabs[nextIdx] ? newTabs[nextIdx].id : newTabs[0].id;
                 }
@@ -54,7 +52,6 @@ export const useTabs = () => {
                 return newTabs;
             });
         } else {
-            // Just filter
             setTabs(prev => prev.filter(t => t.id !== id));
         }
     }, [activeTabId]);
@@ -83,8 +80,6 @@ export const useTabs = () => {
             return [...prev, { id: tabId, type: 'query', title: query.name, savedQueryId: query.id }];
         });
     }, []);
-
-    // ... helpers for logic ...
 
     return {
         tabs,

@@ -8,6 +8,7 @@ import { TableCreatorView } from './TableCreatorView';
 import { SchemaDiagramView } from './SchemaDiagramView';
 import { FunctionOutputView } from './FunctionOutputView';
 import { QueryView } from './QueryView';
+import { FilterCondition } from '../modals/FilterModal';
 
 interface MainViewContentProps {
     activeTab: Tab | undefined;
@@ -50,7 +51,7 @@ interface MainViewContentProps {
     onDeleteRows: () => void;
     onCopy: (format: 'CSV' | 'JSON') => void;
     onExport: (format: 'CSV' | 'JSON') => void;
-    fetchTableData: (tabId: string, tableName: string, page?: number, pageSize?: number) => void;
+    fetchTableData: (tabId: string, tableName: string, page?: number, pageSize?: number, filtersOverride?: any[]) => void;
     setSortState: React.Dispatch<React.SetStateAction<{ column: string; direction: 'ASC' | 'DESC' } | null>>;
     onCellEdit: (rowIndex: number, column: string, newValue: any) => void;
     onRowDelete: (rowIndex: number) => void;
@@ -68,6 +69,10 @@ interface MainViewContentProps {
     handleRefresh: () => void;
     setIsCapturing: React.Dispatch<React.SetStateAction<boolean>>;
     addToast: (title: string, message: string, filePath?: string, type?: 'success' | 'error' | 'info') => void;
+
+    // Filter props
+    filtersMap: Record<string, FilterCondition[]>;
+    updateFilters: (tabId: string, tableName: string, filters: FilterCondition[]) => void;
 }
 
 export const MainViewContent: React.FC<MainViewContentProps> = ({
@@ -120,7 +125,9 @@ export const MainViewContent: React.FC<MainViewContentProps> = ({
     handleSort,
     handleRefresh,
     setIsCapturing,
-    addToast
+    addToast,
+    filtersMap,
+    updateFilters
 }) => {
     if (!activeTab) {
         return <EmptyStateView onOpenNewQuery={handleAddQuery} />;
@@ -139,6 +146,12 @@ export const MainViewContent: React.FC<MainViewContentProps> = ({
                 tableSchemas={tableSchemas}
                 activeDropdown={activeDropdown}
                 setActiveDropdown={setActiveDropdown}
+                filters={filtersMap[activeTab.id] || []}
+                onFiltersChange={(filters) => {
+                    updateFilters(activeTab.id, activeTab.title, filters);
+                    // Refetch data when filters change - pass filters directly to avoid stale state
+                    fetchTableData(activeTab.id, activeTab.title, 1, undefined, filters);
+                }}
                 onInsertRow={onInsertRow}
                 onRefresh={() => fetchTableData(activeTab.id, activeTab.title)}
                 onDeleteRows={onDeleteRows}

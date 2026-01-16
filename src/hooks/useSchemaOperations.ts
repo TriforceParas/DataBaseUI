@@ -1,3 +1,10 @@
+/**
+ * Schema Operations Hook
+ * 
+ * Handles table schema viewing, editing, and refreshing operations.
+ * Converts between backend ColumnSchema and frontend TableCreatorState formats.
+ */
+
 import { useCallback } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import * as api from '../api';
@@ -6,6 +13,7 @@ import { TableCreatorState } from '../components/editors/TableCreator';
 
 interface UseSchemaOperationsProps {
     connection: Connection;
+    sessionId?: string | null;
     tabs: TabItem[];
     setTabs: (tabs: TabItem[]) => void;
     setActiveTabId: (id: string) => void;
@@ -17,6 +25,7 @@ interface UseSchemaOperationsProps {
 
 export const useSchemaOperations = ({
     connection,
+    sessionId,
     tabs,
     setTabs,
     setActiveTabId,
@@ -27,8 +36,12 @@ export const useSchemaOperations = ({
 }: UseSchemaOperationsProps) => {
 
     const getConnectionString = useCallback(async (): Promise<string> => {
-        return await invoke<string>('get_connection_string', { connectionId: connection.id });
-    }, [connection.id]);
+        if (sessionId) return sessionId;
+        return await invoke<string>('get_connection_string', { 
+            connectionId: connection.id,
+            databaseName: connection.database_name 
+        });
+    }, [connection.id, connection.database_name, sessionId]);
 
     const handleGetTableSchema = useCallback(async (tableName: string) => {
         try {
@@ -68,10 +81,8 @@ export const useSchemaOperations = ({
     const handleEditTableSchema = useCallback(async (tableName: string) => {
         try {
             const connectionString = await getConnectionString();
-            // Fetch existing schema
             const schema = await api.getTableSchema(connectionString, tableName);
 
-            // Convert ColumnSchema to ColumnDef format
             const columns = schema.map((col: ColumnSchema) => ({
                 name: col.name,
                 type: col.type_name.toUpperCase().replace(/\(.*\)/, ''), // Strip length from type
@@ -90,7 +101,6 @@ export const useSchemaOperations = ({
                 foreignKeys: []
             };
 
-            // Store both current and original state
             setTableCreatorStates(prev => ({ ...prev, [tabId]: initialState }));
             setOriginalSchemas(prev => ({ ...prev, [tabId]: JSON.parse(JSON.stringify(initialState)) }));
 
@@ -102,14 +112,11 @@ export const useSchemaOperations = ({
         }
     }, [connection.id, tabs, setTabs, setActiveTabId, setTableCreatorStates, setOriginalSchemas, getConnectionString]);
 
-    // Refresh schema for an existing edit tab after changes are confirmed
     const refreshEditTableSchema = useCallback(async (tabId: string, tableName: string) => {
         try {
             const connectionString = await getConnectionString();
-            // Re-fetch schema from database
             const schema = await api.getTableSchema(connectionString, tableName);
 
-            // Convert ColumnSchema to ColumnDef format
             const columns = schema.map((col: ColumnSchema) => ({
                 name: col.name,
                 type: col.type_name.toUpperCase().replace(/\(.*\)/, ''),
@@ -127,7 +134,6 @@ export const useSchemaOperations = ({
                 foreignKeys: []
             };
 
-            // Update both current and original state with fresh data from database
             setTableCreatorStates(prev => ({ ...prev, [tabId]: newState }));
             setOriginalSchemas(prev => ({ ...prev, [tabId]: JSON.parse(JSON.stringify(newState)) }));
         } catch (e) {

@@ -88,14 +88,6 @@ const categorizeColumns = (columns: ColumnSchema[], expanded: boolean) => {
     };
 };
 
-
-// ... 
-
-// Logic inside calculateNodesAndEdges needs update too
-// I'll handle that via separate chunks or confirm if I can do it here. 
-// The chunk above covers restoring the function and interface. 
-// I need another chunk for the logic inside calculateNodesAndEdges.
-
 const TableHandles = ({ columns }: { columns: ColumnSchema[] }) => {
     return (
         <>

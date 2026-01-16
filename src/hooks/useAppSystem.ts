@@ -1,3 +1,10 @@
+/**
+ * App System Hook
+ * 
+ * Manages application-wide settings: theme, zoom, sidebar state,
+ * preferences, and keyboard shortcuts. Persists settings to localStorage.
+ */
+
 import { useState, useEffect, useCallback } from 'react';
 import { Connection } from '../types/index';
 import { THEMES, applyTheme, getSavedTheme } from '../utils/themeUtils';
@@ -26,7 +33,6 @@ export const useAppSystem = (connection: Connection): UseAppSystemReturn => {
     const [showDbMenu, setShowDbMenu] = useState(false);
     const [isCapturing, setIsCapturing] = useState(false);
 
-    // Preference State - Load from localStorage
     const [theme, setTheme] = useState<string>(getSavedTheme);
     const [zoom, setZoom] = useState(() => {
         const saved = localStorage.getItem('app-zoom');
@@ -40,28 +46,22 @@ export const useAppSystem = (connection: Connection): UseAppSystemReturn => {
         return localStorage.getItem('app-default-export-path') || '';
     });
 
-    // Window Management
     useEffect(() => {
         const maximize = async () => {
             try {
-                // const win = getCurrentWindow();
-                // await win.maximize();
             } catch (e) { console.error(e) }
         };
         maximize();
     }, [connection]);
 
-    // Save and apply theme
     useEffect(() => {
         applyTheme(theme);
     }, [theme]);
 
-    // Save zoom
     useEffect(() => {
         localStorage.setItem('app-zoom', zoom.toString());
     }, [zoom]);
 
-    // Save preferences
     useEffect(() => {
         localStorage.setItem('app-enable-changelog', String(enableChangeLog));
     }, [enableChangeLog]);
@@ -70,7 +70,6 @@ export const useAppSystem = (connection: Connection): UseAppSystemReturn => {
         localStorage.setItem('app-default-export-path', defaultExportPath);
     }, [defaultExportPath]);
 
-    // Close dropdowns on outside click
     useEffect(() => {
         const handleClickOutside = (event: MouseEvent) => {
             const target = event.target as HTMLElement;
@@ -89,7 +88,6 @@ export const useAppSystem = (connection: Connection): UseAppSystemReturn => {
         setZoom(prev => Math.max(0.5, Math.min(2.0, prev + delta)));
     }, []);
 
-    // Keyboard Shortcuts for Zoom
     useEffect(() => {
         const handleKeyDown = (e: KeyboardEvent) => {
             if (e.ctrlKey) {

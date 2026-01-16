@@ -1,6 +1,10 @@
 pub mod connection;
 pub mod credential;
+pub mod crud;
 pub mod db_ops;
+pub mod filter;
 pub mod saved;
+pub mod sidebar;
 pub mod tag;
 pub mod window;
+pub mod session;

@@ -1,3 +1,10 @@
+/**
+ * Persistence Actions Hook
+ * 
+ * Handles saving, updating, and exporting queries, functions, and data.
+ * Supports CSV/JSON export formats with clipboard and file export options.
+ */
+
 import { useCallback } from 'react';
 import { QueryResult, SystemLog, Tab } from '../types/index';
 import { saveExportFile } from '../utils/screenshotHelper';
@@ -45,7 +52,7 @@ export const usePersistenceActions = ({
                 ));
             }
         } catch (e) {
-            // Error logged in hook
+            console.error('Error saving query:', e);
         }
     }, [activeTab, tabQueries, saveQuery, setTabs]);
 
@@ -67,7 +74,9 @@ export const usePersistenceActions = ({
                     t.id === activeTab.id ? { ...t, title: `ƒ ${name}`, savedFunctionId: savedId } : t
                 ));
             }
-        } catch (e) { }
+        } catch (e) {
+            console.error('Error saving function:', e);
+        }
     }, [activeTab, tabQueries, saveFunction, setTabs]);
 
     const handleUpdateFunction = useCallback(async () => {
@@ -135,9 +144,7 @@ export const usePersistenceActions = ({
     }, [activeTab, results, logs, selectedIndices, addToast, defaultExportPath]);
 
     const handleExportQueryToFile = useCallback(async () => {
-        if (!activeTab || activeTab.type !== 'query') return; // Enforce query type? Or maybe log/function too?
-        // Logic says "export schemas or sql queries"
-        // Let's assume text buffer is in tabQueries
+        if (!activeTab || activeTab.type !== 'query') return;
         const query = tabQueries[activeTab.id] || '';
         if (!query.trim()) return;
 

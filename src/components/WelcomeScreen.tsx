@@ -4,7 +4,7 @@ import { getCurrentWindow } from '@tauri-apps/api/window';
 import styles from '../styles/Welcome.module.css';
 import { Connection, DbType } from '../types/index';
 import { RiEdit2Line, RiDeleteBin7Line, RiAddLine, RiShieldKeyholeLine } from 'react-icons/ri';
-import { openConnectionWindow, openVaultWindow } from '../utils/windowManager';
+import { openConnectionWindow, openVaultWindow, openCredentialPromptWindow } from '../utils/windowManager';
 import { DiMysql } from 'react-icons/di';
 import { BiLogoPostgresql } from 'react-icons/bi';
 import { SiSqlite } from 'react-icons/si';
@@ -92,6 +92,13 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onConnect }) => {
 
     const handleConnect = async (conn: Connection) => {
         setError(null);
+
+        // Check if credential is required but missing (except for SQLite)
+        if (conn.db_type !== 'sqlite' && !conn.credential_id) {
+            openCredentialPromptWindow(conn.id, conn.name);
+            return;
+        }
+
         setIsConnecting(true);
         try {
             // Check connection first
@@ -173,12 +180,11 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onConnect }) => {
 
                 {/* Footer */}
                 <div className={styles.footer}>
-                    <div>Version 0.1.0</div>
+                    <div className={styles.version}>Version 0.1.0</div>
                     <div className={styles.footerRight}>
                         <div
                             className={styles.testConnection}
                             onClick={openVaultWindow}
-                            style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.5rem' }}
                         >
                             <RiShieldKeyholeLine size={16} /> Credential Vault
                         </div>

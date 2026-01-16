@@ -3,8 +3,7 @@ import { pictureDir, documentDir } from '@tauri-apps/api/path';
 import { writeFile, mkdir, exists, BaseDirectory } from '@tauri-apps/plugin-fs';
 
 /**
- * Capture schema diagram as a high-quality PNG using html-to-image
- * This library handles SVG edges better than html2canvas
+ * Capture schema diagram as a high-quality PNG using html-to-image.
  */
 export const captureSchemaScreenshot = async (
     containerRef: HTMLElement,
@@ -13,26 +12,20 @@ export const captureSchemaScreenshot = async (
     customPath?: string
 ) => {
     try {
-        // Define filter to exclude controls
         const filter = (node: HTMLElement) => {
-            // Ignore React Flow controls
             if (node.classList && node.classList.contains('react-flow__controls')) return false;
-            // Ignore the download button itself logic (managed by controls mostly but good to be safe)
             if (node.tagName === 'BUTTON' && node.getAttribute('title') === 'Save Image') return false;
             return true;
         };
 
-        // Capture using html-to-image
-        // pixelRatio: 2 ensures high quality
         const dataUrl = await toPng(containerRef, {
             quality: 1.0,
             pixelRatio: 2,
             filter: filter,
             backgroundColor: getComputedStyle(document.documentElement).getPropertyValue('--bg-primary') || '#1a1a2e',
-            skipFonts: true, // Prevent CORS errors from remote webfonts
+            skipFonts: true,
         });
 
-        // Convert Data URL to Uint8Array
         const base64Data = dataUrl.replace(/^data:image\/png;base64,/, "");
         const binaryString = atob(base64Data);
         const len = binaryString.length;
@@ -48,42 +41,32 @@ export const captureSchemaScreenshot = async (
         let fileName = `schema_${timestamp}.png`;
 
         if (customPath && customPath.trim() !== '') {
-            // Use custom path (Absolute)
-            // Ensure directory exists
             try {
                 await mkdir(customPath, { recursive: true });
             } catch (e) {
-                // Ignore if exists, or fail on write
                 console.log("Mkdir check:", e);
             }
 
-            // Handle separators
             const sep = customPath.includes('\\') ? '\\' : '/';
             const cleanPath = customPath.endsWith(sep) ? customPath : customPath + sep;
 
             filePath = `${cleanPath}${fileName}`;
             fileWritePath = filePath;
-            // No options = absolute path usually
         } else {
-            // Default: Pictures/SQL-UI
             const picturesPath = await pictureDir();
             const sqlUiDir = `${picturesPath}SQL-UI`;
 
-            // Ensure directory exists
             const dirExists = await exists('SQL-UI', { baseDir: BaseDirectory.Picture });
             if (!dirExists) {
                 await mkdir('SQL-UI', { baseDir: BaseDirectory.Picture, recursive: true });
             }
 
             filePath = `${sqlUiDir}\\${fileName}`;
-            // Relative path for BaseDirectory.Picture
             fileWritePath = `SQL-UI\\${fileName}`;
             options = { baseDir: BaseDirectory.Picture };
         }
 
-        // Write file
         await writeFile(fileWritePath, bytes, options);
-
         onSuccess(filePath);
     } catch (error) {
         console.error('Screenshot failed:', error);
@@ -92,7 +75,7 @@ export const captureSchemaScreenshot = async (
 };
 
 /**
- * Get the documents directory path for table exports
+ * Get the documents directory path for table exports.
  */
 export const getExportDirectory = async (): Promise<string> => {
     const documentsPath = await documentDir();
@@ -108,7 +91,7 @@ export const getExportDirectory = async (): Promise<string> => {
 };
 
 /**
- * Save export file (CSV/JSON) to Documents/SQL-UI or Custom Path
+ * Save export file (CSV/JSON) to Documents/SQL-UI or custom path.
  */
 export const saveExportFile = async (
     fileName: string,
@@ -123,7 +106,6 @@ export const saveExportFile = async (
         let options = undefined;
 
         if (customPath && customPath.trim() !== '') {
-            // Use custom path
             try {
                 await mkdir(customPath, { recursive: true });
             } catch (e) {

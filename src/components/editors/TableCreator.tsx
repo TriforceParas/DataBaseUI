@@ -68,12 +68,8 @@ export const TableCreator: React.FC<TableCreatorProps> = ({ connection, onSucces
     // Track original columns reference to detect when parent updates it (after schema confirmation)
     const prevOriginalColumnsRef = useRef(originalColumns);
 
-    // Reset deletedColumns and sync state when originalColumns changes (after schema changes are confirmed)
     useEffect(() => {
         if (mode === 'edit' && originalColumns && prevOriginalColumnsRef.current !== originalColumns) {
-            // originalColumns changed - schema was likely confirmed
-
-            // If we have columns marked for deletion, remove them from the local state now
             if (deletedColumns.size > 0) {
                 setColumns(prev => prev.filter(c => !deletedColumns.has(c.name)));
             }
@@ -81,13 +77,11 @@ export const TableCreator: React.FC<TableCreatorProps> = ({ connection, onSucces
             setDeletedColumns(new Set());
             prevOriginalColumnsRef.current = originalColumns;
         } else if (mode === 'edit' && originalColumns && !prevOriginalColumnsRef.current) {
-            // Initial load of originalColumns - just sync ref
             prevOriginalColumnsRef.current = originalColumns;
         }
     }, [originalColumns, mode, deletedColumns]);
 
     useEffect(() => {
-        // Skip first render if we have initial state (to avoid unnecessary update)
         if (isFirstRender.current) {
             isFirstRender.current = false;
             return;
@@ -103,11 +97,9 @@ export const TableCreator: React.FC<TableCreatorProps> = ({ connection, onSucces
 
     const removeColumn = (idx: number) => {
         const col = columns[idx];
-        // In edit mode, if this is an original column, mark it for deletion instead of removing
         if (mode === 'edit' && originalColumns?.find(oc => oc.name === col.name)) {
             setDeletedColumns(prev => new Set([...prev, col.name]));
         } else {
-            // New column - just remove it
             const newCols = [...columns];
             newCols.splice(idx, 1);
             setColumns(newCols);
@@ -145,8 +137,11 @@ export const TableCreator: React.FC<TableCreatorProps> = ({ connection, onSucces
     };
 
     const getConnectionString = useCallback(async (): Promise<string> => {
-        return await invoke<string>('get_connection_string', { connectionId: connection.id });
-    }, [connection.id]);
+        return await invoke<string>('get_connection_string', { 
+            connectionId: connection.id,
+            databaseName: connection.database_name 
+        });
+    }, [connection.id, connection.database_name]);
 
     useEffect(() => {
         const fetchTables = async () => {
@@ -159,7 +154,7 @@ export const TableCreator: React.FC<TableCreatorProps> = ({ connection, onSucces
             }
         };
         fetchTables();
-    }, [connection.id, getConnectionString]);
+    }, [connection.id, connection.database_name, getConnectionString]);
 
     const fetchColumnsForTable = async (tableName: string) => {
         if (refTableColumns[tableName]) return;

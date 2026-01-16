@@ -5,11 +5,17 @@ import { Connection } from '../types';
  * Get the connection string for a connection by ID.
  * This fetches credentials from the keyring and builds the full connection string.
  */
-export async function getConnectionString(connectionId: number): Promise<string> {
-    // The backend builds the connection string using stored metadata + keyring credentials
-    // This is handled by the verify_connection_by_id command internally
-    // For now, we build a simplified version for display/use
-    return await invoke<string>('get_connection_string', { connectionId });
+export async function getConnectionString(connectionId: number, databaseName?: string): Promise<string> {
+    const params = new URLSearchParams(window.location.search);
+    const u = params.get('u');
+    const p = params.get('p');
+
+    return await invoke<string>('get_connection_string', {
+        connectionId,
+        databaseName,
+        username: u,
+        password: p
+    });
 }
 
 /**

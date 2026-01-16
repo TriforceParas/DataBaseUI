@@ -5,22 +5,23 @@ import { Connection, ColumnSchema, SavedFunction } from '../types/index';
 import { MainLayout } from './layout/MainLayout';
 import { TableCreatorState } from './editors';
 import { openConnectionWindow } from '../utils/windowManager';
-import { useSystemLogs, useSavedItems, useTableOperations, useTableData, useResultsPane, useTabs, useTableActions, usePersistenceActions, useDatabaseRegistry, useChangeManager, useAppSystem, useSchemaOperations, useDataMutation, ChangeError } from '../hooks';
+import { useSystemLogs, useSavedItems, useTableOperations, useTableData, useResultsPane, useTabs, useTableActions, usePersistenceActions, useDatabaseRegistry, useChangeManager, useAppSystem, useSchemaOperations, useDataMutation, ChangeError, useSession } from '../hooks';
 import { useToast } from './common/Toast';
 import { ErrorSummaryModal } from './modals/ErrorSummaryModal';
+
 interface MainInterfaceProps {
     connection: Connection;
     onSwitchConnection: (conn: Connection) => void;
 }
 
 export const MainInterface: React.FC<MainInterfaceProps> = ({ connection: initialConnection, onSwitchConnection }) => {
-    // --- Connection State Management (Database Switching) ---
-    // We maintain a local connection object that can change its connection string when switching databases
     const [connection, setConnection] = useState<Connection>(initialConnection);
 
     useEffect(() => {
         setConnection(initialConnection);
     }, [initialConnection]);
+
+    const { sessionId } = useSession(connection);
 
     const handleSwitchDatabase = (dbName: string) => {
         // Update connection with new database_name
@@ -28,7 +29,6 @@ export const MainInterface: React.FC<MainInterfaceProps> = ({ connection: initia
     };
 
 
-    // --- System UI (Theme, Zoom, Sidebar, Dropdowns) ---
     const {
         sidebarOpen, setSidebarOpen,
         theme, setTheme,
@@ -47,14 +47,11 @@ export const MainInterface: React.FC<MainInterfaceProps> = ({ connection: initia
 
     const { toasts, addToast, dismissToast } = useToast();
 
-    // --- Orchestration: Registry (Pure Data) ---
     const registry = useDatabaseRegistry(connection);
     const { tables, savedConnections, tags, tableTags, fetchTables, fetchConnections } = registry;
 
-    // --- Hooks ---
     const { logs, addLog } = useSystemLogs();
 
-    // Tabs & Navigation (Extracted to useTabs)
     const {
         tabs,
         setTabs,
@@ -70,7 +67,6 @@ export const MainInterface: React.FC<MainInterfaceProps> = ({ connection: initia
         handleOpenSavedQuery
     } = useTabs();
 
-    // Get current database name from connection
     const currentDbName = connection.database_name || connection.name;
 
     const {
@@ -82,10 +78,11 @@ export const MainInterface: React.FC<MainInterfaceProps> = ({ connection: initia
         setSortState,
         handleSort,
         fetchTableData,
-        handleRunQuery: runQuery
-    } = useTableData({ connection, addLog, tableSchemas, setTableSchemas });
+        handleRunQuery: runQuery,
+        filtersMap,
+        updateFilters
+    } = useTableData({ connection, sessionId, addLog, tableSchemas, setTableSchemas });
 
-    // Results Pane UI State (Extracted to useResultsPane)
     const {
         resultsHeight,
         isResizing,
@@ -94,7 +91,6 @@ export const MainInterface: React.FC<MainInterfaceProps> = ({ connection: initia
         startResizing
     } = useResultsPane();
 
-    // Legacy mapping for existing code compatibility if any
     const [selectedIndicesMap, setSelectedIndicesMap] = useState<Record<string, Set<number>>>({});
     const selectedIndices = selectedIndicesMap[activeTabId] || new Set();
 
@@ -122,14 +118,12 @@ export const MainInterface: React.FC<MainInterfaceProps> = ({ connection: initia
     // Dropdown state for Table View
     const [activeDropdown, setActiveDropdown] = useState<'copy' | 'export' | 'pageSize' | null>(null);
 
-    // Saved Items
     const {
         savedQueries, savedFunctions, fetchSavedItems,
         saveQuery, saveFunction, deleteQuery, deleteFunction, updateQuery, updateFunction
     } = useSavedItems(connection);
     const [saveModal, setSaveModal] = useState<{ type: 'query' | 'function' } | null>(null);
 
-    // Table Operations
     const {
         tableConfirmModal, setTableConfirmModal,
         duplicateTableModal, setDuplicateTableModal,
@@ -144,35 +138,26 @@ export const MainInterface: React.FC<MainInterfaceProps> = ({ connection: initia
         addLog
     });
 
-    // --- Orchestration: Change Manager (Action Engine) ---
-    // TableCreator state persistence per tab - moved here to be available for onSuccess
     const [tableCreatorStates, setTableCreatorStates] = useState<Record<string, TableCreatorState>>({});
     const [originalSchemas, setOriginalSchemas] = useState<Record<string, TableCreatorState>>({});
 
-    // Use ref to access current tableCreatorStates in callback without dependency issues
     const tableCreatorStatesRef = React.useRef(tableCreatorStates);
     React.useEffect(() => {
         tableCreatorStatesRef.current = tableCreatorStates;
     }, [tableCreatorStates]);
 
-    // State for error modal
     const [changeErrors, setChangeErrors] = useState<ChangeError[]>([]);
     const [showErrorModal, setShowErrorModal] = useState(false);
 
-    // Ref for refresh function to avoid circular dependency
     const refreshEditTableSchemaRef = React.useRef<((tabId: string, tableName: string) => Promise<void>) | null>(null);
 
-    // Enhanced onSuccess: Refresh edit tabs from database to clear highlights and sync state
     const handleChangeManagerSuccess = React.useCallback(() => {
         fetchTables();
 
-        // Refresh all edit tabs from database to get current schema state
-        // This properly removes deleted columns and syncs everything
         const tabsRef = tabs;
         Object.keys(tableCreatorStatesRef.current).forEach(tabId => {
             const state = tableCreatorStatesRef.current[tabId];
             if (state && refreshEditTableSchemaRef.current) {
-                // Check if this is an edit tab (has a table name)
                 const tab = tabsRef.find(t => t.id === tabId);
                 if (tab && tab.title.startsWith('Edit:')) {
                     refreshEditTableSchemaRef.current(tabId, state.tableName);
@@ -189,7 +174,8 @@ export const MainInterface: React.FC<MainInterfaceProps> = ({ connection: initia
 
     const changeManager = useChangeManager(connection, {
         onSuccess: handleChangeManagerSuccess,
-        onErrors: handleChangeErrors
+        onErrors: handleChangeErrors,
+        sessionId
     });
     const {
         pendingChanges, setPendingChanges,
@@ -268,9 +254,11 @@ export const MainInterface: React.FC<MainInterfaceProps> = ({ connection: initia
         selectedIndices,
         setSelectedIndices,
         connection,
+        sessionId,
         enableChangeLog,
         addLog,
-        fetchTableData
+        fetchTableData,
+        tableSchemas
     });
 
     const {
@@ -314,11 +302,8 @@ export const MainInterface: React.FC<MainInterfaceProps> = ({ connection: initia
         setResults(prev => ({ ...prev, [tabId]: { data: null, loading: true, error: null } }));
 
         try {
-            const invoke = (await import('@tauri-apps/api/core')).invoke;
-            const connectionString = await invoke<string>('get_connection_string', {
-                connectionId: connection.id,
-                databaseName: connection.database_name
-            });
+            const { getConnectionString } = await import('../utils/connectionHelper');
+            const connectionString = await getConnectionString(connection.id, connection.database_name);
             const res = await api.executeQuery(connectionString, func.function_body);
             const lastRes = res.length > 0 ? res[res.length - 1] : null;
             setResults(prev => ({ ...prev, [tabId]: { data: lastRes, allData: res, loading: false, error: null } }));
@@ -444,6 +429,7 @@ export const MainInterface: React.FC<MainInterfaceProps> = ({ connection: initia
 
     const { handleGetTableSchema, handleEditTableSchema, refreshEditTableSchema } = useSchemaOperations({
         connection,
+        sessionId,
         tabs,
         setTabs,
         setActiveTabId,
@@ -583,7 +569,10 @@ export const MainInterface: React.FC<MainInterfaceProps> = ({ connection: initia
         } else {
             // Fetch all table schemas first
             const invoke = (await import('@tauri-apps/api/core')).invoke;
-            const connectionString = await invoke<string>('get_connection_string', { connectionId: connection.id });
+            const connectionString = await invoke<string>('get_connection_string', {
+                connectionId: connection.id,
+                databaseName: connection.database_name
+            });
             Promise.all(tables.map(async (tableName) => {
                 if (!tableSchemas[tableName]) {
                     try {
@@ -711,6 +700,8 @@ export const MainInterface: React.FC<MainInterfaceProps> = ({ connection: initia
                 handleSort={handleSort}
                 setIsCapturing={setIsCapturing}
                 addToast={addToast}
+                filtersMap={filtersMap}
+                updateFilters={updateFilters}
 
                 // Changelog Actions
                 handleConfirmChanges={handleConfirmChanges}
@@ -748,6 +739,7 @@ export const MainInterface: React.FC<MainInterfaceProps> = ({ connection: initia
                 isCapturing={isCapturing}
                 toasts={toasts}
                 onDismissToast={dismissToast}
+                sessionId={sessionId}
             />
 
             {/* Error Summary Modal */}

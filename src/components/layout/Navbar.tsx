@@ -3,7 +3,10 @@ import styles from '../../styles/MainLayout.module.css';
 import { Icons } from '../../assets/icons';
 import { WindowControls } from './WindowControls';
 import { Portal } from '../common/Portal';
-import { Connection } from '../../types';
+import { Connection, DbType } from '../../types';
+import { DiMysql } from 'react-icons/di';
+import { BiLogoPostgresql } from 'react-icons/bi';
+import { SiSqlite } from 'react-icons/si';
 
 interface NavbarProps {
     sidebarOpen: boolean;
@@ -67,7 +70,6 @@ export const Navbar: React.FC<NavbarProps> = ({
         return () => document.removeEventListener('mousedown', handleClickOutside);
     }, [showConnectionMenu]);
 
-    // DB Dropdown Logic
     const dbButtonRef = useRef<HTMLDivElement>(null);
     const [dbDropdownPos, setDbDropdownPos] = useState({ top: 0, left: 0 });
 
@@ -96,6 +98,15 @@ export const Navbar: React.FC<NavbarProps> = ({
         } else {
             setIsSearchActive(false);
             onSearchChange('');
+        }
+    };
+
+    const getDbIcon = (dbType: DbType, size: number = 14) => {
+        switch (dbType) {
+            case 'mysql': return <DiMysql size={size} color="#00758F" />;
+            case 'postgres': return <BiLogoPostgresql size={size} color="#336791" />;
+            case 'sqlite': return <SiSqlite size={Math.round(size * 0.85)} color="#003B57" />;
+            default: return <DiMysql size={size} color="#00758F" />;
         }
     };
 
@@ -196,7 +207,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                                         borderRadius: '4px',
                                         flexShrink: 0
                                     }}>
-                                        <Icons.Database size={14} />
+                                        {getDbIcon(connection.db_type, 18)}
                                     </div>
                                     <Icons.ChevronDown size={12} style={{ opacity: 0.7 }} />
                                 </button>
@@ -256,7 +267,10 @@ export const Navbar: React.FC<NavbarProps> = ({
                                                         }
                                                     }}
                                                 >
-                                                    <span>{conn.name}</span>
+                                                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                                        {getDbIcon(conn.db_type, 16)}
+                                                        <span>{conn.name}</span>
+                                                    </div>
                                                     {conn.id === connection.id && <Icons.Check size={14} />}
                                                 </div>
                                             ))
@@ -342,21 +356,36 @@ export const Navbar: React.FC<NavbarProps> = ({
                 }}
                 data-tauri-drag-region
             >
-                <span
+                <div
+                    data-tauri-drag-region
                     style={{
-                        fontSize: '0.9rem',
-                        fontWeight: 400,
-                        color: 'var(--text-secondary)',
-                        opacity: 0.7,
-                        userSelect: 'none',
-                        pointerEvents: 'none',
-                        whiteSpace: 'nowrap',
-                        overflow: 'hidden',
-                        textOverflow: 'ellipsis'
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '8px',
+                        minWidth: 0,
+                        overflow: 'hidden'
                     }}
                 >
-                    {connection.name}
-                </span>
+                    <div style={{ pointerEvents: 'none', display: 'flex' }}>
+                        {getDbIcon(connection.db_type, 16)}
+                    </div>
+                    <span
+                        data-tauri-drag-region
+                        style={{
+                            fontSize: '0.9rem',
+                            fontWeight: 400,
+                            color: 'var(--text-secondary)',
+                            opacity: 0.7,
+                            userSelect: 'none',
+                            pointerEvents: 'none',
+                            whiteSpace: 'nowrap',
+                            overflow: 'hidden',
+                            textOverflow: 'ellipsis'
+                        }}
+                    >
+                        {connection.name}
+                    </span>
+                </div>
             </div>
 
             {/* RIGHT SECTION - Changes, Logs, Schema, Edit, Window Controls */}

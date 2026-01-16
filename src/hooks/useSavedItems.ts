@@ -1,3 +1,9 @@
+/**
+ * Saved Items Hook
+ * 
+ * Manages saved queries and functions per connection/database.
+ * Provides CRUD operations with backend persistence.
+ */
 
 import { useState, useEffect, useCallback } from 'react';
 import { Connection, SavedQuery, SavedFunction } from '../types/index';

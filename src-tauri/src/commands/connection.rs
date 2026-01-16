@@ -23,34 +23,13 @@ pub async fn verify_connection(
         .await
         .map_err(|e| format!("Credential not found: {}", e))?;
         
-        // Get password from keyring
         let password = get_password_from_keyring(&cred.id)?;
-        
-        // Inject into connection string
-        // We assume the frontend passed "protocol://" or "protocol://host:port"
-        // We need to inject "username:password@" before the host
-        // This is tricky with simple string manipulation if the string is already formed.
-        // It's safer if frontend sends components, OR we assume the frontend sends a template.
-        
-        // BETTER APPROACH: Frontend sends partial string, we rebuild it.
-        // But for "verify_connection", the frontend was building the string.
-        // Let's parse the URL to inject credentials.
-        
-        // Simple string injection (assuming standard format protocol://host:port...)
-        // Warning: This is fragile. 
-        // A better way is to rely on the frontend sending a URL that ALREADY has the username (which it does),
-        // and we just need to inject the password.
         
         if let Some(protocol_end) = final_conn_string.find("://") {
              let split_idx = protocol_end + 3;
              let (protocol_part, rest) = final_conn_string.split_at(split_idx);
              
-             // Check if username is already in 'rest' (username@host)
              if rest.contains('@') {
-                 // Insert password after username
-                 // rest is "username@host:port"
-                 // we want "username:password@host:port"
-                 // Find the '@'
                  if let Some(at_idx) = rest.find('@') {
                      let (user_part, host_part) = rest.split_at(at_idx);
                      // host_part starts with '@'
@@ -77,6 +56,39 @@ pub async fn verify_connection_by_id(
 ) -> Result<(), String> {
     let connection_string = get_connection_string_internal(&state, connection_id, None).await?;
     verify_connection(state, connection_string, None).await
+}
+
+/// Verify connection using stored metadata but manual credentials
+#[tauri::command]
+pub async fn verify_connection_manual(
+    state: State<'_, AppState>,
+    connection_id: i64,
+    username: String,
+    password: String,
+) -> Result<(), String> {
+    // Fetch connection metadata
+    let conn: Connection = sqlx::query_as::<_, Connection>(
+        "SELECT id, name, db_type, host, port, database_name, credential_id, ssl_mode, datetime(created_at) as created_at FROM connections WHERE id = ?"
+    )
+    .bind(connection_id)
+    .fetch_one(&state.db)
+    .await
+    .map_err(|e| format!("Connection not found: {}", e))?;
+
+    let connection_string = build_connection_string(
+        &conn.db_type,
+        &conn.host,
+        conn.port,
+        conn.database_name.as_deref(),
+        Some(&username),
+        Some(&password),
+        conn.ssl_mode.as_deref(),
+    );
+
+    <AnyConnection as SqlxConnection>::connect(&connection_string)
+        .await
+        .map_err(|e| format!("Failed to connect: {}", e))
+        .map(|_| ())
 }
 
 /// Build connection string from connection ID by fetching metadata and credentials
@@ -125,7 +137,29 @@ pub async fn get_connection_string(
     state: State<'_, AppState>,
     connection_id: i64,
     database_name: Option<String>,
+    username: Option<String>,
+    password: Option<String>,
 ) -> Result<String, String> {
+    if let (Some(u), Some(p)) = (username, password) {
+        // Build with manual creds
+        let conn: Connection = sqlx::query_as::<_, Connection>(
+            "SELECT id, name, db_type, host, port, database_name, credential_id, ssl_mode, datetime(created_at) as created_at FROM connections WHERE id = ?"
+        )
+        .bind(connection_id)
+        .fetch_one(&state.db)
+        .await
+        .map_err(|e| format!("Connection not found: {}", e))?;
+
+        return Ok(build_connection_string(
+            &conn.db_type,
+            &conn.host,
+            conn.port,
+            database_name.or(conn.database_name).as_deref(),
+            Some(&u),
+            Some(&p),
+            conn.ssl_mode.as_deref(),
+        ));
+    }
     get_connection_string_internal(&state, connection_id, database_name).await
 }
 

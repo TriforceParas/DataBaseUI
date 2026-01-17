@@ -48,6 +48,7 @@ pub async fn open_loading_window<R: tauri::Runtime>(
         .title("Processing")
         .inner_size(400.0, 250.0)
         .decorations(false)
+        .transparent(true)
         .always_on_top(true)
         .skip_taskbar(true)
         .center()

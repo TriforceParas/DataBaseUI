@@ -360,58 +360,37 @@ pub async fn get_columns(
     connection_string: String,
     table_name: String,
 ) -> Result<Vec<String>, String> {
-    let pool = crate::db::get_connection(&state, &connection_string).await.map_err(|e| e.to_string())?;
+    let db_type = detect_db_type(&connection_string)?;
+    let mut conn = connect_to_db(&connection_string).await?;
 
-    match pool {
-        PoolWrapper::Mysql(p) => {
-             let query = format!("SHOW COLUMNS FROM {}", escape_identifier(&table_name, "mysql"));
-             let rows = sqlx::query(&query).fetch_all(&p).await.map_err(|e| format!("Failed to fetch columns: {}", e))?;
-             let columns: Vec<String> = rows.iter().map(|row| row.try_get(0).unwrap_or_default()).collect();
-             Ok(columns)
-        },
-        PoolWrapper::Postgres(p) => {
-             // Added ::TEXT cast to fix PostgreSQL type issue
-             let query = format!("SELECT column_name::TEXT FROM information_schema.columns WHERE table_name = '{}' AND table_schema = 'public'", table_name.replace('\'', "''"));
-             let rows = sqlx::query(&query).fetch_all(&p).await.map_err(|e| format!("Failed to fetch columns: {}", e))?;
-             let columns: Vec<String> = rows.iter().map(|row| row.try_get(0).unwrap_or_default()).collect();
-             Ok(columns)
-        },
-        PoolWrapper::Sqlite(p) => {
-             let query = format!("PRAGMA table_info({})", escape_identifier(&table_name, "sqlite"));
-             let rows = sqlx::query(&query).fetch_all(&p).await.map_err(|e| format!("Failed to fetch columns: {}", e))?;
-             // PRAGMA table_info returns: cid, name, type, notnull, dflt_value, pk at indices 0,1,2,3,4,5
-             // name is index 1
-             let columns: Vec<String> = rows.iter().map(|row| row.try_get(1).unwrap_or_default()).collect();
-             Ok(columns)
-        }
-    }
+    let (query, col_idx) = match db_type {
+        "postgres" => (format!("SELECT column_name::TEXT FROM information_schema.columns WHERE table_name = '{}' AND table_schema = 'public'", table_name.replace('\'', "''")), 0),
+        "mysql" => (format!("SHOW COLUMNS FROM {}", escape_identifier(&table_name, db_type)), 0),
+        "sqlite" => (format!("PRAGMA table_info({})", escape_identifier(&table_name, db_type)), 1),
+        _ => return Ok(vec![]),
+    };
+
+    let rows = sqlx::query(&query)
+        .fetch_all(&mut conn)
+        .await
+        .map_err(|e| format!("Failed to fetch columns: {}", e))?;
+
+    let columns: Vec<String> = rows
+        .iter()
+        .map(|row| row.try_get(col_idx).unwrap_or_default())
+        .collect();
+
+    Ok(columns)
 }
 
 #[tauri::command]
-pub async fn get_tables(
-    state: State<'_, AppState>,
-    connection_string: String
-) -> Result<Vec<String>, String> {
-    let pool = crate::db::get_connection(&state, &connection_string).await.map_err(|e| e.to_string())?;
+pub async fn get_tables(connection_string: String) -> Result<Vec<String>, String> {
+    let db_type = detect_db_type(&connection_string)?;
+    let mut conn = connect_to_db(&connection_string).await?;
 
-    match pool {
-        PoolWrapper::Mysql(p) => {
-             let rows = sqlx::query("SHOW TABLES").fetch_all(&p).await.map_err(|e| format!("Failed to fetch tables: {}", e))?;
-             let tables: Vec<String> = rows.iter().map(|row| row.try_get(0).unwrap_or_default()).collect();
-             Ok(tables)
-        },
-        PoolWrapper::Postgres(p) => {
-             // Added ::TEXT cast to fix PostgreSQL type issue
-             let rows = sqlx::query("SELECT table_name::TEXT FROM information_schema.tables WHERE table_schema = 'public'")
-                 .fetch_all(&p).await.map_err(|e| format!("Failed to fetch tables: {}", e))?;
-             let tables: Vec<String> = rows.iter().map(|row| row.try_get(0).unwrap_or_default()).collect();
-             Ok(tables)
-        },
-        PoolWrapper::Sqlite(p) => {
-             let rows = sqlx::query("SELECT name FROM sqlite_master WHERE type='table'")
-                 .fetch_all(&p).await.map_err(|e| format!("Failed to fetch tables: {}", e))?;
-             let tables: Vec<String> = rows.iter().map(|row| row.try_get(0).unwrap_or_default()).collect();
-             Ok(tables)
+    let query = match db_type {
+        "postgres" => {
+            "SELECT table_name::TEXT FROM information_schema.tables WHERE table_schema = 'public'"
         }
     }
 }
@@ -687,32 +666,28 @@ pub async fn duplicate_table(
 }
 
 #[tauri::command]
-pub async fn get_databases(
-    state: State<'_, AppState>,
-    connection_string: String
-) -> Result<Vec<String>, String> {
-    let pool = crate::db::get_connection(&state, &connection_string).await.map_err(|e| e.to_string())?;
+pub async fn get_databases(connection_string: String) -> Result<Vec<String>, String> {
+    let db_type = detect_db_type(&connection_string)?;
+    let mut conn = connect_to_db(&connection_string).await?;
 
-    match pool {
-        PoolWrapper::Mysql(p) => {
-             let rows = sqlx::query("SHOW DATABASES").fetch_all(&p).await.map_err(|e| format!("Failed to fetch databases: {}", e))?;
-             let dbs: Vec<String> = rows.iter().map(|row| row.try_get(0).unwrap_or_default()).collect();
-             Ok(dbs)
-        },
-        PoolWrapper::Postgres(p) => {
-             // Added ::TEXT cast to fix PostgreSQL type issue
-             let rows = sqlx::query("SELECT datname::TEXT FROM pg_database WHERE datistemplate = false AND datallowconn = true")
-                 .fetch_all(&p).await.map_err(|e| format!("Failed to fetch databases: {}", e))?;
-             let dbs: Vec<String> = rows.iter().map(|row| row.try_get(0).unwrap_or_default()).collect();
-             Ok(dbs)
-        },
-        PoolWrapper::Sqlite(p) => {
-             let rows = sqlx::query("SELECT file FROM pragma_database_list WHERE name='main'")
-                 .fetch_all(&p).await.map_err(|e| format!("Failed to fetch databases: {}", e))?;
-             let dbs: Vec<String> = rows.iter().map(|row| row.try_get(0).unwrap_or_default()).collect();
-             Ok(dbs)
-        }
-    }
+    let query = match db_type {
+        "postgres" => "SELECT datname::TEXT FROM pg_database WHERE datistemplate = false AND datallowconn = true",
+        "mysql" => "SHOW DATABASES",
+        "sqlite" => "SELECT file FROM pragma_database_list WHERE name='main'", 
+        _ => return Ok(vec![]), 
+    };
+
+    let rows = sqlx::query(query)
+        .fetch_all(&mut conn)
+        .await
+        .map_err(|e| format!("Failed to fetch databases: {}", e))?;
+
+    let dbs: Vec<String> = rows
+        .iter()
+        .map(|row| row.try_get(0).unwrap_or_default())
+        .collect();
+
+    Ok(dbs)
 }
 
 fn generate_create_table_sql(table_name: &str, columns: &[ColumnSchema], foreign_keys: &[ForeignKeyInput], db_type: &str) -> String {
